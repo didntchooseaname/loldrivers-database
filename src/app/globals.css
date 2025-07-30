@@ -1276,9 +1276,15 @@ select.form-control {
 }
 
 .filter-btn.clear {
+  padding: var(--space-6) var(--space-12);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
   background: var(--color-bg-2);
   border-color: var(--color-orange-400);
   color: var(--color-orange-500);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
 }
 
 .filter-btn.clear:hover {
@@ -1288,13 +1294,18 @@ select.form-control {
 }
 
 .apply-filters-btn {
+  padding: var(--space-6) var(--space-12);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-6);
   white-space: nowrap;
-  font-size: var(--font-size-sm);
-  padding: var(--space-10) var(--space-16);
   margin-left: var(--space-12);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+  user-select: none;
 }
 
 .apply-filters-btn:disabled {

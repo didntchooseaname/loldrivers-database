@@ -698,7 +698,7 @@ export default function DriversClient({
               className="filter-btn clear"
               onClick={clearAllFilters}
             >
-              Clear Filters
+              <i className="fas fa-times"></i> Clear Filters
             </button>
           </div>
         </div>
