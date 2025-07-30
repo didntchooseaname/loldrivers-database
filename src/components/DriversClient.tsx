@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
-import { debounce } from '@/utils';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());

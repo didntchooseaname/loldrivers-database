@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Terms of Service - LOLDrivers Database',
@@ -9,9 +10,9 @@ export default function TermsPage() {
   return (
     <div className="container">
       <div className="terms-container">
-        <a href="/" className="back-button-top">
+        <Link href="/" className="back-button-top">
           <i className="fas fa-arrow-left"></i>
-        </a>
+        </Link>
         
         <header className="terms-header">
           <h1>Terms of Service</h1>
@@ -27,10 +28,10 @@ export default function TermsPage() {
           <section className="terms-section">
             <h2>1. Introduction and Acceptance</h2>
             <p>
-              Welcome to the LOLDrivers Database interface ("Service"). This Service provides 
+              Welcome to the LOLDrivers Database interface (&quot;Service&quot;). This Service provides 
               an independent web interface to access and search the LOLDrivers database, which 
               catalogs vulnerable and malicious Windows drivers. By accessing or using this Service, 
-              you agree to be bound by these Terms of Service ("Terms").
+              you agree to be bound by these Terms of Service (&quot;Terms&quot;).
             </p>
             <p>
               This Service is provided for educational and research purposes only. If you do not 
@@ -84,7 +85,7 @@ export default function TermsPage() {
           <section className="terms-section">
             <h2>5. Disclaimer of Warranties</h2>
             <p>
-              This Service is provided "AS IS" and "AS AVAILABLE" without any warranties of any kind, 
+              This Service is provided &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; without any warranties of any kind, 
               either express or implied. We do not warrant that:
             </p>
             <ul>
