@@ -1658,11 +1658,6 @@ select.form-control {
     padding: var(--space-6) var(--space-10);
   }
 
-  .resource-btn {
-    padding: var(--space-3);
-    margin-left: var(--space-3);
-  }
-
   .simple-section-content,
   .hash-section-content {
     font-size: var(--font-size-md);
@@ -1705,11 +1700,6 @@ select.form-control {
     font-size: var(--font-size-xl);
     padding: var(--space-8) var(--space-12);
     border-radius: var(--radius-md);
-  }
-
-  .resource-btn {
-    padding: var(--space-4);
-    margin-left: var(--space-4);
   }
 
   .simple-section-content,
@@ -1764,11 +1754,6 @@ select.form-control {
   .download-btn {
     font-size: var(--font-size-2xl);
     padding: var(--space-10) var(--space-16);
-  }
-
-  .resource-btn {
-    padding: var(--space-6);
-    margin-left: var(--space-6);
   }
 }
 
@@ -1827,14 +1812,6 @@ select.form-control {
     display: flex;
     align-items: center;
     gap: var(--space-6);
-  }
-
-  /* Resource button mobile */
-  .resource-btn {
-    min-height: var(--mobile-touch-target);
-    padding: var(--space-6);
-    margin-left: var(--space-2);
-    border-radius: var(--radius-base);
   }
 
   /* Section content mobile stacking */
@@ -2066,47 +2043,6 @@ select.form-control {
 
 .download-btn i {
   font-size: var(--font-size-lg);
-  color: inherit;
-}
-
-/* Resource button styles */
-.resource-btn {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: auto;
-  flex-shrink: 0;
-  margin-left: var(--space-4);
-  position: relative;
-}
-
-.resource-btn:hover {
-  color: var(--color-primary);
-  background: var(--color-secondary);
-  transform: translateY(-1px);
-}
-
-.resource-btn:active {
-  transform: translateY(0);
-}
-
-.resource-btn img {
-  transition: all var(--duration-fast) var(--ease-standard);
-}
-
-.resource-btn:hover img {
-  opacity: 0.8;
-}
-
-.resource-btn i {
-  font-size: var(--font-size-sm);
   color: inherit;
 }
 
@@ -3348,6 +3284,73 @@ select.form-control {
   box-shadow: 0 4px 12px rgba(var(--color-error-rgb), 0.25);
 }
 
+/* Resources section styles */
+.resources-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* Resource links using hash style */
+.clickable-hash.resource-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  background-color: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-4);
+}
+
+.clickable-hash.resource-link::before {
+  background: linear-gradient(180deg, var(--color-teal-500), var(--color-teal-600));
+}
+
+.clickable-hash.resource-link:hover {
+  background-color: var(--color-bg-2);
+  border-color: var(--color-teal-500);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(var(--color-teal-500-rgb), 0.15);
+}
+
+.clickable-hash.resource-link .hash-type {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-teal-600);
+  font-weight: var(--font-weight-bold);
+  text-transform: none;
+  font-size: var(--font-size-sm);
+}
+
+.clickable-hash.resource-link .hash-type img {
+  flex-shrink: 0;
+  border-radius: var(--radius-xs);
+}
+
+.clickable-hash.resource-link .hash-type i {
+  flex-shrink: 0;
+  color: var(--color-teal-600);
+  font-size: var(--font-size-sm);
+}
+
+.clickable-hash.resource-link .hash-value {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  word-break: break-all;
+  line-height: var(--line-height-tight);
+  flex: 1;
+}
+
+.clickable-hash.resource-link:hover .hash-value {
+  color: var(--color-text);
+}
+
+.clickable-hash.resource-link:hover .hash-type,
+.clickable-hash.resource-link:hover .hash-type i {
+  color: var(--color-teal-500);
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .container {
@@ -3391,6 +3394,16 @@ select.form-control {
   .stats-section {
     grid-template-columns: 1fr;
     gap: var(--space-16);
+  }
+
+  /* Resources mobile styles */
+  .clickable-hash.resource-link {
+    padding: var(--space-4) var(--space-6);
+    gap: var(--space-4);
+  }
+
+  .clickable-hash.resource-link .hash-value {
+    font-size: var(--font-size-xs);
   }
 
   .stat-item {

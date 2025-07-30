@@ -321,56 +321,6 @@ export default function DriversClient({
     );
   };
 
-  // Rendre les boutons de ressources
-  const renderResourceButtons = (resources: string[] | undefined) => {
-    if (!resources || resources.length === 0) return null;
-
-    return (
-      <>
-        {resources.map((resource, index) => {
-          if (!resource || !resource.trim()) return null;
-          
-          // Extract domain for favicon
-          let domain = '';
-          try {
-            const url = new URL(resource);
-            domain = url.hostname;
-          } catch (e) {
-            // If URL parsing fails, skip this resource
-            return null;
-          }
-
-          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
-          
-          return (
-            <button
-              key={`resource-${index}`}
-              className="resource-btn"
-              onClick={() => window.open(resource, '_blank', 'noopener,noreferrer')}
-              title={`Open resource: ${resource}`}
-              aria-label={`Open resource from ${domain}`}
-            >
-              <img 
-                src={faviconUrl} 
-                alt={`${domain} favicon`}
-                width="16" 
-                height="16"
-                onError={(e) => {
-                  // Fallback to Font Awesome icon if favicon fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const icon = target.nextElementSibling as HTMLElement;
-                  if (icon) icon.style.display = 'inline';
-                }}
-              />
-              <i className="fas fa-external-link-alt" style={{ display: 'none' }}></i>
-            </button>
-          );
-        })}
-      </>
-    );
-  };
-
   // Générer les status tags
   const generateStatusTags = (driver: Driver) => {
     const tags = [];
@@ -490,6 +440,96 @@ export default function DriversClient({
                   );
                 })}
               </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Section des ressources
+  const renderResourcesSection = (resources: string[] | undefined, driver: Driver, index: number) => {
+    if (!resources || resources.length === 0) return null;
+    
+    // Filtrer les liens "internal research"
+    const filteredResources = resources.filter(resource => {
+      if (!resource || !resource.trim()) return false;
+      const lowerResource = resource.toLowerCase();
+      return !lowerResource.includes('internal research') && 
+             !lowerResource.includes('internal-research') &&
+             !lowerResource.includes('internal_research');
+    });
+    
+    if (filteredResources.length === 0) return null;
+    
+    const sectionId = `resources-${index}`;
+    const isExpanded = expandedSections.has(sectionId);
+    
+    return (
+      <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
+        <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
+          <span className="collapsible-title">
+            <i className="fas fa-external-link-alt"></i> Resources ({filteredResources.length})
+          </span>
+          <span className="collapsible-icon">
+            <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
+          </span>
+        </div>
+        {isExpanded && (
+          <div className="collapsible-content">
+            <div className="collapsible-inner">
+              <div className="resources-list">
+                {filteredResources.map((resource, resourceIndex) => {
+                  if (!resource || !resource.trim()) return null;
+                  
+                  // Extract domain for favicon and display name
+                  let domain = '';
+                  let displayName = resource;
+                  try {
+                    const url = new URL(resource);
+                    domain = url.hostname;
+                    // Create a shorter display name
+                    displayName = `${domain}${url.pathname}`;
+                    if (displayName.length > 60) {
+                      displayName = displayName.substring(0, 57) + '...';
+                    }
+                  } catch (e) {
+                    // If URL parsing fails, use the resource as is
+                    displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
+                  }
+
+                  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : null;
+                  
+                  return (
+                    <div 
+                      key={`resource-${resourceIndex}`}
+                      className="clickable-hash resource-link"
+                      onClick={() => window.open(resource, '_blank', 'noopener,noreferrer')}
+                      title={resource}
+                    >
+                      <span className="hash-type">
+                        {faviconUrl ? (
+                          <img 
+                            src={faviconUrl} 
+                            alt={`${domain} favicon`}
+                            width="16" 
+                            height="16"
+                            onError={(e) => {
+                              // Fallback to Font Awesome icon if favicon fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const icon = target.nextElementSibling as HTMLElement;
+                              if (icon) icon.style.display = 'inline';
+                            }}
+                          />
+                        ) : null}
+                        <i className="fas fa-external-link-alt" style={{ display: faviconUrl ? 'none' : 'inline' }}></i>
+                      </span>
+                      <span className="hash-value">{displayName}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -642,7 +682,6 @@ export default function DriversClient({
         <div className="driver-header">
           <h3 className="driver-title">
             <i className="fas fa-microchip"></i> {filename}
-            {renderResourceButtons(driver.Resources)}
             <button 
               className="download-btn"
               onClick={() => downloadDriver(driver)}
@@ -665,6 +704,7 @@ export default function DriversClient({
         {driver.MitreID && renderSimpleSection('MITRE ID', driver.MitreID, 'fas fa-shield-alt')}
         {renderCommandsSection(driver.Commands, driver, index)}
         {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
+        {renderResourcesSection(driver.Resources, driver, index)}
       </div>
     );
   };
