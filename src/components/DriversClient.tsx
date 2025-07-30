@@ -21,6 +21,8 @@ export default function DriversClient({
   const [expandedSections, setExpandedSections] = useState(new Set<string>());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [showHelpPopup, setShowHelpPopup] = useState(false);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   
   // États de pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -724,14 +726,24 @@ export default function DriversClient({
               />
             </p>
           </div>
-          <button id="themeToggle" className="theme-toggle" aria-label="Toggle theme">
-            <div className="theme-toggle-track">
-              <div className="theme-toggle-thumb">
-                <span className="theme-icon theme-icon-sun">☀️</span>
-                <span className="theme-icon theme-icon-moon">🌙</span>
+          <div className="header-controls">
+            <button 
+              className="help-button" 
+              onClick={() => setShowHelpPopup(true)}
+              aria-label="Aide - Définitions des termes"
+              title="Aide - Définitions des termes"
+            >
+              <i className="fas fa-question-circle"></i>
+            </button>
+            <button id="themeToggle" className="theme-toggle" aria-label="Toggle theme">
+              <div className="theme-toggle-track">
+                <div className="theme-toggle-thumb">
+                  <span className="theme-icon theme-icon-sun">☀️</span>
+                  <span className="theme-icon theme-icon-moon">🌙</span>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+          </div>
         </div>
         
         <div className="stats-section">
@@ -1049,6 +1061,141 @@ export default function DriversClient({
           </div>
         </div>
       </footer>
+
+      {/* Help Popup */}
+      {showHelpPopup && (
+        <div className="help-popup-overlay" onClick={() => {
+          setShowHelpPopup(false);
+          setShowScrollIndicator(true); // Reset scroll indicator when closing
+        }}>
+          <div 
+            className="help-popup" 
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => {
+              const element = e.target as HTMLDivElement;
+              const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
+              setShowScrollIndicator(!isAtBottom);
+            }}
+          >
+            <button 
+              className="help-popup-close"
+              onClick={() => {
+                setShowHelpPopup(false);
+                setShowScrollIndicator(true); // Reset scroll indicator when closing
+              }}
+              aria-label="Close help"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+            
+            <h3>
+              <i className="fas fa-book"></i> Help - Technical Definitions
+            </h3>
+            
+            <div className="help-intro">
+              <p>
+                <strong>About this project:</strong> The LOLDrivers database is a comprehensive research platform designed to filter, sort, and analyze vulnerable and malicious Windows drivers used in real-world attack campaigns. This tool empowers security researchers, threat hunters, and defenders to efficiently investigate driver-based threats.
+              </p>
+              <p>
+                <strong>Key Features:</strong> Advanced filtering by HVCI compatibility, signature status, and certificate dates. Interactive sorting and search capabilities to quickly identify specific drivers. Comprehensive metadata including hashes, certificates, and known attack usage patterns.
+              </p>
+              <p>
+                Use this database to research BYOVD (Bring Your Own Vulnerable Driver) attacks, track emerging threats, and build defensive signatures against malicious driver campaigns.
+              </p>
+            </div>
+            
+            <div className="help-section">
+              <h4><i className="fas fa-check"></i> HVCI (Hypervisor-protected Code Integrity)</h4>
+              <p>
+                <strong>Definition:</strong> A Windows security feature that uses the hypervisor to protect kernel code integrity against malicious modifications.
+              </p>
+              <p>
+                <strong>Impact:</strong> HVCI-compatible drivers can run on systems with this protection enabled.
+              </p>
+              <p>
+                <strong>Reference:</strong>{" "}
+                <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/bringup/device-guard-and-credential-guard" target="_blank" rel="noopener noreferrer">
+                  Microsoft HVCI Documentation
+                </a>
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-skull-crossbones"></i> Killer Drivers</h4>
+              <p>
+                <strong>Definition:</strong> Legitimate but vulnerable drivers that can be exploited by attackers to perform malicious actions with system privileges.
+              </p>
+              <p>
+                <strong>Usage:</strong> Often used in BYOVD (Bring Your Own Vulnerable Driver) attacks to bypass security protections.
+              </p>
+              <p>
+                <strong>Reference:</strong>{" "}
+                <a href="https://www.loldrivers.io/" target="_blank" rel="noopener noreferrer">
+                  LOLDrivers Project
+                </a>
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-certificate"></i> Signed Drivers</h4>
+              <p>
+                <strong>Definition:</strong> Drivers that have a valid digital signature from a recognized publisher, certifying their authenticity and integrity.
+              </p>
+              <p>
+                <strong>Advantage:</strong> Indicates verified provenance, but does not guarantee absence of vulnerabilities.
+              </p>
+              <p>
+                <strong>Reference:</strong>{" "}
+                <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/install/driver-signing" target="_blank" rel="noopener noreferrer">
+                  Microsoft Driver Signing
+                </a>
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-exclamation-triangle"></i> Unsigned Drivers</h4>
+              <p>
+                <strong>Definition:</strong> Drivers without a valid digital signature, which may indicate unverified origin or unauthorized modification.
+              </p>
+              <p>
+                <strong>Risk:</strong> More likely to be malicious or have been modified since their original creation.
+              </p>
+              <p>
+                <strong>Note:</strong> Modern Windows generally blocks loading of unsigned drivers.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-clock"></i> Recent Certificates</h4>
+              <p>
+                <strong>Definition:</strong> Drivers whose signing certificates were issued recently, typically within the last few months.
+              </p>
+              <p>
+                <strong>Interest:</strong> Helps identify new threats or recently discovered drivers in the database.
+              </p>
+              <p>
+                <strong>Usage:</strong> Useful for monitoring threat landscape evolution and new vulnerabilities.
+              </p>
+            </div>
+
+            <div className="help-note">
+              <p>
+                <i className="fas fa-info-circle"></i>{" "}
+                <strong>Important Note:</strong> This database is intended for educational and security research purposes. 
+                Use of this information must comply with applicable laws and ethical best practices.
+              </p>
+            </div>
+
+            {showScrollIndicator && (
+              <div className="help-scroll-indicator">
+                <i className="fas fa-chevron-down"></i>
+                <span>Scroll for more information</span>
+                <i className="fas fa-chevron-down"></i>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
