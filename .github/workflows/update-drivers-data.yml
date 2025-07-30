@@ -5,6 +5,12 @@ on:
   schedule:
     - cron: '0 6 * * 2'  # Chaque mardi à 6h UTC
   workflow_dispatch:  # Permet d'exécuter manuellement
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: write
+  metadata: read
   
 env:
   REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
@@ -19,6 +25,8 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        persist-credentials: true
         
     - name: 🔍 Download remote file for comparison
       id: download
@@ -162,7 +170,7 @@ jobs:
         git commit -m "$commit_msg"
         
         echo "🚀 Pushing to repository..."
-        git push
+        git push origin ${{ github.ref_name }}
         
         echo "✅ Changes pushed successfully!"
         
