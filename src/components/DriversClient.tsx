@@ -219,14 +219,70 @@ export default function DriversClient({
 
   // Gestion des sections collapsibles
   const renderHashTags = (hashes: { MD5?: string; SHA1?: string; SHA256?: string }) => {
+    const copyToClipboard = async (hashType: string, hashValue: string) => {
+      try {
+        await navigator.clipboard.writeText(hashValue);
+        showToast(`${hashType} hash copied to clipboard!`);
+      } catch (err) {
+        console.error('Failed to copy: ', err);
+        showToast(`Failed to copy ${hashType} hash`);
+      }
+    };
+
+    const hasHashes = hashes.MD5 || hashes.SHA1 || hashes.SHA256;
+    
+    if (!hasHashes) {
+      return (
+        <div className="hash-section">
+          <div className="hash-section-header">
+            <i className="fas fa-fingerprint"></i>
+            <span className="hash-section-title">Hashes</span>
+          </div>
+          <div className="hash-section-content">
+            <span className="text-muted">No hashes available</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="hash-tags">
-        {hashes.MD5 && <span className="hash-tag md5">MD5: {hashes.MD5}</span>}
-        {hashes.SHA1 && <span className="hash-tag sha1">SHA1: {hashes.SHA1}</span>}
-        {hashes.SHA256 && <span className="hash-tag sha256">SHA256: {hashes.SHA256}</span>}
-        {!hashes.MD5 && !hashes.SHA1 && !hashes.SHA256 && (
-          <span className="hash-tag">No hashes available</span>
-        )}
+      <div className="hash-section">
+        <div className="hash-section-header">
+          <i className="fas fa-fingerprint"></i>
+          <span className="hash-section-title">Hashes</span>
+        </div>
+        <div className="hash-section-content">
+          {hashes.MD5 && (
+            <div 
+              className="clickable-hash md5" 
+              onClick={() => copyToClipboard('MD5', hashes.MD5!)}
+              title="Click to copy MD5 hash"
+            >
+              <span className="hash-type">MD5</span>
+              <span className="hash-value">{hashes.MD5}</span>
+            </div>
+          )}
+          {hashes.SHA1 && (
+            <div 
+              className="clickable-hash sha1" 
+              onClick={() => copyToClipboard('SHA1', hashes.SHA1!)}
+              title="Click to copy SHA1 hash"
+            >
+              <span className="hash-type">SHA1</span>
+              <span className="hash-value">{hashes.SHA1}</span>
+            </div>
+          )}
+          {hashes.SHA256 && (
+            <div 
+              className="clickable-hash sha256" 
+              onClick={() => copyToClipboard('SHA256', hashes.SHA256!)}
+              title="Click to copy SHA256 hash"
+            >
+              <span className="hash-type">SHA256</span>
+              <span className="hash-value">{hashes.SHA256}</span>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -286,7 +342,9 @@ export default function DriversClient({
 
   // Section simple (non-collapsible)
   const renderSimpleSection = (title: string, content: string, icon: string) => {
-    if (!content) return null;
+    if (!content || 
+        content.toLowerCase() === 'unknown' || 
+        content.toLowerCase() === 'no description available') return null;
     
     return (
       <div className="simple-section">
