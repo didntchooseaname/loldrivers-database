@@ -1708,6 +1708,8 @@ select.form-control {
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
+  background: transparent;
+  border: 1px solid var(--color-border);
 }
 
 .clickable-hash::before {
@@ -1722,7 +1724,7 @@ select.form-control {
 
 .clickable-hash:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary);
 }
 
 .clickable-hash:active {
@@ -1743,60 +1745,51 @@ select.form-control {
 
 /* Hash color variants */
 .clickable-hash.md5 {
-  background-color: var(--color-bg-2);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid var(--color-border);
 }
 
 .clickable-hash.md5::before {
-  background: linear-gradient(45deg, #3b82f6, #60a5fa);
+  background: transparent;
 }
 
 .clickable-hash.md5:hover {
-  background-color: var(--color-bg-2);
-  border-color: #3b82f6;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  border-color: var(--color-primary);
 }
 
 .clickable-hash.md5 .hash-type {
-  color: #3b82f6;
+  color: var(--color-text);
 }
 
 .clickable-hash.sha1 {
-  background-color: var(--color-bg-3);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid var(--color-border);
 }
 
 .clickable-hash.sha1::before {
-  background: linear-gradient(45deg, #10b981, #34d399);
+  background: transparent;
 }
 
 .clickable-hash.sha1:hover {
-  background-color: var(--color-bg-3);
-  border-color: #10b981;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  border-color: var(--color-primary);
 }
 
 .clickable-hash.sha1 .hash-type {
-  color: #10b981;
+  color: var(--color-text);
 }
 
 .clickable-hash.sha256 {
-  background-color: var(--color-bg-4);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  border: 1px solid var(--color-border);
 }
 
 .clickable-hash.sha256::before {
-  background: linear-gradient(45deg, #f59e0b, #fbbf24);
+  background: transparent;
 }
 
 .clickable-hash.sha256:hover {
-  background-color: var(--color-bg-4);
-  border-color: #f59e0b;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  border-color: var(--color-primary);
 }
 
 .clickable-hash.sha256 .hash-type {
-  color: #f59e0b;
+  color: var(--color-text);
 }
 
 /* Status tags */
