@@ -21,6 +21,7 @@ export interface Driver {
     Privileges?: string;
     Usecase?: string;
   };
+  Resources?: string[];
   Category?: string;
   Author?: string;
   Created?: string;

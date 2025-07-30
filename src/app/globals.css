@@ -1244,6 +1244,13 @@ select.form-control {
   padding: var(--space-10) var(--space-16);
 }
 
+.clear-button:disabled,
+.clear-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* Filter options */
 .filter-options {
   margin-bottom: var(--space-16);
@@ -1334,7 +1341,7 @@ select.form-control {
 }
 
 .filter-btn.hvci-filter {
-  border-color: rgba(var(--color-green-dark-rgb), 0.3);
+  border-color: rgba(var(--color-white), 0.3);
 }
 
 .filter-btn.hvci-filter i {
@@ -1344,7 +1351,7 @@ select.form-control {
 .filter-btn.hvci-filter:hover {
   border-color: var(--color-green-dark);
   background: rgba(var(--color-green-dark-rgb), 0.1);
-  color: var(--color-black);
+  color: var(--color-white);
 }
 
 .filter-btn.hvci-filter.active {
@@ -1444,7 +1451,7 @@ select.form-control {
   font-weight: 500;
   background: var(--color-bg-2);
   border-color: var(--color-orange-400);
-  color: var(--color-orange-500);
+  color: var(--color-white);
   display: flex;
   align-items: center;
   gap: var(--space-6);
@@ -1454,6 +1461,16 @@ select.form-control {
   background: var(--color-orange-400);
   color: var(--color-white);
   border-color: var(--color-orange-500);
+}
+
+.filter-btn.clear:disabled,
+.filter-btn.clear.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: var(--color-secondary);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
 }
 
 .apply-filters-btn {
@@ -1641,6 +1658,11 @@ select.form-control {
     padding: var(--space-6) var(--space-10);
   }
 
+  .resource-btn {
+    padding: var(--space-3);
+    margin-left: var(--space-3);
+  }
+
   .simple-section-content,
   .hash-section-content {
     font-size: var(--font-size-md);
@@ -1683,6 +1705,11 @@ select.form-control {
     font-size: var(--font-size-xl);
     padding: var(--space-8) var(--space-12);
     border-radius: var(--radius-md);
+  }
+
+  .resource-btn {
+    padding: var(--space-4);
+    margin-left: var(--space-4);
   }
 
   .simple-section-content,
@@ -1737,6 +1764,11 @@ select.form-control {
   .download-btn {
     font-size: var(--font-size-2xl);
     padding: var(--space-10) var(--space-16);
+  }
+
+  .resource-btn {
+    padding: var(--space-6);
+    margin-left: var(--space-6);
   }
 }
 
@@ -1795,6 +1827,14 @@ select.form-control {
     display: flex;
     align-items: center;
     gap: var(--space-6);
+  }
+
+  /* Resource button mobile */
+  .resource-btn {
+    min-height: var(--mobile-touch-target);
+    padding: var(--space-6);
+    margin-left: var(--space-2);
+    border-radius: var(--radius-base);
   }
 
   /* Section content mobile stacking */
@@ -2026,6 +2066,47 @@ select.form-control {
 
 .download-btn i {
   font-size: var(--font-size-lg);
+  color: inherit;
+}
+
+/* Resource button styles */
+.resource-btn {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: auto;
+  flex-shrink: 0;
+  margin-left: var(--space-4);
+  position: relative;
+}
+
+.resource-btn:hover {
+  color: var(--color-primary);
+  background: var(--color-secondary);
+  transform: translateY(-1px);
+}
+
+.resource-btn:active {
+  transform: translateY(0);
+}
+
+.resource-btn img {
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.resource-btn:hover img {
+  opacity: 0.8;
+}
+
+.resource-btn i {
+  font-size: var(--font-size-sm);
   color: inherit;
 }
 

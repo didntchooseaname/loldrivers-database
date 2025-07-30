@@ -321,6 +321,56 @@ export default function DriversClient({
     );
   };
 
+  // Rendre les boutons de ressources
+  const renderResourceButtons = (resources: string[] | undefined) => {
+    if (!resources || resources.length === 0) return null;
+
+    return (
+      <>
+        {resources.map((resource, index) => {
+          if (!resource || !resource.trim()) return null;
+          
+          // Extract domain for favicon
+          let domain = '';
+          try {
+            const url = new URL(resource);
+            domain = url.hostname;
+          } catch (e) {
+            // If URL parsing fails, skip this resource
+            return null;
+          }
+
+          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
+          
+          return (
+            <button
+              key={`resource-${index}`}
+              className="resource-btn"
+              onClick={() => window.open(resource, '_blank', 'noopener,noreferrer')}
+              title={`Open resource: ${resource}`}
+              aria-label={`Open resource from ${domain}`}
+            >
+              <img 
+                src={faviconUrl} 
+                alt={`${domain} favicon`}
+                width="16" 
+                height="16"
+                onError={(e) => {
+                  // Fallback to Font Awesome icon if favicon fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const icon = target.nextElementSibling as HTMLElement;
+                  if (icon) icon.style.display = 'inline';
+                }}
+              />
+              <i className="fas fa-external-link-alt" style={{ display: 'none' }}></i>
+            </button>
+          );
+        })}
+      </>
+    );
+  };
+
   // Générer les status tags
   const generateStatusTags = (driver: Driver) => {
     const tags = [];
@@ -447,6 +497,21 @@ export default function DriversClient({
     );
   };
 
+  // Section Description des commandes (placée après les Hashes)
+  const renderCommandDescription = (commands: Driver['Commands']) => {
+    if (!commands || !commands.Description) return null;
+    
+    return (
+      <div className="command-field">
+        <div className="command-field-header">
+          <i className="fas fa-file-text"></i>
+          <strong>Description</strong>
+        </div>
+        <div className="command-field-content">{commands.Description}</div>
+      </div>
+    );
+  };
+
   // Section des commandes
   const renderCommandsSection = (commands: Driver['Commands'], driver: Driver, index: number) => {
     if (!commands || typeof commands !== 'object') return null;
@@ -475,15 +540,6 @@ export default function DriversClient({
         {isExpanded && (
           <div className="collapsible-content">
             <div className="collapsible-inner">
-              {commands.Description && (
-                <div className="command-field">
-                  <div className="command-field-header">
-                    <i className="fas fa-file-text"></i>
-                    <strong>Description</strong>
-                  </div>
-                  <div className="command-field-content">{commands.Description}</div>
-                </div>
-              )}
               {commands.OperatingSystem && (
                 <div className="command-field">
                   <div className="command-field-header">
@@ -586,6 +642,7 @@ export default function DriversClient({
         <div className="driver-header">
           <h3 className="driver-title">
             <i className="fas fa-microchip"></i> {filename}
+            {renderResourceButtons(driver.Resources)}
             <button 
               className="download-btn"
               onClick={() => downloadDriver(driver)}
@@ -597,9 +654,10 @@ export default function DriversClient({
           </h3>
           {renderStatusTags(statusTags)}
           {renderHashTags(hashes)}
+          {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
+          {renderCommandDescription(driver.Commands)}
         </div>
         
-        {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
         {renderSimpleSection('Description', driver.Description || 'No description available', 'fas fa-info-circle')}
         {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
         {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
@@ -685,8 +743,9 @@ export default function DriversClient({
             <i className="fas fa-search"></i> {isLoading ? 'Searching...' : 'Search'}
           </button>
           <button 
-            className="btn btn--outline btn--sm clear-button"
+            className={`btn btn--outline btn--sm clear-button ${(!searchQuery.trim() && activeFilters.size === 0) ? 'disabled' : ''}`}
             onClick={clearAllFilters}
+            disabled={!searchQuery.trim() && activeFilters.size === 0}
           >
             <i className="fas fa-eraser"></i> Clear
           </button>
@@ -749,8 +808,9 @@ export default function DriversClient({
               <i className="fas fa-check"></i> Apply Filters
             </button>
             <button 
-              className="filter-btn clear"
+              className={`filter-btn clear ${(!searchQuery.trim() && activeFilters.size === 0) ? 'disabled' : ''}`}
               onClick={clearAllFilters}
+              disabled={!searchQuery.trim() && activeFilters.size === 0}
             >
               <i className="fas fa-times"></i> Clear Filters
             </button>
