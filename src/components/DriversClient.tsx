@@ -17,6 +17,7 @@ export default function DriversClient({
   const [searchQuery, setSearchQuery] = useState('');
   const [inputValue, setInputValue] = useState(''); // Nouvelle valeur pour l'input
   const [activeFilters, setActiveFilters] = useState(new Set<string>());
+  const [pendingFilters, setPendingFilters] = useState(new Set<string>()); // Filtres en attente
   const [expandedSections, setExpandedSections] = useState(new Set<string>());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -124,8 +125,16 @@ export default function DriversClient({
 
   // Gestion des filtres
   const toggleFilter = useCallback((filterType: string) => {
-    setActiveFilters(prev => {
+    setPendingFilters(prev => {
       const newFilters = new Set(prev);
+      
+      // Logique pour les filtres mutuellement exclusifs
+      if (filterType === 'signed' && newFilters.has('unsigned')) {
+        newFilters.delete('unsigned');
+      } else if (filterType === 'unsigned' && newFilters.has('signed')) {
+        newFilters.delete('signed');
+      }
+      
       if (newFilters.has(filterType)) {
         newFilters.delete(filterType);
       } else {
@@ -135,10 +144,15 @@ export default function DriversClient({
     });
   }, []);
 
+  const applyFilters = useCallback(() => {
+    setActiveFilters(new Set(pendingFilters));
+  }, [pendingFilters]);
+
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
     setInputValue('');
     setActiveFilters(new Set());
+    setPendingFilters(new Set());
   }, []);
 
   // Fonction pour effectuer la recherche
@@ -501,16 +515,16 @@ export default function DriversClient({
 
   // Fonction pour télécharger un driver
   const downloadDriver = useCallback((driver: Driver) => {
-    const hash = driver.SHA256 || driver.SHA1 || driver.MD5;
+    const hash = driver.MD5;
     const filename = driver.OriginalFilename || driver.Filename || 'driver';
     
     if (!hash) {
-      showToast('No hash available for download');
+      showToast('No MD5 hash available for download');
       return;
     }
     
-    // Créer l'URL de téléchargement basée sur le hash
-    const downloadUrl = `https://www.loldrivers.io/api/drivers/${hash}/download`;
+    // Créer l'URL de téléchargement basée sur le hash MD5
+    const downloadUrl = `https://github.com/magicsword-io/LOLDrivers/raw/main/drivers/${hash}.bin`;
     
     // Créer un lien temporaire pour déclencher le téléchargement
     const link = document.createElement('a');
@@ -622,11 +636,6 @@ export default function DriversClient({
               onKeyPress={handleKeyPress}
               disabled={isLoading}
             />
-            {isLoading && (
-              <div className="search-loading-icon">
-                <i className="fas fa-spinner fa-spin"></i>
-              </div>
-            )}
           </div>
           <button 
             className="btn btn--primary search-button"
@@ -647,34 +656,43 @@ export default function DriversClient({
           <div className="filter-group">
             <span className="filter-label">Quick Filters:</span>
             <button 
-              className={`filter-btn hvci-filter ${activeFilters.has('hvci') ? 'active' : ''}`}
+              className={`filter-btn hvci-filter ${pendingFilters.has('hvci') ? 'active' : ''}`}
               onClick={() => toggleFilter('hvci')}
             >
               HVCI PASSED
             </button>
             <button 
-              className={`filter-btn killer ${activeFilters.has('killer') ? 'active' : ''}`}
+              className={`filter-btn killer ${pendingFilters.has('killer') ? 'active' : ''}`}
               onClick={() => toggleFilter('killer')}
             >
               Killer Drivers
             </button>
             <button 
-              className={`filter-btn ${activeFilters.has('signed') ? 'active' : ''}`}
+              className={`filter-btn ${pendingFilters.has('signed') ? 'active' : ''} ${pendingFilters.has('unsigned') ? 'disabled' : ''}`}
               onClick={() => toggleFilter('signed')}
+              disabled={pendingFilters.has('unsigned')}
             >
               Signed Drivers
             </button>
             <button 
-              className={`filter-btn ${activeFilters.has('unsigned') ? 'active' : ''}`}
+              className={`filter-btn ${pendingFilters.has('unsigned') ? 'active' : ''} ${pendingFilters.has('signed') ? 'disabled' : ''}`}
               onClick={() => toggleFilter('unsigned')}
+              disabled={pendingFilters.has('signed')}
             >
               Unsigned Drivers
             </button>
             <button 
-              className={`filter-btn ${activeFilters.has('recent') ? 'active' : ''}`}
+              className={`filter-btn ${pendingFilters.has('recent') ? 'active' : ''}`}
               onClick={() => toggleFilter('recent')}
             >
               Recent Certificates
+            </button>
+            <button 
+              className="btn btn--primary apply-filters-btn"
+              onClick={applyFilters}
+              disabled={pendingFilters.size === 0 && activeFilters.size === 0}
+            >
+              <i className="fas fa-check"></i> Apply Filters
             </button>
             <button 
               className="filter-btn clear"
@@ -684,6 +702,16 @@ export default function DriversClient({
             </button>
           </div>
         </div>
+        
+        {/* Barre de chargement */}
+        {isLoading && (
+          <div className="loading-bar-container">
+            <div className="loading-bar">
+              <div className="loading-bar-progress"></div>
+            </div>
+            <span className="loading-bar-text">Searching drivers...</span>
+          </div>
+        )}
         
         <div className="search-stats">
           <span>
@@ -696,16 +724,7 @@ export default function DriversClient({
         </div>
       </div>
 
-      <div className="drivers-grid">
-        {isLoading && (
-          <div className="global-loading">
-            <div className="loading-spinner">
-              <div className="spinner"></div>
-            </div>
-            <p className="loading-text">Searching drivers...</p>
-          </div>
-        )}
-        
+      <div className="drivers-grid">        
         {!isLoading && filteredDrivers.length > 0 ? (
           filteredDrivers.map((driver, index) => {
             // Calculer l'index global pour l'unicité
