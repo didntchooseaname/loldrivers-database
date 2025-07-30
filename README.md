@@ -91,9 +91,6 @@ Copiez `.env.example` vers `.env.local` et configurez :
 # Durée de cache en secondes
 CACHE_TTL=3600
 
-# Secret pour les tâches cron
-CRON_SECRET=your-secret-key
-
 # Configuration Next.js
 NEXT_TELEMETRY_DISABLED=1
 ```

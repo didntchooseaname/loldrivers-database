@@ -108,13 +108,6 @@ Le projet est configuré pour Vercel avec :
 ### Variables d'environnement
 ```env
 CACHE_TTL=3600          # Durée de cache en secondes
-CRON_SECRET=your-secret # Secret pour les tâches cron
-```
-
-### Cache
-Le cache peut être rafraîchi manuellement via :
-```bash
-curl -X POST /api/cache/refresh
 ```
 
 ## 📊 Comparaison des performances
@@ -142,18 +135,16 @@ curl -X POST /api/cache/refresh
 ### API Routes
 - `/api/drivers` : Liste paginée des drivers avec filtres
 - `/api/stats` : Statistiques globales
-- `/api/cache/refresh` : Rafraîchissement du cache
 
 ## 🚀 Déploiement sur Vercel
 
 1. **Connecter le repository** à Vercel
 2. **Configuration automatique** : Vercel détecte Next.js automatiquement
-3. **Variables d'environnement** : Configurer `CACHE_TTL` et `CRON_SECRET`
+3. **Variables d'environnement** : Configurer `CACHE_TTL` si nécessaire
 4. **Déploiement** : Push sur la branche principale
 
 Le fichier `vercel.json` configure automatiquement :
 - Headers de cache optimisés
-- Cron job pour rafraîchir le cache
 - Redirections et rewrites
 - Headers de sécurité
 

@@ -14,8 +14,7 @@ export const APP_CONFIG = {
   // API endpoints
   API_ENDPOINTS: {
     DRIVERS: '/api/drivers',
-    STATS: '/api/stats',
-    CACHE_REFRESH: '/api/cache/refresh'
+    STATS: '/api/stats'
   }
 } as const;
 
