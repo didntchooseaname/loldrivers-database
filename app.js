@@ -5,6 +5,7 @@ class LOLDriversApp {
         this.currentDate = new Date(); // Use current actual date
         this.dataUrl = 'data/drv.json';
         this.lastFetch = null;
+        this.renderingInProgress = false; // Éviter les re-rendus multiples
         
         this.initializeElements();
         this.bindEvents();
@@ -27,12 +28,41 @@ class LOLDriversApp {
         this.totalDrivers = document.getElementById('totalDrivers');
         this.hvciTrueCount = document.getElementById('hvciTrueCount');
         this.killerDriversCount = document.getElementById('killerDriversCount');
+        this.hvciStatItem = document.getElementById('hvciStatItem');
+        this.killerStatItem = document.getElementById('killerStatItem');
+        this.filterButtons = document.querySelectorAll('.filter-btn');
+        this.themeToggle = document.getElementById('themeToggle');
+        
+        // Track current filter state
+        this.activeFilters = new Set(); // Use Set to track multiple active filters
+        
+        // Initialize theme
+        this.initializeTheme();
     }
     
     bindEvents() {
         this.searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
         this.clearSearchBtn.addEventListener('click', () => this.clearSearch());
         this.retryButton.addEventListener('click', () => this.loadData());
+        
+        // Add stat item click handlers
+        this.hvciStatItem.addEventListener('click', () => this.toggleFilter('hvci'));
+        this.killerStatItem.addEventListener('click', () => this.toggleFilter('killer'));
+        
+        // Add theme toggle handler
+        this.themeToggle.addEventListener('click', (e) => this.toggleTheme(e));
+        
+        // Add filter button click handlers
+        this.filterButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const filterType = e.target.getAttribute('data-filter');
+                if (filterType === 'clear') {
+                    this.clearAllFilters();
+                } else {
+                    this.toggleFilter(filterType);
+                }
+            });
+        });
     }
     
     setupWeeklyUpdates() {
@@ -51,19 +81,34 @@ class LOLDriversApp {
         
         try {
             console.log('Fetching data from:', this.dataUrl);
-            const response = await fetch(this.dataUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
+            
+            // Try different methods to load the data
+            let response;
+            let data;
+            
+            // Method 1: Try standard fetch
+            try {
+                response = await fetch(this.dataUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                
+                data = await response.json();
+                console.log('Data loaded successfully via fetch:', data);
+                
+            } catch (fetchError) {
+                console.warn('Fetch failed, trying alternative method:', fetchError.message);
+                
+                // Method 2: Try XMLHttpRequest for local files
+                data = await this.loadDataViaXHR();
+                console.log('Data loaded successfully via XHR:', data);
             }
-            
-            const data = await response.json();
-            console.log('Data loaded successfully:', data);
             
             // Handle different possible response formats
             let driversArray = [];
@@ -116,9 +161,41 @@ class LOLDriversApp {
             
             // Load sample data as fallback
             this.loadSampleData();
-            this.showError(`Data file unavailable. Showing sample data. Error: ${error.message}`);
+            this.showError(`Data file unavailable. Showing sample data. Error: ${error.message}
+
+💡 Pour charger vos données réelles:
+1. Démarrez un serveur local: python -m http.server 8000
+2. Ou ouvrez via: http://localhost:8000
+3. Ou utilisez Live Server dans VS Code`);
             this.hideLoading();
         }
+    }
+    
+    // Alternative method to load data using XMLHttpRequest
+    loadDataViaXHR() {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', this.dataUrl, true);
+            xhr.responseType = 'json';
+            
+            xhr.onload = function() {
+                if (xhr.status === 200 || xhr.status === 0) { // 0 for local files
+                    resolve(xhr.response || JSON.parse(xhr.responseText));
+                } else {
+                    reject(new Error(`XHR error! status: ${xhr.status}`));
+                }
+            };
+            
+            xhr.onerror = function() {
+                reject(new Error('XHR network error'));
+            };
+            
+            try {
+                xhr.send();
+            } catch (e) {
+                reject(e);
+            }
+        });
     }
     
     loadSampleData() {
@@ -258,16 +335,127 @@ class LOLDriversApp {
         this.killerDriversCount.textContent = killerDrivers;
     }
     
+    applyCombinedFilters() {
+        if (this.activeFilters.size === 0) {
+            this.filteredDrivers = [...this.drivers];
+            return;
+        }
+        
+        this.filteredDrivers = this.drivers.filter(driver => {
+            // Driver must match ALL active filters (AND logic)
+            return Array.from(this.activeFilters).every(filterType => {
+                return this.matchesFilter(driver, filterType);
+            });
+        });
+    }
+    
+    matchesFilter(driver, filterType) {
+        switch (filterType) {
+            case 'hvci':
+                return driver.LoadsDespiteHVCI && 
+                       driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE';
+            
+            case 'killer':
+                if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
+                    return driver.ImportedFunctions.some(func => 
+                        func.toLowerCase().includes('zwterminateprocess') ||
+                        func.toLowerCase().includes('zwkillprocess') ||
+                        func.toLowerCase().includes('ntterminate')
+                    );
+                }
+                return false;
+            
+            case 'signed':
+                return driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0;
+            
+            case 'unsigned':
+                return !driver.Signatures || !Array.isArray(driver.Signatures) || driver.Signatures.length === 0;
+            
+            case 'recent':
+                return this.hasActiveCertificate(driver);
+            
+            default:
+                return true;
+        }
+    }
+    
+    updateFilterUI() {
+        // Update stat items
+        this.clearStatItemActive();
+        if (this.activeFilters.has('hvci')) {
+            this.hvciStatItem.classList.add('active');
+        }
+        if (this.activeFilters.has('killer')) {
+            this.killerStatItem.classList.add('active');
+        }
+        
+        // Update filter buttons
+        this.filterButtons.forEach(button => {
+            const filterType = button.getAttribute('data-filter');
+            if (filterType && filterType !== 'clear') {
+                if (this.activeFilters.has(filterType)) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
+            }
+        });
+    }
+    
+    toggleFilter(filterType) {
+        // Clear search input when using stat filters
+        this.searchInput.value = '';
+        
+        // Toggle filter in the set
+        if (this.activeFilters.has(filterType)) {
+            this.activeFilters.delete(filterType);
+        } else {
+            this.activeFilters.add(filterType);
+        }
+        
+        // Apply combined filters
+        this.applyCombinedFilters();
+        this.updateFilterUI();
+        this.renderDrivers();
+    }
+    
+    clearFilterButtonsActive() {
+        this.filterButtons.forEach(button => {
+            button.classList.remove('active');
+        });
+    }
+    
+    clearAllFilters() {
+        this.searchInput.value = '';
+        this.activeFilters.clear();
+        this.clearStatItemActive();
+        this.clearFilterButtonsActive();
+        this.applyCombinedFilters();
+        this.renderDrivers();
+    }
+    
+    clearStatItemActive() {
+        this.hvciStatItem.classList.remove('active');
+        this.killerStatItem.classList.remove('active');
+    }
+    
     handleSearch(query) {
         const searchTerm = query.toLowerCase().trim();
         
+        // Start with filtered drivers (which already have active filters applied)
+        this.applyCombinedFilters();
+        let baseDrivers = this.filteredDrivers;
+        
         if (!searchTerm) {
-            this.filteredDrivers = [...this.drivers];
-        } else {
-            this.filteredDrivers = this.drivers.filter(driver => 
-                this.searchInDriver(driver, searchTerm)
-            );
+            // If no search term, keep the filtered drivers as they are
+            this.renderDrivers();
+            return;
         }
+        
+        // Apply search to the already filtered drivers
+        this.filteredDrivers = baseDrivers.filter(driver => 
+            this.searchInDriver(driver, searchTerm)
+        );
         
         this.renderDrivers();
     }
@@ -352,9 +540,7 @@ class LOLDriversApp {
     }
     
     clearSearch() {
-        this.searchInput.value = '';
-        this.filteredDrivers = [...this.drivers];
-        this.renderDrivers();
+        this.clearAllFilters();
     }
     
     renderDrivers() {
@@ -370,12 +556,22 @@ class LOLDriversApp {
             return;
         }
         
+        // Éviter les re-rendus multiples
+        if (this.renderingInProgress) {
+            return;
+        }
+        this.renderingInProgress = true;
+        
+        // Rendu simple sans gestion complexe d'animations
         this.driversGrid.innerHTML = this.filteredDrivers
             .map(driver => this.createDriverCard(driver))
             .join('');
         
-        // Bind collapsible events after rendering
-        setTimeout(() => this.bindCollapsibleEvents(), 100);
+        // Bind collapsible events après le rendu
+        setTimeout(() => {
+            this.bindCollapsibleEvents();
+            this.renderingInProgress = false;
+        }, 100);
     }
     
     createDriverCard(driver) {
@@ -554,7 +750,7 @@ class LOLDriversApp {
                 </div>
                 <div class="collapsible-content">
                     <div class="collapsible-inner">
-                        <ul class="functions-list">${functionsList}</ul>
+                        <ul class="functions-list functions-scrollable">${functionsList}</ul>
                     </div>
                 </div>
             </div>
@@ -590,7 +786,7 @@ class LOLDriversApp {
         }
         
         return `
-            <div class="collapsible-section expanded" data-section-id="${sectionId}">
+            <div class="collapsible-section" data-section-id="${sectionId}">
                 <div class="collapsible-header">
                     <span class="collapsible-title">Commands & Usage</span>
                     <span class="collapsible-icon">▼</span>
@@ -627,6 +823,52 @@ class LOLDriversApp {
         const div = document.createElement('div');
         div.textContent = text.toString();
         return div.innerHTML;
+    }
+    
+    // Theme management methods
+    initializeTheme() {
+        // Get saved theme or default to system preference
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        this.currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+        this.applyTheme(this.currentTheme, false);
+        
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                this.currentTheme = e.matches ? 'dark' : 'light';
+                this.applyTheme(this.currentTheme);
+            }
+        });
+    }
+    
+    toggleTheme(event) {
+        // Toggle theme
+        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        this.applyTheme(this.currentTheme);
+        
+        // Save preference
+        localStorage.setItem('theme', this.currentTheme);
+    }
+    
+    applyTheme(theme) {
+        // Apply theme immediately
+        document.documentElement.setAttribute('data-color-scheme', theme);
+        this.updateThemeToggleState(theme);
+    }
+    
+    updateThemeToggleState(theme) {
+        const track = this.themeToggle.querySelector('.theme-toggle-track');
+        const thumb = this.themeToggle.querySelector('.theme-toggle-thumb');
+        
+        if (theme === 'dark') {
+            track.setAttribute('aria-label', 'Switch to light mode');
+            this.themeToggle.setAttribute('aria-label', 'Switch to light mode');
+        } else {
+            track.setAttribute('aria-label', 'Switch to dark mode');
+            this.themeToggle.setAttribute('aria-label', 'Switch to dark mode');
+        }
     }
 }
 

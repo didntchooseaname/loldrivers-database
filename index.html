@@ -4,24 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LOLDrivers - Living Off The Land Drivers</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>LOLDrivers Database</h1>
-            <p class="header-subtitle">Vulnerable and malicious Windows drivers database</p>
-            <p class="last-updated">Last updated: <span id="lastUpdated">Loading...</span></p>
+            <div class="header-top">
+                <div class="header-content">
+                    <h1>LOLDrivers Database</h1>
+                    <p class="header-subtitle">Vulnerable and malicious Windows drivers database</p>
+                    <p class="last-updated">Last updated: <span id="lastUpdated">Loading...</span></p>
+                </div>
+                <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+                    <div class="theme-toggle-track">
+                        <div class="theme-toggle-thumb">
+                            <span class="theme-icon theme-icon-sun">☀️</span>
+                            <span class="theme-icon theme-icon-moon">🌙</span>
+                        </div>
+                    </div>
+                </button>
+            </div>
             <div class="stats-section">
                 <div class="stat-item">
                     <span class="stat-label">Total Drivers</span>
                     <span class="stat-value" id="totalDrivers">0</span>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item clickable hvci-item" id="hvciStatItem">
                     <span class="stat-label">HVCI Compatible</span>
                     <span class="stat-value" id="hvciTrueCount">0</span>
                 </div>
-                <div class="stat-item killer">
+                <div class="stat-item killer clickable" id="killerStatItem">
                     <span class="stat-label">Killer Drivers</span>
                     <span class="stat-value" id="killerDriversCount">0</span>
                 </div>
@@ -38,6 +51,19 @@
                 >
                 <button id="clearSearch" class="btn btn--outline btn--sm">Clear</button>
             </div>
+            
+            <div class="filter-options">
+                <div class="filter-group">
+                    <span class="filter-label">Quick Filters:</span>
+                    <button class="filter-btn hvci-filter" data-filter="hvci">HVCI Compatible</button>
+                    <button class="filter-btn killer" data-filter="killer">Killer Drivers</button>
+                    <button class="filter-btn" data-filter="signed">Signed Drivers</button>
+                    <button class="filter-btn" data-filter="unsigned">Unsigned Drivers</button>
+                    <button class="filter-btn" data-filter="recent">Recent Certificates</button>
+                    <button class="filter-btn clear" data-filter="clear">Clear Filters</button>
+                </div>
+            </div>
+            
             <div class="search-stats">
                 <span id="resultsCount">0</span> drivers found
             </div>

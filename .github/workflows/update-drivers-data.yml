@@ -1,0 +1,196 @@
+name: Update LOLDrivers Data
+
+# Exécution programmée : tous les mardis à 06:00 UTC
+on:
+  schedule:
+    - cron: '0 6 * * 2'  # Chaque mardi à 6h UTC
+  workflow_dispatch:  # Permet d'exécuter manuellement
+  
+env:
+  REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
+  LOCAL_FILE: data/drv.json
+
+jobs:
+  update-drivers-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 🔍 Download remote file for comparison
+      id: download
+      run: |
+        echo "📡 Downloading remote drivers.json..."
+        curl -s -L "$REMOTE_URL" -o temp_drivers.json
+        
+        if [ ! -f temp_drivers.json ]; then
+          echo "❌ Failed to download remote file"
+          exit 1
+        fi
+        
+        echo "✅ Remote file downloaded successfully"
+        echo "📊 Remote file size: $(stat -c%s temp_drivers.json) bytes"
+        
+    - name: 📋 Compare files
+      id: compare
+      run: |
+        if [ ! -f "$LOCAL_FILE" ]; then
+          echo "🆕 Local file doesn't exist, will create it"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "change_type=new_file" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        echo "🔍 Comparing files..."
+        echo "📊 Local file size: $(stat -c%s $LOCAL_FILE) bytes"
+        echo "📊 Remote file size: $(stat -c%s temp_drivers.json) bytes"
+        
+        # Comparaison des hash MD5
+        local_hash=$(md5sum "$LOCAL_FILE" | cut -d' ' -f1)
+        remote_hash=$(md5sum temp_drivers.json | cut -d' ' -f1)
+        
+        echo "🔐 Local MD5: $local_hash"
+        echo "🔐 Remote MD5: $remote_hash"
+        
+        if [ "$local_hash" != "$remote_hash" ]; then
+          echo "🔄 Files are different - update needed"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "change_type=updated" >> $GITHUB_OUTPUT
+          
+          # Analyse des changements JSON (optionnel)
+          if command -v jq &> /dev/null; then
+            local_count=$(jq '. | length' "$LOCAL_FILE" 2>/dev/null || echo "unknown")
+            remote_count=$(jq '. | length' temp_drivers.json 2>/dev/null || echo "unknown")
+            echo "📈 Local entries: $local_count"
+            echo "📈 Remote entries: $remote_count"
+            echo "local_count=$local_count" >> $GITHUB_OUTPUT
+            echo "remote_count=$remote_count" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "✅ Files are identical - no update needed"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: 🔄 Update local file
+      if: steps.compare.outputs.has_changes == 'true'
+      run: |
+        echo "📝 Updating local file..."
+        
+        # Créer le répertoire data s'il n'existe pas
+        mkdir -p data
+        
+        # Remplacer le fichier local
+        mv temp_drivers.json "$LOCAL_FILE"
+        
+        echo "✅ Local file updated successfully"
+        echo "📊 New file size: $(stat -c%s $LOCAL_FILE) bytes"
+        
+    - name: 📄 Generate update summary
+      if: steps.compare.outputs.has_changes == 'true'
+      id: summary
+      run: |
+        echo "📋 Generating update summary..."
+        
+        # Créer un résumé des changements
+        summary="## 🔄 LOLDrivers Data Update\n\n"
+        summary+="**Update Type:** ${{ steps.compare.outputs.change_type }}\n"
+        summary+="**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n"
+        summary+="**Source:** [LOLDrivers GitHub](https://github.com/magicsword-io/LOLDrivers)\n\n"
+        
+        if [ "${{ steps.compare.outputs.change_type }}" = "updated" ]; then
+          summary+="### 📊 Statistics\n"
+          summary+="- **Local entries:** ${{ steps.compare.outputs.local_count }}\n"
+          summary+="- **Remote entries:** ${{ steps.compare.outputs.remote_count }}\n\n"
+          
+          # Calculer la différence si possible
+          if [[ "${{ steps.compare.outputs.local_count }}" =~ ^[0-9]+$ ]] && [[ "${{ steps.compare.outputs.remote_count }}" =~ ^[0-9]+$ ]]; then
+            diff=$((${{ steps.compare.outputs.remote_count }} - ${{ steps.compare.outputs.local_count }}))
+            if [ $diff -gt 0 ]; then
+              summary+="- **New entries:** +$diff 📈\n"
+            elif [ $diff -lt 0 ]; then
+              summary+="- **Removed entries:** $diff 📉\n"
+            else
+              summary+="- **No change in count** (content updated) 🔄\n"
+            fi
+          fi
+        fi
+        
+        summary+="### 🔗 Links\n"
+        summary+="- [View Updated File](./data/drv.json)\n"
+        summary+="- [LOLDrivers Website](https://loldrivers.io/)\n"
+        summary+="- [Source Repository](https://github.com/magicsword-io/LOLDrivers)\n"
+        
+        # Sauvegarder pour le commit message
+        echo -e "$summary" > update_summary.md
+        echo "summary_created=true" >> $GITHUB_OUTPUT
+        
+    - name: 🚀 Commit and push changes
+      if: steps.compare.outputs.has_changes == 'true'
+      run: |
+        echo "🔧 Configuring git..."
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action - LOLDrivers Updater"
+        
+        echo "📝 Adding changes..."
+        git add "$LOCAL_FILE"
+        
+        # Message de commit avec résumé
+        if [ "${{ steps.compare.outputs.change_type }}" = "new_file" ]; then
+          commit_msg="🆕 Add initial LOLDrivers data file"
+        else
+          commit_msg="🔄 Update LOLDrivers data"
+          if [[ "${{ steps.compare.outputs.local_count }}" =~ ^[0-9]+$ ]] && [[ "${{ steps.compare.outputs.remote_count }}" =~ ^[0-9]+$ ]]; then
+            diff=$((${{ steps.compare.outputs.remote_count }} - ${{ steps.compare.outputs.local_count }}))
+            if [ $diff -gt 0 ]; then
+              commit_msg+=": +$diff new entries"
+            elif [ $diff -lt 0 ]; then
+              commit_msg+=": $diff entries removed"
+            else
+              commit_msg+=": content updated"
+            fi
+          fi
+        fi
+        
+        commit_msg+="\n\nAutomated update from LOLDrivers repository"
+        commit_msg+="\nSource: $REMOTE_URL"
+        commit_msg+="\nTimestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        
+        echo "💾 Committing changes..."
+        git commit -m "$commit_msg"
+        
+        echo "🚀 Pushing to repository..."
+        git push
+        
+        echo "✅ Changes pushed successfully!"
+        
+    - name: 🧹 Cleanup temporary files
+      if: always()
+      run: |
+        echo "🧹 Cleaning up temporary files..."
+        rm -f temp_drivers.json update_summary.md
+        echo "✅ Cleanup completed"
+        
+    - name: 📊 Job Summary
+      if: always()
+      run: |
+        echo "## 📋 Job Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow:** Update LOLDrivers Data" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.compare.outputs.has_changes }}" = "true" ]; then
+          echo "- **Result:** ✅ Data updated successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- **Change Type:** ${{ steps.compare.outputs.change_type }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Result:** ℹ️ No changes detected" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Resources" >> $GITHUB_STEP_SUMMARY
+        echo "- [LOLDrivers Website](https://loldrivers.io/)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Source Repository](https://github.com/magicsword-io/LOLDrivers)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Data File]($REMOTE_URL)" >> $GITHUB_STEP_SUMMARY
