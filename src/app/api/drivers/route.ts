@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('hvci') === 'true') filters.hvci = true;
     if (searchParams.get('killer') === 'true') filters.killer = true;
     if (searchParams.get('recent') === 'true') filters.recent = true;
+    if (searchParams.get('newest-first') === 'true') filters.newestFirst = true;
+    if (searchParams.get('oldest-first') === 'true') filters.oldestFirst = true;
     
     // Exclusion mutuelle pour signed/unsigned
     const signedParam = searchParams.get('signed');

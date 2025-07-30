@@ -23,6 +23,7 @@ export interface Driver {
   };
   Category?: string;
   Author?: string;
+  Created?: string;
   MitreID?: string;
   FileVersion?: string;
   Copyright?: string;

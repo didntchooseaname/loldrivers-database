@@ -39,6 +39,8 @@ export default function DriversClient({
     if (activeFilters.has('signed')) params.set('signed', 'true');
     if (activeFilters.has('unsigned')) params.set('unsigned', 'true');
     if (activeFilters.has('recent')) params.set('recent', 'true');
+    if (activeFilters.has('newest-first')) params.set('newest-first', 'true');
+    if (activeFilters.has('oldest-first')) params.set('oldest-first', 'true');
     // Supprimer la limite pour récupérer tous les résultats
     
     return `/api/drivers?${params.toString()}`;
@@ -147,6 +149,25 @@ export default function DriversClient({
   const applyFilters = useCallback(() => {
     setActiveFilters(new Set(pendingFilters));
   }, [pendingFilters]);
+
+  // Fonction pour appliquer directement un filtre depuis le header
+  const applyDirectFilter = useCallback((filterType: string) => {
+    // Si le filtre est déjà actif, le désactiver (toggle)
+    if (activeFilters.has(filterType)) {
+      setActiveFilters(new Set());
+      setPendingFilters(new Set());
+      setSearchQuery('');
+      setInputValue('');
+    } else {
+      // Sinon, clear other filters and apply only this one
+      const newFilters = new Set([filterType]);
+      setActiveFilters(newFilters);
+      setPendingFilters(newFilters);
+      // Clear search query to show only filtered results
+      setSearchQuery('');
+      setInputValue('');
+    }
+  }, [activeFilters]);
 
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
@@ -374,6 +395,22 @@ export default function DriversClient({
 
   // Section des fonctions importées
   const renderImportedFunctionsSection = (functions: string[] | undefined, driver: Driver, index: number) => {
+    // Si pas de fonctions ou tableau vide, affichage simple non-collapsible
+    if (!functions || functions.length === 0) {
+      return (
+        <div className="simple-section">
+          <div className="simple-section-header">
+            <i className="fas fa-code"></i>
+            <span className="simple-section-title">Imported Functions</span>
+          </div>
+          <div className="simple-section-content">
+            No Imported Functions
+          </div>
+        </div>
+      );
+    }
+
+    // Si des fonctions existent, section collapsible
     const sectionId = `functions-${index}`;
     const isExpanded = expandedSections.has(sectionId);
     
@@ -381,7 +418,7 @@ export default function DriversClient({
       <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
         <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
           <span className="collapsible-title">
-            <i className="fas fa-code"></i> Imported Functions ({functions?.length || 0})
+            <i className="fas fa-code"></i> Imported Functions ({functions.length})
           </span>
           <span className="collapsible-icon">
             <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
@@ -390,23 +427,19 @@ export default function DriversClient({
         {isExpanded && (
           <div className="collapsible-content">
             <div className="collapsible-inner">
-              {functions && functions.length > 0 ? (
-                <ul className="functions-list functions-scrollable">
-                  {functions.map((func, idx) => {
-                    const isDangerous = func.toLowerCase().includes('zwterminateprocess') ||
-                                      func.toLowerCase().includes('zwkillprocess') ||
-                                      func.toLowerCase().includes('ntterminate');
-                    
-                    return (
-                      <li key={idx} className={`function-item ${isDangerous ? 'dangerous' : ''}`}>
-                        {func}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="field-content">No imported functions available</div>
-              )}
+              <ul className="functions-list functions-scrollable">
+                {functions.map((func, idx) => {
+                  const isDangerous = func.toLowerCase().includes('zwterminateprocess') ||
+                                    func.toLowerCase().includes('zwkillprocess') ||
+                                    func.toLowerCase().includes('ntterminate');
+                  
+                  return (
+                    <li key={idx} className={`function-item ${isDangerous ? 'dangerous' : ''}`}>
+                      {func}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           </div>
         )}
@@ -570,6 +603,7 @@ export default function DriversClient({
         {renderSimpleSection('Description', driver.Description || 'No description available', 'fas fa-info-circle')}
         {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
         {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
+        {driver.Created && renderSimpleSection('Created Date', driver.Created, 'fas fa-calendar')}
         {driver.MitreID && renderSimpleSection('MITRE ID', driver.MitreID, 'fas fa-shield-alt')}
         {renderCommandsSection(driver.Commands, driver, index)}
         {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
@@ -604,21 +638,27 @@ export default function DriversClient({
         
         <div className="stats-section">
           <div className="stat-item">
-            <span className="stat-label">Total Drivers</span>
+            <span className="stat-label">
+              <i className="fas fa-database"></i> Total Drivers
+            </span>
             <span className="stat-value">{statsData?.stats?.total || 0}</span>
           </div>
           <div 
             className={`stat-item clickable hvci-item ${activeFilters.has('hvci') ? 'active' : ''}`}
-            onClick={() => toggleFilter('hvci')}
+            onClick={() => applyDirectFilter('hvci')}
           >
-            <span className="stat-label">HVCI PASSED</span>
+            <span className="stat-label">
+              <i className="fas fa-check"></i> HVCI PASSED
+            </span>
             <span className="stat-value">{statsData?.stats?.hvciCompatible || 0}</span>
           </div>
           <div 
             className={`stat-item killer clickable ${activeFilters.has('killer') ? 'active' : ''}`}
-            onClick={() => toggleFilter('killer')}
+            onClick={() => applyDirectFilter('killer')}
           >
-            <span className="stat-label">Killer Drivers</span>
+            <span className="stat-label">
+              <i className="fas fa-skull-crossbones"></i> Killer Drivers
+            </span>
             <span className="stat-value">{statsData?.stats?.killerDrivers || 0}</span>
           </div>
         </div>
@@ -654,38 +694,52 @@ export default function DriversClient({
         
         <div className="filter-options">
           <div className="filter-group">
-            <span className="filter-label">Quick Filters:</span>
+            <span className="filter-label"><i className="fas fa-filter"></i> Quick Filters:</span>
             <button 
               className={`filter-btn hvci-filter ${pendingFilters.has('hvci') ? 'active' : ''}`}
               onClick={() => toggleFilter('hvci')}
             >
-              HVCI PASSED
+              <i className="fas fa-check"></i> HVCI PASSED
             </button>
             <button 
               className={`filter-btn killer ${pendingFilters.has('killer') ? 'active' : ''}`}
               onClick={() => toggleFilter('killer')}
             >
-              Killer Drivers
+              <i className="fas fa-skull-crossbones"></i> Killer Drivers
             </button>
             <button 
               className={`filter-btn ${pendingFilters.has('signed') ? 'active' : ''} ${pendingFilters.has('unsigned') ? 'disabled' : ''}`}
               onClick={() => toggleFilter('signed')}
               disabled={pendingFilters.has('unsigned')}
             >
-              Signed Drivers
+              <i className="fas fa-certificate"></i> Signed Drivers
             </button>
             <button 
               className={`filter-btn ${pendingFilters.has('unsigned') ? 'active' : ''} ${pendingFilters.has('signed') ? 'disabled' : ''}`}
               onClick={() => toggleFilter('unsigned')}
               disabled={pendingFilters.has('signed')}
             >
-              Unsigned Drivers
+              <i className="fas fa-exclamation-triangle"></i> Unsigned Drivers
             </button>
             <button 
               className={`filter-btn ${pendingFilters.has('recent') ? 'active' : ''}`}
               onClick={() => toggleFilter('recent')}
             >
-              Recent Certificates
+              <i className="fas fa-clock"></i> Recent Certificates
+            </button>
+            <button 
+              className={`filter-btn ${pendingFilters.has('newest-first') ? 'active' : ''} ${pendingFilters.has('oldest-first') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('newest-first')}
+              disabled={pendingFilters.has('oldest-first')}
+            >
+              <i className="fas fa-sort-amount-down"></i> Newest First
+            </button>
+            <button 
+              className={`filter-btn ${pendingFilters.has('oldest-first') ? 'active' : ''} ${pendingFilters.has('newest-first') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('oldest-first')}
+              disabled={pendingFilters.has('newest-first')}
+            >
+              <i className="fas fa-sort-amount-up"></i> Oldest First
             </button>
             <button 
               className="btn btn--primary apply-filters-btn"
@@ -760,38 +814,37 @@ export default function DriversClient({
               <i className="fas fa-angle-left"></i>
             </button>
             
-            <div className="pagination-info">
-              <span className="pagination-text">
-                Page {currentPage} of {totalPages}
-              </span>
-              <div className="pagination-numbers">
-                {(() => {
-                  const pages = [];
-                  const maxVisiblePages = 5;
-                  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-                  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-                  
-                  // Ajuster startPage si on est proche de la fin
-                  if (endPage - startPage < maxVisiblePages - 1) {
-                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                  }
-                  
-                  for (let i = startPage; i <= endPage; i++) {
-                    pages.push(
-                      <button
-                        key={i}
-                        className={`pagination-number ${i === currentPage ? 'active' : ''}`}
-                        onClick={() => goToPage(i)}
-                        aria-label={`Go to page ${i}`}
-                      >
-                        {i}
-                      </button>
-                    );
-                  }
-                  
-                  return pages;
-                })()}
-              </div>
+            <span className="pagination-text">
+              Page {currentPage} of {totalPages}
+            </span>
+            
+            <div className="pagination-numbers">
+              {(() => {
+                const pages = [];
+                const maxVisiblePages = 5;
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                
+                // Ajuster startPage si on est proche de la fin
+                if (endPage - startPage < maxVisiblePages - 1) {
+                  startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                }
+                
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(
+                    <button
+                      key={i}
+                      className={`pagination-number ${i === currentPage ? 'active' : ''}`}
+                      onClick={() => goToPage(i)}
+                      aria-label={`Go to page ${i}`}
+                    >
+                      {i}
+                    </button>
+                  );
+                }
+                
+                return pages;
+              })()}
             </div>
             
             <button 

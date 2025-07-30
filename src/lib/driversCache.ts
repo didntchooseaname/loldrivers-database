@@ -219,6 +219,31 @@ class DriversCache {
       filtered = filtered.filter(driver => this.searchInDriverOptimized(driver, searchTerm));
     }
 
+    // Tri par date si demandé
+    if (filters.newestFirst) {
+      filtered.sort((a, b) => {
+        const dateA = a.Created ? new Date(a.Created).getTime() : 0;
+        const dateB = b.Created ? new Date(b.Created).getTime() : 0;
+        // Si les deux dates sont invalides, maintenir l'ordre original
+        if (dateA === 0 && dateB === 0) return 0;
+        // Les éléments avec date valide viennent en premier
+        if (dateA === 0) return 1;
+        if (dateB === 0) return -1;
+        return dateB - dateA; // Plus récent en premier
+      });
+    } else if (filters.oldestFirst) {
+      filtered.sort((a, b) => {
+        const dateA = a.Created ? new Date(a.Created).getTime() : Number.MAX_SAFE_INTEGER;
+        const dateB = b.Created ? new Date(b.Created).getTime() : Number.MAX_SAFE_INTEGER;
+        // Si les deux dates sont invalides, maintenir l'ordre original
+        if (dateA === Number.MAX_SAFE_INTEGER && dateB === Number.MAX_SAFE_INTEGER) return 0;
+        // Les éléments avec date valide viennent en premier
+        if (dateA === Number.MAX_SAFE_INTEGER) return 1;
+        if (dateB === Number.MAX_SAFE_INTEGER) return -1;
+        return dateA - dateB; // Plus ancien en premier
+      });
+    }
+
     // Pagination - if no limit, return all results
     let result;
     if (!limit) {
@@ -276,6 +301,11 @@ class DriversCache {
     
     for (const [filterType, value] of Object.entries(filters)) {
       if (!value) continue;
+      
+      // Ignorer les filtres de tri
+      if (filterType === 'newestFirst' || filterType === 'oldestFirst') {
+        continue;
+      }
       
       // Utiliser l'index préconçu quand possible
       const indexedResult = this.indexedData.get(filterType);
