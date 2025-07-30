@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOLDrivers - Living Off The Land Drivers</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>LOLDrivers Database</h1>
+            <p class="header-subtitle">Vulnerable and malicious Windows drivers database</p>
+            <p class="last-updated">Last updated: <span id="lastUpdated">Loading...</span></p>
+            <div class="stats-section">
+                <div class="stat-item">
+                    <span class="stat-label">Total Drivers</span>
+                    <span class="stat-value" id="totalDrivers">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">HVCI Compatible</span>
+                    <span class="stat-value" id="hvciTrueCount">0</span>
+                </div>
+                <div class="stat-item killer">
+                    <span class="stat-label">Killer Drivers</span>
+                    <span class="stat-value" id="killerDriversCount">0</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="search-section">
+            <div class="search-container">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="form-control search-input" 
+                    placeholder="Search drivers by name, hash, company, description..."
+                >
+                <button id="clearSearch" class="btn btn--outline btn--sm">Clear</button>
+            </div>
+            <div class="search-stats">
+                <span id="resultsCount">0</span> drivers found
+            </div>
+        </div>
+
+        <div class="loading" id="loadingIndicator">
+            <div class="loading-spinner"></div>
+            <p>Loading drivers data...</p>
+        </div>
+
+        <div class="error hidden" id="errorMessage">
+            <h3>Error Loading Data</h3>
+            <p id="errorText"></p>
+            <button id="retryButton" class="btn btn--primary">Retry</button>
+        </div>
+
+        <div class="drivers-grid" id="driversGrid">
+            <!-- Drivers will be populated here -->
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
