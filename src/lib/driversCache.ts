@@ -20,8 +20,8 @@ interface Driver {
     Usecase?: string;
   };
   Resources?: string[];
-  KnownVulnerableSamples?: any[];
-  [key: string]: any;
+  KnownVulnerableSamples?: Record<string, unknown>[];
+  [key: string]: unknown;
 }
 
 interface ProcessedDriver extends Driver {
@@ -39,7 +39,7 @@ interface ProcessedDriver extends Driver {
     SHA1?: string;
     SHA256?: string;
   };
-  Signatures?: any[];
+  Signatures?: Record<string, unknown>[];
 }
 
 // Cache keys
@@ -48,15 +48,31 @@ const CACHE_KEYS = {
   STATS: 'driver_stats',
   SEARCH_PREFIX: 'search_',
   FILTER_PREFIX: 'filter_',
+  FILE_HASH: 'file_hash',
+} as const;
+
+// Cache TTL (en millisecondes) - augmenté pour de meilleures performances
+const CACHE_TTL = parseInt(process.env.CACHE_TTL || '7200') * 1000; // 2 heures par défaut
+const SEARCH_CACHE_TTL = 600000; // 10 minutes pour les recherches
+const STATS_CACHE_TTL = 1800000; // 30 minutes pour les stats
+
+// Fonctions utilitaires optimisées
+const createSearchKey = (query: string, filters: Record<string, unknown>, page: number, limit: number): string => {
+  const filterStr = JSON.stringify(filters);
+  return `${CACHE_KEYS.SEARCH_PREFIX}${query}_${filterStr}_${page}_${limit}`;
 };
 
-// Cache TTL (en millisecondes)
-const CACHE_TTL = parseInt(process.env.CACHE_TTL || '3600') * 1000; // 1 heure par défaut
+const normalizeString = (str: string): string => str.toLowerCase().trim();
+
+// Pré-compilation des regex pour de meilleures performances
+const KILLER_FUNCTIONS_REGEX = /zwterminateprocess|zwkillprocess|ntterminate/i;
 
 class DriversCache {
   private static instance: DriversCache;
   private drivers: ProcessedDriver[] = [];
   private isLoaded = false;
+  private fileHash: string = '';
+  private indexedData: Map<string, ProcessedDriver[]> = new Map();
 
   static getInstance(): DriversCache {
     if (!DriversCache.instance) {
@@ -65,20 +81,58 @@ class DriversCache {
     return DriversCache.instance;
   }
 
+  private getFileHash(filePath: string): string {
+    try {
+      const stats = fs.statSync(filePath);
+      return `${stats.size}_${stats.mtime.getTime()}`;
+    } catch {
+      return '';
+    }
+  }
+
+  private buildSearchIndex(): void {
+    // Index par type de filtre pour accès rapide
+    const hvciDrivers = this.drivers.filter(driver => 
+      driver.LoadsDespiteHVCI?.toString().toUpperCase() === 'TRUE'
+    );
+    
+    const killerDrivers = this.drivers.filter(driver => 
+      driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) && 
+      driver.ImportedFunctions.some(func => KILLER_FUNCTIONS_REGEX.test(func))
+    );
+    
+    const signedDrivers = this.drivers.filter(driver => 
+      driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0
+    );
+    
+    const unsignedDrivers = this.drivers.filter(driver => 
+      !driver.Signatures || !Array.isArray(driver.Signatures) || driver.Signatures.length === 0
+    );
+
+    this.indexedData.set('hvci', hvciDrivers);
+    this.indexedData.set('killer', killerDrivers);
+    this.indexedData.set('signed', signedDrivers);
+    this.indexedData.set('unsigned', unsignedDrivers);
+  }
+
   async loadDrivers(): Promise<ProcessedDriver[]> {
-    // Vérifier le cache mémoire d'abord
+    const dataPath = path.join(process.cwd(), 'data', 'drv.json');
+    const currentFileHash = this.getFileHash(dataPath);
+    
+    // Vérifier le cache avec hash du fichier
+    const cachedHash = cache.get(CACHE_KEYS.FILE_HASH);
     const cached = cache.get(CACHE_KEYS.ALL_DRIVERS);
-    if (cached && this.isLoaded) {
+    
+    if (cached && this.isLoaded && cachedHash === currentFileHash) {
       return cached;
     }
 
     try {
       console.log('Loading drivers from file...');
-      const dataPath = path.join(process.cwd(), 'data', 'drv.json');
       const fileContent = fs.readFileSync(dataPath, 'utf8');
       const rawData: Driver[] = JSON.parse(fileContent);
 
-      // Traitement des données similaire à l'original
+      // Traitement optimisé des données
       this.drivers = rawData
         .filter(item => item && typeof item === 'object')
         .flatMap(driver => {
@@ -100,24 +154,39 @@ class DriversCache {
           return [driver];
         }) as ProcessedDriver[];
 
-      // Mise en cache
-      cache.put(CACHE_KEYS.ALL_DRIVERS, this.drivers, CACHE_TTL);
-      this.isLoaded = true;
+      // Construction de l'index de recherche
+      this.buildSearchIndex();
 
-      console.log(`Loaded ${this.drivers.length} drivers`);
+      // Mise en cache optimisée
+      cache.put(CACHE_KEYS.ALL_DRIVERS, this.drivers, CACHE_TTL);
+      cache.put(CACHE_KEYS.FILE_HASH, currentFileHash, CACHE_TTL);
+      this.isLoaded = true;
+      this.fileHash = currentFileHash;
+
+      console.log(`Loaded ${this.drivers.length} drivers with search index`);
       return this.drivers;
-    } catch (error) {
-      console.error('Error loading drivers:', error);
-      throw error;
+    } catch {
+      console.error('Error loading drivers');
+      throw new Error('Failed to load drivers data');
     }
   }
 
-  async getDrivers(page = 1, limit = 50): Promise<{
+  async getDrivers(page = 1, limit?: number): Promise<{
     drivers: ProcessedDriver[];
     total: number;
     hasMore: boolean;
   }> {
     const allDrivers = await this.loadDrivers();
+    
+    // If no limit specified, return all drivers
+    if (!limit) {
+      return {
+        drivers: allDrivers,
+        total: allDrivers.length,
+        hasMore: false
+      };
+    }
+    
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     
@@ -128,8 +197,8 @@ class DriversCache {
     };
   }
 
-  async searchDrivers(query: string, filters: any = {}, page = 1, limit = 50) {
-    const cacheKey = `${CACHE_KEYS.SEARCH_PREFIX}${query}_${JSON.stringify(filters)}_${page}_${limit}`;
+  async searchDrivers(query: string, filters: Record<string, unknown> = {}, page = 1, limit?: number) {
+    const cacheKey = createSearchKey(query, filters, page, limit || 0);
     const cached = cache.get(cacheKey);
     
     if (cached) {
@@ -139,32 +208,44 @@ class DriversCache {
     const allDrivers = await this.loadDrivers();
     let filtered = allDrivers;
 
-    // Appliquer les filtres
+    // Optimisation : utiliser l'index pour les filtres
     if (Object.keys(filters).length > 0) {
-      filtered = this.applyFilters(allDrivers, filters);
+      filtered = this.applyFiltersOptimized(allDrivers, filters);
     }
 
-    // Appliquer la recherche
+    // Optimisation de la recherche
     if (query && query.trim()) {
-      const searchTerm = query.toLowerCase().trim();
-      filtered = filtered.filter(driver => this.searchInDriver(driver, searchTerm));
+      const searchTerm = normalizeString(query);
+      filtered = filtered.filter(driver => this.searchInDriverOptimized(driver, searchTerm));
     }
 
-    // Pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    
-    const result = {
-      drivers: filtered.slice(startIndex, endIndex),
-      total: filtered.length,
-      hasMore: endIndex < filtered.length,
-      page,
-      query,
-      filters
-    };
+    // Pagination - if no limit, return all results
+    let result;
+    if (!limit) {
+      result = {
+        drivers: filtered,
+        total: filtered.length,
+        hasMore: false,
+        page,
+        query,
+        filters
+      };
+    } else {
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      
+      result = {
+        drivers: filtered.slice(startIndex, endIndex),
+        total: filtered.length,
+        hasMore: endIndex < filtered.length,
+        page,
+        query,
+        filters
+      };
+    }
 
-    // Cache pour 5 minutes
-    cache.put(cacheKey, result, 5 * 60 * 1000);
+    // Cache pour les recherches fréquentes
+    cache.put(cacheKey, result, SEARCH_CACHE_TTL);
     return result;
   }
 
@@ -176,75 +257,78 @@ class DriversCache {
 
     const drivers = await this.loadDrivers();
     
+    // Utilisation de l'index pour des stats plus rapides
     const stats = {
       total: drivers.length,
-      hvciCompatible: drivers.filter(driver => 
-        driver.LoadsDespiteHVCI && 
-        driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE'
-      ).length,
-      killerDrivers: drivers.filter(driver => {
-        if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
-          return driver.ImportedFunctions.some(func => 
-            func.toLowerCase().includes('zwterminateprocess') ||
-            func.toLowerCase().includes('zwkillprocess') ||
-            func.toLowerCase().includes('ntterminate')
-          );
-        }
-        return false;
-      }).length,
-      signed: drivers.filter(driver => 
-        driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0
-      ).length,
+      hvciCompatible: this.indexedData.get('hvci')?.length || 0,
+      killerDrivers: this.indexedData.get('killer')?.length || 0,
+      signed: this.indexedData.get('signed')?.length || 0,
       lastUpdated: new Date().toISOString()
     };
 
-    cache.put(CACHE_KEYS.STATS, stats, CACHE_TTL);
+    // Cache pour les statistiques
+    cache.put(CACHE_KEYS.STATS, stats, STATS_CACHE_TTL);
     return stats;
   }
 
-  private applyFilters(drivers: ProcessedDriver[], filters: any): ProcessedDriver[] {
-    return drivers.filter(driver => {
-      for (const [filterType, value] of Object.entries(filters)) {
-        if (!value) continue;
-
-        switch (filterType) {
-          case 'hvci':
-            if (!(driver.LoadsDespiteHVCI && 
-                  driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE')) {
-              return false;
-            }
-            break;
-          
-          case 'killer':
-            if (!(driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
-                  driver.ImportedFunctions.some(func => 
-                    func.toLowerCase().includes('zwterminateprocess') ||
-                    func.toLowerCase().includes('zwkillprocess') ||
-                    func.toLowerCase().includes('ntterminate')
-                  ))) {
-              return false;
-            }
-            break;
-          
-          case 'signed':
-            if (!(driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0)) {
-              return false;
-            }
-            break;
-          
-          case 'unsigned':
-            if (driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0) {
-              return false;
-            }
-            break;
-        }
+  private applyFiltersOptimized(drivers: ProcessedDriver[], filters: Record<string, unknown>): ProcessedDriver[] {
+    let result = drivers;
+    
+    for (const [filterType, value] of Object.entries(filters)) {
+      if (!value) continue;
+      
+      // Utiliser l'index préconçu quand possible
+      const indexedResult = this.indexedData.get(filterType);
+      if (indexedResult) {
+        // Intersection optimisée
+        result = result.filter(driver => indexedResult.includes(driver));
+      } else {
+        // Fallback pour les filtres non indexés
+        result = result.filter(driver => this.applyFilter(driver, filterType));
       }
-      return true;
-    });
+    }
+    
+    return result;
   }
 
-  private searchInDriver(driver: ProcessedDriver, searchTerm: string): boolean {
-    const basicFields = [
+  private applyFilter(driver: ProcessedDriver, filterType: string): boolean {
+    switch (filterType) {
+      case 'recent':
+        return this.hasActiveCertificate(driver);
+      default:
+        return true;
+    }
+  }
+
+  private hasActiveCertificate(driver: ProcessedDriver): boolean {
+    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+      return false;
+    }
+
+    const now = Date.now();
+    
+    for (const signature of driver.Signatures) {
+      if (signature.Certificates && Array.isArray(signature.Certificates)) {
+        for (const cert of signature.Certificates) {
+          if (cert.ValidTo) {
+            try {
+              const validTo = new Date(cert.ValidTo).getTime();
+              if (validTo > now) {
+                return true;
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private searchInDriverOptimized(driver: ProcessedDriver, searchTerm: string): boolean {
+    // Pré-compiler les champs de recherche pour éviter la répétition
+    const searchFields = [
       driver.OriginalFilename || driver.Filename,
       driver.Company,
       driver.Description,
@@ -257,11 +341,11 @@ class DriversCache {
       driver.Author,
       driver.MitreID,
       driver.Verified
-    ];
+    ].filter(Boolean);
 
     // Authentihash
     if (driver.Authentihash) {
-      basicFields.push(
+      searchFields.push(
         driver.Authentihash.MD5,
         driver.Authentihash.SHA1,
         driver.Authentihash.SHA256
@@ -269,27 +353,26 @@ class DriversCache {
     }
 
     // Tags et CVE
-    if (driver.Tags && Array.isArray(driver.Tags)) {
-      basicFields.push(...driver.Tags);
+    if (driver.Tags?.length) {
+      searchFields.push(...driver.Tags);
     }
-    if (driver.CVE && Array.isArray(driver.CVE)) {
-      basicFields.push(...driver.CVE);
-    }
-
-    // Recherche dans les champs de base
-    if (basicFields.some(field => 
-      field && field.toString().toLowerCase().includes(searchTerm)
-    )) {
-      return true;
+    if (driver.CVE?.length) {
+      searchFields.push(...driver.CVE);
     }
 
-    // ImportedFunctions
-    if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
-      if (driver.ImportedFunctions.some(func => 
-        func.toLowerCase().includes(searchTerm)
-      )) {
-        return true;
-      }
+    // Recherche optimisée dans les champs de base
+    const hasBasicMatch = searchFields.some(field => 
+      field && normalizeString(field.toString()).includes(searchTerm)
+    );
+    
+    if (hasBasicMatch) return true;
+
+    // ImportedFunctions avec regex optimisée
+    if (driver.ImportedFunctions?.length) {
+      const hasImportMatch = driver.ImportedFunctions.some(func => 
+        normalizeString(func).includes(searchTerm)
+      );
+      if (hasImportMatch) return true;
     }
 
     // Commands
@@ -300,12 +383,12 @@ class DriversCache {
         driver.Commands.OperatingSystem,
         driver.Commands.Privileges,
         driver.Commands.Usecase
-      ];
-      if (commandFields.some(field => 
-        field && field.toString().toLowerCase().includes(searchTerm)
-      )) {
-        return true;
-      }
+      ].filter(Boolean);
+      
+      const hasCommandMatch = commandFields.some(field => 
+        field && normalizeString(field.toString()).includes(searchTerm)
+      );
+      if (hasCommandMatch) return true;
     }
 
     return false;

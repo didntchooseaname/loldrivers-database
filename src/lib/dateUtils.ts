@@ -6,7 +6,7 @@ export function formatDateConsistent(date: string | Date): string {
     
     // Utiliser un format ISO pour la consistance serveur/client
     return dateObj.toISOString().replace('T', ' ').slice(0, 19);
-  } catch (error) {
+  } catch {
     return 'Invalid date';
   }
 }
@@ -24,7 +24,7 @@ export function formatDateLocale(date: string | Date): string {
     const seconds = dateObj.getSeconds().toString().padStart(2, '0');
     
     return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
-  } catch (error) {
+  } catch {
     return 'Invalid date';
   }
 }

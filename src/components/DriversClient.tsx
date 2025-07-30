@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
+import { debounce } from '@/utils';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
@@ -15,18 +16,41 @@ export default function DriversClient({
   initialStats: { success: boolean; stats: Stats };
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [inputValue, setInputValue] = useState(''); // Nouvelle valeur pour l'input
   const [activeFilters, setActiveFilters] = useState(new Set<string>());
-  const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>(initialDrivers.drivers);
   const [expandedSections, setExpandedSections] = useState(new Set<string>());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  
+  // États de pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
-  // Utilisation de SWR pour le cache côté client
-  const { data: driversData } = useSWR<DriversResponse>(
-    `/api/drivers?limit=10000`, // Charger tous les drivers pour filtrage côté client
+  // Utilisation de SWR pour la recherche côté serveur
+  const searchKey = useMemo(() => {
+    if (!searchQuery.trim() && activeFilters.size === 0) {
+      return null; // Pas de recherche, utiliser les données initiales
+    }
+    
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('q', searchQuery);
+    if (activeFilters.has('hvci')) params.set('hvci', 'true');
+    if (activeFilters.has('killer')) params.set('killer', 'true');
+    if (activeFilters.has('signed')) params.set('signed', 'true');
+    if (activeFilters.has('unsigned')) params.set('unsigned', 'true');
+    if (activeFilters.has('recent')) params.set('recent', 'true');
+    // Supprimer la limite pour récupérer tous les résultats
+    
+    return `/api/drivers?${params.toString()}`;
+  }, [searchQuery, activeFilters]);
+
+  const { data: searchData, isLoading } = useSWR<DriversResponse>(
+    searchKey,
     fetcher,
     {
-      fallbackData: initialDrivers,
       revalidateOnFocus: false,
-      dedupingInterval: 60000,
+      dedupingInterval: 30000, // 30 secondes de cache pour les recherches
+      revalidateOnMount: false,
     }
   );
 
@@ -36,128 +60,42 @@ export default function DriversClient({
     {
       fallbackData: initialStats,
       revalidateOnFocus: false,
-      refreshInterval: 300000,
+      refreshInterval: 600000, // 10 minutes
+      revalidateOnMount: false,
     }
   );
 
-  // Filtrage combiné (identique à l'original)
-  const applyCombinedFilters = useCallback(() => {
-    if (!driversData?.drivers) return;
-
-    let filtered = [...driversData.drivers];
-
-    // Appliquer les filtres actifs
-    if (activeFilters.size > 0) {
-      filtered = filtered.filter(driver => {
-        return Array.from(activeFilters).every(filterType => {
-          switch (filterType) {
-            case 'hvci':
-              return driver.LoadsDespiteHVCI && 
-                     driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE';
-            
-            case 'killer':
-              if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
-                return driver.ImportedFunctions.some(func => 
-                  func.toLowerCase().includes('zwterminateprocess') ||
-                  func.toLowerCase().includes('zwkillprocess') ||
-                  func.toLowerCase().includes('ntterminate')
-                );
-              }
-              return false;
-            
-            case 'signed':
-              return driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0;
-            
-            case 'unsigned':
-              return !driver.Signatures || !Array.isArray(driver.Signatures) || driver.Signatures.length === 0;
-            
-            case 'recent':
-              return hasActiveCertificate(driver);
-            
-            default:
-              return true;
-          }
-        });
-      });
+  // Mémoriser les drivers à afficher (soit les résultats de recherche, soit les données initiales)
+  const allDrivers = useMemo(() => {
+    if (searchKey && searchData) {
+      return searchData.drivers || [];
     }
+    return initialDrivers.drivers || [];
+  }, [searchKey, searchData, initialDrivers.drivers]);
 
-    // Appliquer la recherche
-    if (searchQuery.trim()) {
-      const searchTerm = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(driver => searchInDriver(driver, searchTerm));
-    }
+  // Calculs de pagination
+  const totalItems = allDrivers.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  
+  // Drivers paginés pour la page actuelle
+  const paginatedDrivers = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return allDrivers.slice(startIndex, endIndex);
+  }, [allDrivers, currentPage, ITEMS_PER_PAGE]);
 
-    setFilteredDrivers(filtered);
-  }, [driversData?.drivers, activeFilters, searchQuery]);
+  // Réinitialiser la page à 1 quand les filtres ou la recherche changent
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeFilters]);
 
-  // Fonction de recherche (identique à l'original)
-  const searchInDriver = (driver: Driver, searchTerm: string): boolean => {
-    const basicFields = [
-      driver.OriginalFilename || driver.Filename,
-      driver.Company,
-      driver.Description,
-      driver.MD5,
-      driver.SHA1,
-      driver.SHA256,
-      driver.FileVersion,
-      driver.Copyright,
-      driver.Category,
-      driver.Author,
-      driver.MitreID,
-      driver.Verified
-    ];
+  // Supprimer l'ancien état filteredDrivers car on utilise maintenant paginatedDrivers
+  const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>(paginatedDrivers);
 
-    if (driver.Authentihash) {
-      basicFields.push(
-        driver.Authentihash.MD5,
-        driver.Authentihash.SHA1,
-        driver.Authentihash.SHA256
-      );
-    }
-
-    if (driver.Tags && Array.isArray(driver.Tags)) {
-      basicFields.push(...driver.Tags);
-    }
-    if (driver.CVE && Array.isArray(driver.CVE)) {
-      basicFields.push(...driver.CVE);
-    }
-
-    if (basicFields.some(field => 
-      field && field.toString().toLowerCase().includes(searchTerm)
-    )) {
-      return true;
-    }
-
-    if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
-      if (driver.ImportedFunctions.some(func => 
-        func.toLowerCase().includes(searchTerm)
-      )) {
-        return true;
-      }
-    }
-
-    if (driver.LoadsDespiteHVCI && 
-        driver.LoadsDespiteHVCI.toLowerCase().includes(searchTerm)) {
-      return true;
-    }
-
-    if (driver.Commands) {
-      const commandFields = [
-        driver.Commands.Command,
-        driver.Commands.Description,
-        driver.Commands.OperatingSystem,
-        driver.Commands.Privileges,
-        driver.Commands.Usecase
-      ];
-      if (commandFields.some(field => 
-        field && field.toString().toLowerCase().includes(searchTerm)
-      )) {
-        return true;
-      }
-    }
-
-    return false;
-  };
+  // Mettre à jour filteredDrivers quand paginatedDrivers change
+  useEffect(() => {
+    setFilteredDrivers(paginatedDrivers);
+  }, [paginatedDrivers]);
 
   // Vérifier certificat actif
   const hasActiveCertificate = (driver: Driver): boolean => {
@@ -175,7 +113,7 @@ export default function DriversClient({
               if (validTo > now) {
                 return true;
               }
-            } catch (error) {
+            } catch {
               continue;
             }
           }
@@ -187,8 +125,6 @@ export default function DriversClient({
 
   // Gestion des filtres
   const toggleFilter = useCallback((filterType: string) => {
-    setSearchQuery('');
-    
     setActiveFilters(prev => {
       const newFilters = new Set(prev);
       if (newFilters.has(filterType)) {
@@ -202,12 +138,71 @@ export default function DriversClient({
 
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
+    setInputValue('');
     setActiveFilters(new Set());
   }, []);
 
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
+  // Fonction pour effectuer la recherche
+  const performSearch = useCallback(() => {
+    setSearchQuery(inputValue.trim());
+  }, [inputValue]);
+
+  // Fonction pour gérer la touche Entrée
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      performSearch();
+    }
+  }, [performSearch]);
+
+  // Fonction pour afficher le toast
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000); // Toast disparaît après 3 secondes
   }, []);
+
+  // Gestion du bouton Back to Top
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
+
+  // Fonctions de pagination
+  const goToPage = useCallback((page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      // Scroll vers le haut de la liste
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [totalPages]);
+
+  const goToNextPage = useCallback(() => {
+    goToPage(currentPage + 1);
+  }, [currentPage, goToPage]);
+
+  const goToPreviousPage = useCallback(() => {
+    goToPage(currentPage - 1);
+  }, [currentPage, goToPage]);
+
+  const goToFirstPage = useCallback(() => {
+    goToPage(1);
+  }, [goToPage]);
+
+  const goToLastPage = useCallback(() => {
+    goToPage(totalPages);
+  }, [totalPages, goToPage]);
 
   // Gestion des sections collapsibles
   const toggleSection = useCallback((sectionId: string) => {
@@ -222,13 +217,8 @@ export default function DriversClient({
     });
   }, []);
 
-  // Appliquer les filtres quand les dépendances changent
-  useEffect(() => {
-    applyCombinedFilters();
-  }, [applyCombinedFilters]);
-
-  // Générer les hash tags
-  const renderHashTags = (hashes: any) => {
+  // Gestion des sections collapsibles
+  const renderHashTags = (hashes: { MD5?: string; SHA1?: string; SHA256?: string }) => {
     return (
       <div className="hash-tags">
         {hashes.MD5 && <span className="hash-tag md5">MD5: {hashes.MD5}</span>}
@@ -248,8 +238,9 @@ export default function DriversClient({
     if (driver.LoadsDespiteHVCI) {
       const isTrue = driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE';
       tags.push({
-        text: `HVCI: ${driver.LoadsDespiteHVCI}`,
-        type: isTrue ? 'success' : 'danger'
+        text: isTrue ? 'HVCI PASSED' : 'HVCI BLOCKED',
+        type: isTrue ? 'success' : 'danger',
+        icon: isTrue ? 'fas fa-check-circle' : 'fas fa-times-circle'
       });
     }
     
@@ -262,55 +253,50 @@ export default function DriversClient({
       if (hasKillerFunction) {
         tags.push({
           text: 'KILLER',
-          type: 'danger'
+          type: 'danger',
+          icon: 'fas fa-skull-crossbones'
         });
       }
     }
     
     if (hasActiveCertificate(driver)) {
       tags.push({
-        text: 'ACTIVE CERTIFICATE',
-        type: 'success'
+        text: 'VALID CERTIFICATE',
+        type: 'success',
+        icon: 'fas fa-certificate'
       });
     }
     
     return tags;
   };
 
-  const renderStatusTags = (tags: any[]) => {
+  const renderStatusTags = (tags: Array<{ text: string; type: string; icon?: string }>) => {
     if (!tags.length) return null;
     
     return (
       <div className="status-tags">
         {tags.map((tag, index) => (
           <span key={index} className={`status-tag ${tag.type}`}>
-            {tag.text}
+            {tag.icon && <i className={tag.icon}></i>} {tag.text}
           </span>
         ))}
       </div>
     );
   };
 
-  // Section collapsible
-  const renderCollapsibleSection = (title: string, content: string, driver: Driver, index: number) => {
+  // Section simple (non-collapsible)
+  const renderSimpleSection = (title: string, content: string, icon: string) => {
     if (!content) return null;
     
-    const sectionId = `section-${index}-${title.replace(/\s+/g, '-').toLowerCase()}`;
-    const isExpanded = expandedSections.has(sectionId);
-    
     return (
-      <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
-        <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
-          <span className="collapsible-title">{title}</span>
-          <span className="collapsible-icon">{isExpanded ? '▼' : '▶'}</span>
+      <div className="simple-section">
+        <div className="simple-section-header">
+          <i className={icon}></i>
+          <span className="simple-section-title">{title}</span>
         </div>
-        {isExpanded && (
-          <div className="collapsible-content">
-            <div className="collapsible-inner">
-              <div className="field-content">{content}</div>
-            </div>
-          </div>
-        )}
+        <div className="simple-section-content">
+          {content}
+        </div>
       </div>
     );
   };
@@ -324,9 +310,11 @@ export default function DriversClient({
       <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
         <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
           <span className="collapsible-title">
-            Imported Functions ({functions?.length || 0})
+            <i className="fas fa-code"></i> Imported Functions ({functions?.length || 0})
           </span>
-          <span className="collapsible-icon">{isExpanded ? '▼' : '▶'}</span>
+          <span className="collapsible-icon">
+            <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
+          </span>
         </div>
         {isExpanded && (
           <div className="collapsible-content">
@@ -356,44 +344,95 @@ export default function DriversClient({
   };
 
   // Section des commandes
-  const renderCommandsSection = (commands: any, driver: Driver, index: number) => {
+  const renderCommandsSection = (commands: Driver['Commands'], driver: Driver, index: number) => {
     if (!commands || typeof commands !== 'object') return null;
     
     const sectionId = `commands-${index}`;
     const isExpanded = expandedSections.has(sectionId);
     
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Command copied to clipboard!');
+      }).catch(() => {
+        showToast('Failed to copy command');
+      });
+    };
+    
     return (
       <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
         <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
-          <span className="collapsible-title">Commands & Usage</span>
-          <span className="collapsible-icon">{isExpanded ? '▼' : '▶'}</span>
+          <span className="collapsible-title">
+            <i className="fas fa-terminal"></i> Commands & Usage
+          </span>
+          <span className="collapsible-icon">
+            <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
+          </span>
         </div>
         {isExpanded && (
           <div className="collapsible-content">
             <div className="collapsible-inner">
               {commands.Description && (
                 <div className="command-field">
-                  <strong>Description:</strong> {commands.Description}
+                  <div className="command-field-header">
+                    <i className="fas fa-file-text"></i>
+                    <strong>Description</strong>
+                  </div>
+                  <div className="command-field-content">{commands.Description}</div>
                 </div>
               )}
               {commands.OperatingSystem && (
                 <div className="command-field">
-                  <strong>OS:</strong> {commands.OperatingSystem}
+                  <div className="command-field-header">
+                    <i className="fas fa-desktop"></i>
+                    <strong>Operating System</strong>
+                  </div>
+                  <div className="command-field-content">{commands.OperatingSystem}</div>
                 </div>
               )}
               {commands.Privileges && (
                 <div className="command-field">
-                  <strong>Privileges:</strong> {commands.Privileges}
+                  <div className="command-field-header">
+                    <i className="fas fa-user-shield"></i>
+                    <strong>Privileges</strong>
+                  </div>
+                  <div className="command-field-content">{commands.Privileges}</div>
                 </div>
               )}
               {commands.Usecase && (
                 <div className="command-field">
-                  <strong>Use case:</strong> {commands.Usecase}
+                  <div className="command-field-header">
+                    <i className="fas fa-bullseye"></i>
+                    <strong>Use Case</strong>
+                  </div>
+                  <div className="command-field-content">{commands.Usecase}</div>
                 </div>
               )}
               {commands.Command && commands.Command.trim() && (
                 <div className="command-field">
-                  <strong>Command:</strong> <code>{commands.Command}</code>
+                  <div className="command-field-header">
+                    <i className="fas fa-code"></i>
+                    <strong>Command</strong>
+                  </div>
+                  <div className="terminal-window">
+                    <div className="terminal-header">
+                      <div className="terminal-buttons">
+                        <span className="terminal-button red"></span>
+                        <span className="terminal-button yellow"></span>
+                        <span className="terminal-button green"></span>
+                      </div>
+                      <div className="terminal-title">Command Prompt</div>
+                      <button 
+                        className="copy-button"
+                        onClick={() => copyToClipboard(commands.Command || '')}
+                        title="Copy command"
+                      >
+                        <i className="fas fa-copy"></i>
+                      </button>
+                    </div>
+                    <div className="terminal-content">
+                      <code>{commands.Command}</code>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -402,6 +441,31 @@ export default function DriversClient({
       </div>
     );
   };
+
+  // Fonction pour télécharger un driver
+  const downloadDriver = useCallback((driver: Driver) => {
+    const hash = driver.SHA256 || driver.SHA1 || driver.MD5;
+    const filename = driver.OriginalFilename || driver.Filename || 'driver';
+    
+    if (!hash) {
+      showToast('No hash available for download');
+      return;
+    }
+    
+    // Créer l'URL de téléchargement basée sur le hash
+    const downloadUrl = `https://www.loldrivers.io/api/drivers/${hash}/download`;
+    
+    // Créer un lien temporaire pour déclencher le téléchargement
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Downloading ${filename}...`);
+  }, [showToast]);
 
   // Créer une carte driver
   const createDriverCard = (driver: Driver, index: number) => {
@@ -416,16 +480,26 @@ export default function DriversClient({
     return (
       <div className="driver-card" key={`driver-${index}-${driver.MD5 || driver.SHA256}`}>
         <div className="driver-header">
-          <h3 className="driver-title">{filename}</h3>
-          {renderHashTags(hashes)}
+          <h3 className="driver-title">
+            <i className="fas fa-microchip"></i> {filename}
+            <button 
+              className="download-btn"
+              onClick={() => downloadDriver(driver)}
+              title={`Download ${filename}`}
+              aria-label={`Download ${filename}`}
+            >
+              <i className="fas fa-download"></i>
+            </button>
+          </h3>
           {renderStatusTags(statusTags)}
+          {renderHashTags(hashes)}
         </div>
         
-        {renderCollapsibleSection('Company', driver.Company || 'Unknown', driver, index)}
-        {renderCollapsibleSection('Description', driver.Description || 'No description available', driver, index)}
-        {driver.Category && renderCollapsibleSection('Category', driver.Category, driver, index)}
-        {driver.Author && renderCollapsibleSection('Author', driver.Author, driver, index)}
-        {driver.MitreID && renderCollapsibleSection('MITRE ID', driver.MitreID, driver, index)}
+        {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
+        {renderSimpleSection('Description', driver.Description || 'No description available', 'fas fa-info-circle')}
+        {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
+        {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
+        {driver.MitreID && renderSimpleSection('MITRE ID', driver.MitreID, 'fas fa-shield-alt')}
         {renderCommandsSection(driver.Commands, driver, index)}
         {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
       </div>
@@ -466,7 +540,7 @@ export default function DriversClient({
             className={`stat-item clickable hvci-item ${activeFilters.has('hvci') ? 'active' : ''}`}
             onClick={() => toggleFilter('hvci')}
           >
-            <span className="stat-label">HVCI Compatible</span>
+            <span className="stat-label">HVCI PASSED</span>
             <span className="stat-value">{statsData?.stats?.hvciCompatible || 0}</span>
           </div>
           <div 
@@ -481,18 +555,34 @@ export default function DriversClient({
 
       <div className="search-section">
         <div className="search-container">
-          <input 
-            type="text" 
-            className="form-control search-input" 
-            placeholder="Search drivers by name, hash, company, description..."
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
+          <div className="search-input-wrapper">
+            <input 
+              type="text" 
+              className="form-control search-input" 
+              placeholder="Search drivers by name, hash, company, description..."
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+            />
+            {isLoading && (
+              <div className="search-loading-icon">
+                <i className="fas fa-spinner fa-spin"></i>
+              </div>
+            )}
+          </div>
           <button 
-            className="btn btn--outline btn--sm"
+            className="btn btn--primary search-button"
+            onClick={performSearch}
+            disabled={isLoading}
+          >
+            <i className="fas fa-search"></i> {isLoading ? 'Searching...' : 'Search'}
+          </button>
+          <button 
+            className="btn btn--outline btn--sm clear-button"
             onClick={clearAllFilters}
           >
-            Clear
+            <i className="fas fa-eraser"></i> Clear
           </button>
         </div>
         
@@ -503,7 +593,7 @@ export default function DriversClient({
               className={`filter-btn hvci-filter ${activeFilters.has('hvci') ? 'active' : ''}`}
               onClick={() => toggleFilter('hvci')}
             >
-              HVCI Compatible
+              HVCI PASSED
             </button>
             <button 
               className={`filter-btn killer ${activeFilters.has('killer') ? 'active' : ''}`}
@@ -539,20 +629,197 @@ export default function DriversClient({
         </div>
         
         <div className="search-stats">
-          <span>{filteredDrivers.length}</span> drivers found
+          <span>
+            {isLoading 
+              ? 'Searching...' 
+              : `Showing ${Math.min(ITEMS_PER_PAGE, filteredDrivers.length)} of ${totalItems} drivers (Page ${currentPage} of ${totalPages})`
+            }
+          </span>
+          {searchKey && <span className="server-search-indicator"> (Server-side search)</span>}
         </div>
       </div>
 
       <div className="drivers-grid">
-        {filteredDrivers.length > 0 ? (
-          filteredDrivers.map((driver, index) => createDriverCard(driver, index))
-        ) : (
+        {isLoading && (
+          <div className="global-loading">
+            <div className="loading-spinner">
+              <div className="spinner"></div>
+            </div>
+            <p className="loading-text">Searching drivers...</p>
+          </div>
+        )}
+        
+        {!isLoading && filteredDrivers.length > 0 ? (
+          filteredDrivers.map((driver, index) => {
+            // Calculer l'index global pour l'unicité
+            const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index;
+            return createDriverCard(driver, globalIndex);
+          })
+        ) : !isLoading ? (
           <div className="empty-state">
             <h3>No drivers found</h3>
             <p>Try adjusting your search criteria</p>
           </div>
-        )}
+        ) : null}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="pagination-container">
+          <div className="pagination">
+            <button 
+              className="pagination-btn" 
+              onClick={goToFirstPage}
+              disabled={currentPage === 1}
+              aria-label="Go to first page"
+            >
+              <i className="fas fa-angle-double-left"></i>
+            </button>
+            <button 
+              className="pagination-btn" 
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              aria-label="Go to previous page"
+            >
+              <i className="fas fa-angle-left"></i>
+            </button>
+            
+            <div className="pagination-info">
+              <span className="pagination-text">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="pagination-numbers">
+                {(() => {
+                  const pages = [];
+                  const maxVisiblePages = 5;
+                  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                  
+                  // Ajuster startPage si on est proche de la fin
+                  if (endPage - startPage < maxVisiblePages - 1) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+                  
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        className={`pagination-number ${i === currentPage ? 'active' : ''}`}
+                        onClick={() => goToPage(i)}
+                        aria-label={`Go to page ${i}`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+                  
+                  return pages;
+                })()}
+              </div>
+            </div>
+            
+            <button 
+              className="pagination-btn" 
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              aria-label="Go to next page"
+            >
+              <i className="fas fa-angle-right"></i>
+            </button>
+            <button 
+              className="pagination-btn" 
+              onClick={goToLastPage}
+              disabled={currentPage === totalPages}
+              aria-label="Go to last page"
+            >
+              <i className="fas fa-angle-double-right"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="toast-notification">
+          <div className="toast-content">
+            <i className="fas fa-check-circle"></i>
+            <span>{toastMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Back to Top Button */}
+      {showBackToTop && (
+        <button 
+          className="back-to-top"
+          onClick={scrollToTop}
+          aria-label="Back to top"
+        >
+          <i className="fas fa-chevron-up"></i>
+        </button>
+      )}
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-content">
+          <div className="footer-section">
+            <h4 className="footer-title">
+              <i className="fas fa-heart"></i> Special Thanks
+            </h4>
+            <p className="footer-text">
+              This database is based on the amazing work from the{' '}
+              <a 
+                href="https://loldrivers.io" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                LOLDrivers.io
+              </a>{' '}
+              project and its contributors.
+            </p>
+          </div>
+          
+          <div className="footer-section">
+            <h4 className="footer-title">
+              <i className="fab fa-github"></i> Source & Contributors
+            </h4>
+            <p className="footer-text">
+              Original project:{' '}
+              <a 
+                href="https://github.com/magicsword-io/LOLDrivers" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                <i className="fab fa-github"></i> magicsword-io/LOLDrivers
+              </a>
+            </p>
+            <div className="contributors">
+              <span className="contributors-label">Key Contributors:</span>
+              <div className="contributors-list">
+                <span className="contributor">Michael Haag</span>
+                <span className="contributor">Jose Hernandez</span>
+                <span className="contributor">Nasreddine Bencherchali</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="footer-bottom">
+          <p className="footer-disclaimer">
+            This is an independent interface for educational and research purposes.
+          </p>
+          <div className="footer-links">
+            <a 
+              href="/terms" 
+              className="footer-legal-link"
+            >
+              <i className="fas fa-gavel"></i> Terms of Service
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

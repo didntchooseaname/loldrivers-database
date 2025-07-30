@@ -1,11 +1,24 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useIsHydrated } from '@/hooks/useHydration';
 
 export default function ThemeToggle() {
+  const isHydrated = useIsHydrated();
+
   useEffect(() => {
+    // N'exécuter le code que après l'hydratation
+    if (!isHydrated) return;
     // Fonction pour initialiser le thème (identique à l'original)
     const initializeTheme = () => {
+      // Vérifier si le thème est déjà défini par le script inline
+      const currentTheme = document.documentElement.getAttribute('data-color-scheme');
+      if (currentTheme) {
+        updateThemeToggle(currentTheme);
+        return;
+      }
+      
+      // Sinon, initialiser normalement
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const theme = savedTheme || (prefersDark ? 'dark' : 'light');
@@ -61,7 +74,7 @@ export default function ThemeToggle() {
       }
       mediaQuery.removeEventListener('change', handleSystemThemeChange);
     };
-  }, []);
+  }, [isHydrated]); // Dépendance sur isHydrated
 
   return null; // Ce composant n'a pas de rendu visuel
 }

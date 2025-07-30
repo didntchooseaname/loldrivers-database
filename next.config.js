@@ -4,11 +4,56 @@ const nextConfig = {
   env: {
     CACHE_TTL: '3600', // 1 heure en secondes
   },
+  
+  // Optimisations bundle
+  experimental: {
+    optimizePackageImports: ['react', 'react-dom', 'swr']
+  },
+  
   // Optimisation des images
   images: {
     unoptimized: true,
+    formats: ['image/avif', 'image/webp'],
   },
-  // Headers pour le cache
+  
+  // Compression et optimisations
+  compress: true,
+  poweredByHeader: false,
+  
+  // Tree shaking optimisé
+  webpack: (config, { dev, isServer }) => {
+    // Optimisation pour la production
+    if (!dev) {
+      config.optimization.sideEffects = false;
+      config.optimization.usedExports = true;
+    }
+    
+    // Optimisation des chunks
+    if (!isServer) {
+      config.optimization.splitChunks = {
+        ...config.optimization.splitChunks,
+        cacheGroups: {
+          ...config.optimization.splitChunks.cacheGroups,
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+            priority: 10,
+          },
+          react: {
+            test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
+            name: 'react',
+            chunks: 'all',
+            priority: 20,
+          },
+        },
+      };
+    }
+    
+    return config;
+  },
+  
+  // Headers pour le cache optimisés
   async headers() {
     return [
       {
@@ -16,29 +61,38 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=3600, stale-while-revalidate=86400', // Cache 1h, stale 24h
+            value: 'public, max-age=3600, stale-while-revalidate=86400',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
         ],
       },
       {
-        source: '/api/drivers/search',
+        source: '/api/stats',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=300, stale-while-revalidate=3600', // Cache 5min, stale 1h
+            value: 'public, max-age=1800, stale-while-revalidate=3600',
+          },
+        ],
+      },
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
           },
         ],
       },
     ];
   },
-  // Compression
-  compress: true,
-  // Configuration pour les gros fichiers JSON
-  webpack: (config) => {
-    // Modern webpack already handles JSON files properly
-    // Remove the custom JSON rule as it's redundant
-    return config;
-  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

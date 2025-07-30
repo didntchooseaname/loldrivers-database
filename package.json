@@ -1,6 +1,7 @@
 {
   "name": "loldrivers-nextjs",
   "version": "1.0.0",
+  "type": "module",
   "description": "LOLDrivers Database with SSR and caching",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
@@ -14,21 +15,22 @@
     "postinstall": "pnpm run type-check"
   },
   "dependencies": {
+    "memory-cache": "^0.2.0",
     "next": "^15.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "swr": "^2.2.5",
-    "memory-cache": "^0.2.0"
+    "swr": "^2.2.5"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@types/memory-cache": "^0.2.5",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@types/memory-cache": "^0.2.5",
     "eslint": "^9.14.0",
     "eslint-config-next": "^15.0.3",
-    "typescript": "^5.6.3",
-    "rimraf": "^6.0.1"
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3"
   },
   "engines": {
     "node": ">=18.0.0",

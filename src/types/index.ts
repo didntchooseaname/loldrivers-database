@@ -29,17 +29,17 @@ export interface Driver {
   Tags?: string[];
   CVE?: string[];
   Verified?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface Signature {
   Certificates?: Certificate[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface Certificate {
   ValidTo?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface DriversResponse {
@@ -49,7 +49,7 @@ export interface DriversResponse {
   hasMore: boolean;
   page?: number;
   query?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
 }
 
 export interface Stats {

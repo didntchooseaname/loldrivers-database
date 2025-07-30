@@ -8,7 +8,7 @@ export default async function HomePage() {
   try {
     // Charger les premières données et les statistiques
     const [initialDrivers, initialStats] = await Promise.all([
-      cache.getDrivers(1, 50),
+      cache.getDrivers(1), // Load all drivers for SSR
       cache.getStatistics()
     ]);
 
@@ -32,7 +32,7 @@ export default async function HomePage() {
       <div className="container">
         <div className="error-message">
           <h1>Error Loading Drivers Database</h1>
-          <p>We're experiencing technical difficulties. Please try again later.</p>
+          <p>We&apos;re experiencing technical difficulties. Please try again later.</p>
           <p className="error-details">{error instanceof Error ? error.message : 'Unknown error'}</p>
         </div>
       </div>

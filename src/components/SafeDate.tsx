@@ -19,7 +19,7 @@ export default function SafeDate({ date, fallback = 'Loading...', prefix = '' }:
     if (date) {
       try {
         setFormattedDate(formatDateLocale(date));
-      } catch (error) {
+      } catch {
         setFormattedDate(fallback);
       }
     } else {
