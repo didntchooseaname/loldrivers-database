@@ -1,0 +1,43 @@
+{
+  "name": "loldrivers-nextjs",
+  "version": "1.0.0",
+  "description": "LOLDrivers Database with SSR and caching",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf .next",
+    "update-data": "node scripts/update-data.js",
+    "postinstall": "pnpm run type-check"
+  },
+  "dependencies": {
+    "next": "^15.0.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "swr": "^2.2.5",
+    "memory-cache": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/memory-cache": "^0.2.5",
+    "eslint": "^9.14.0",
+    "eslint-config-next": "^15.0.3",
+    "typescript": "^5.6.3",
+    "rimraf": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "^18.3.12",
+      "@types/react-dom": "^18.3.1"
+    }
+  }
+}
