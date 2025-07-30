@@ -1032,7 +1032,7 @@ select.form-control {
 
 /* HVCI Compatible styling - Green Theme */
 .hvci-item .stat-label {
-  color: var(--color-green-dark);
+  color: var(--color-text-primary);
   font-weight: 600;
 }
 
@@ -1071,7 +1071,7 @@ select.form-control {
 }
 
 .hvci-item.active .stat-label {
-  color: var(--color-green-dark);
+  color: var(--color-white);
   text-shadow: 0 1px 2px rgba(var(--color-green-dark-rgb), 0.2);
 }
 
@@ -1083,7 +1083,7 @@ select.form-control {
 /* HVCI styles for dark mode */
 @media (prefers-color-scheme: dark) {
   .hvci-item .stat-label {
-    color: var(--color-green);
+    color: var(---color-text-primary);
   }
 
   .hvci-item .stat-value {
@@ -1099,12 +1099,12 @@ select.form-control {
   .hvci-filter:hover {
     background: rgba(var(--color-green-rgb), 0.2);
     border-color: var(--color-green);
-    color: var(--color-black);
+    color: var(--color-white);
   }
 
   .hvci-filter.active {
     background: linear-gradient(135deg, rgba(var(--color-green-rgb), 0.9), rgba(21, 128, 61, 0.8));
-    color: var(--color-charcoal-800);
+    color: var(--color-white);
   }
 
   .hvci-item.active .stat-label,
@@ -1121,7 +1121,7 @@ select.form-control {
 }
 
 [data-color-scheme="dark"] .hvci-item .stat-label {
-  color: var(--color-green);
+  color: var(--color-text-secondary);
 }
 
 [data-color-scheme="dark"] .hvci-item .stat-value {
@@ -1137,24 +1137,18 @@ select.form-control {
 [data-color-scheme="dark"] .hvci-filter:hover {
   background: rgba(var(--color-green-rgb), 0.2);
   border-color: var(--color-green);
-  color: var(--color-black);
+  color: var(--color-white);
 }
 
 [data-color-scheme="dark"] .hvci-filter.active {
   background: linear-gradient(135deg, rgba(var(--color-green-rgb), 0.9), rgba(21, 128, 61, 0.8));
-  color: var(--color-charcoal-800);
+  color: var(--color-white);
 }
 
 [data-color-scheme="dark"] .hvci-item.active .stat-label,
 [data-color-scheme="dark"] .hvci-item.active .stat-value {
-  color: var(--color-green);
+  color: var(--color-white);
   text-shadow: 0 1px 3px rgba(21, 128, 61, 0.3);
-}
-
-[data-color-scheme="dark"] .hvci-item.active {
-  border-color: var(--color-gold-500);
-  background: linear-gradient(135deg, rgba(var(--color-gold-500-rgb), 0.08), rgba(var(--color-gold-500-rgb), 0.05));
-  box-shadow: 0 4px 20px rgba(var(--color-gold-500-rgb), 0.25);
 }
 
 .stat-item.clickable {
