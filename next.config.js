@@ -5,15 +5,19 @@ const nextConfig = {
     CACHE_TTL: '3600', // 1 heure en secondes
   },
   
-  // Optimisations bundle
+  // Optimisations bundle améliorées
   experimental: {
-    optimizePackageImports: ['react', 'react-dom', 'swr']
+    optimizePackageImports: ['react', 'react-dom', 'swr'],
+    optimizeCss: true,
+    esmExternals: true,
   },
   
   // Optimisation des images
   images: {
     unoptimized: true,
     formats: ['image/avif', 'image/webp'],
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   
   // Compression et optimisations
@@ -26,12 +30,17 @@ const nextConfig = {
     if (!dev) {
       config.optimization.sideEffects = false;
       config.optimization.usedExports = true;
+      
+      // Optimisation CSS
+      config.optimization.providedExports = true;
+      config.optimization.minimize = true;
     }
     
-    // Optimisation des chunks
+    // Optimisation des chunks améliorée
     if (!isServer) {
       config.optimization.splitChunks = {
         ...config.optimization.splitChunks,
+        chunks: 'all',
         cacheGroups: {
           ...config.optimization.splitChunks.cacheGroups,
           vendor: {
@@ -39,12 +48,21 @@ const nextConfig = {
             name: 'vendors',
             chunks: 'all',
             priority: 10,
+            enforce: true,
           },
           react: {
             test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
             name: 'react',
             chunks: 'all',
             priority: 20,
+            enforce: true,
+          },
+          swr: {
+            test: /[\\/]node_modules[\\/]swr[\\/]/,
+            name: 'swr',
+            chunks: 'all',
+            priority: 15,
+            enforce: true,
           },
         },
       };

@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import type { Driver } from '@/types';
+import { useVirtualization } from '@/hooks/usePerformanceOptimizations';
 
 interface VirtualizedDriverListProps {
   drivers: Driver[];

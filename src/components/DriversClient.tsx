@@ -937,10 +937,6 @@ export default function DriversClient({
               <i className="fas fa-angle-left"></i>
             </button>
             
-            <span className="pagination-text">
-              Page {currentPage} of {totalPages}
-            </span>
-            
             <div className="pagination-numbers">
               {(() => {
                 const pages = [];
@@ -986,6 +982,11 @@ export default function DriversClient({
             >
               <i className="fas fa-angle-double-right"></i>
             </button>
+          </div>
+          
+          {/* Pagination Indicator */}
+          <div className="pagination-indicator">
+            Page {currentPage} of {totalPages}
           </div>
         </div>
       )}

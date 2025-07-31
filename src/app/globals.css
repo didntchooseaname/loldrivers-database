@@ -1865,6 +1865,11 @@ select.form-control {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: var(--space-16);
+  margin-bottom: var(--space-64);
+  
+  /* Optimisations de performance */
+  contain: layout style paint;
+  transform: translateZ(0);
 }
 
 /* 2K Resolution optimizations (1440px and up) */
@@ -2142,6 +2147,10 @@ select.form-control {
   position: relative;
   overflow: hidden;
   
+  /* Optimisations de performance */
+  contain: layout style paint;
+  will-change: auto;
+  
   /* Animation d'apparition plus simple et stable */
   opacity: 0;
   animation: fadeInStable var(--duration-slow) var(--ease-standard) forwards;
@@ -2217,7 +2226,7 @@ select.form-control {
 .driver-card:hover {
   box-shadow: var(--shadow-lg);
   border-color: var(--color-primary);
-  transform: translateY(-4px) scale(1.005);
+  transform: translateY(-2px) scale(1.002);
   background: var(--color-surface);
 }
 
@@ -3697,11 +3706,16 @@ select.form-control {
 
 /* Pagination Styles */
 .pagination-container {
-  margin: var(--space-32) 0;
-  padding: var(--space-24) 0;
+  margin: var(--space-16) 0 var(--space-32) 0;
+  padding: var(--space-8) 0;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: var(--space-12);
+  position: relative;
+  z-index: 10;
+  clear: both;
 }
 
 .pagination {
@@ -3714,6 +3728,19 @@ select.form-control {
   border-radius: var(--radius-lg);
   padding: var(--space-8);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  margin: 0;
+  padding: var(--space-8);
 }
 
 .pagination-btn {
@@ -3840,9 +3867,14 @@ select.form-control {
     padding: 0 var(--space-6);
   }
   
+  .pagination-indicator {
+    font-size: var(--font-size-xs);
+    padding: var(--space-6);
+  }
+  
   .pagination-container {
-    margin: var(--space-16) 0;
-    padding: var(--space-16) 0;
+    margin: var(--space-12) 0 var(--space-16) 0;
+    padding: var(--space-12) 0;
   }
   
   .download-btn {
@@ -3899,6 +3931,7 @@ select.form-control {
 
   .drivers-grid {
     gap: var(--space-6);
+    margin-bottom: var(--space-48);
   }
 
   .driver-card {
@@ -4019,4 +4052,63 @@ select.form-control {
     flex-wrap: wrap;
     gap: var(--space-6);
   }
+}
+
+/* =================================================================
+   OPTIMISATIONS DE PERFORMANCE
+   ================================================================= */
+
+/* Optimisation des images et favicons */
+img[src*="favicons"] {
+  contain: layout style paint;
+  will-change: auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Optimisation des animations pour réduire les repaints */
+@media (prefers-reduced-motion: no-preference) {
+  .driver-card {
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+  
+  .driver-card:hover {
+    will-change: transform;
+  }
+  
+  .driver-card:not(:hover) {
+    will-change: auto;
+  }
+}
+
+/* Optimisation pour les appareils à faible performance */
+@media (max-width: 768px), (prefers-reduced-motion: reduce) {
+  .driver-card,
+  .driver-card:hover {
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
+  
+  .driver-card::before,
+  .driver-card::after {
+    display: none !important;
+  }
+}
+
+/* Optimisation du scroll */
+.drivers-grid,
+.help-popup,
+.collapsible-content {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+/* Optimisation des listes longues */
+.functions-list,
+.resources-list {
+  contain: layout style;
+  overflow-anchor: auto;
 }
