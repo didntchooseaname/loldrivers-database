@@ -2,8 +2,8 @@ name: Update LOLDrivers Data
 
 # Exécution programmée : tous les mardis à 06:00 UTC
 on:
-  schedule:
-    - cron: '0 6 * * 2'  # Chaque mardi à 6h UTC
+  #schedule:
+  #  - cron: '0 6 * * 2'  # Chaque mardi à 6h UTC
   workflow_dispatch:  # Permet d'exécuter manuellement
 
 permissions:
