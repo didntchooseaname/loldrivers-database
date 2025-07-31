@@ -1143,12 +1143,34 @@ select.form-control {
     flex-direction: column;
     align-items: center;
     gap: var(--space-16);
+    padding: var(--space-16) var(--space-12);
   }
   
+  .header-content {
+    order: 2;
+    margin-top: var(--space-8);
+  }
+  
+  .header-controls {
+    position: static;
+    order: 1;
+    margin-top: 0;
+    gap: var(--space-16);
+    justify-content: center;
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  /* Keep toggle switch on medium screens (tablets) */
   .theme-toggle {
-    position: absolute;
-    top: 0;
-    right: 0;
+    margin-top: 0;
+    width: 55px;
+    height: 28px;
+  }
+  
+  .theme-toggle-thumb {
+    width: 20px;
+    height: 20px;
   }
   
   .help-popup {
@@ -1160,6 +1182,87 @@ select.form-control {
   .help-popup h3 {
     font-size: 1.125rem;
     padding-right: var(--space-40);
+  }
+}
+
+/* Extra small screens - Better header controls layout */
+@media (max-width: 480px) {
+  .header-top {
+    padding: var(--space-12) var(--space-8);
+    gap: var(--space-12);
+  }
+  
+  .header-controls {
+    gap: var(--space-12);
+    max-width: 160px;
+  }
+  
+  .help-button,
+  .share-button {
+    width: 36px;
+    height: 36px;
+    font-size: var(--font-size-base);
+  }
+  
+  /* Transform theme toggle into a simple button on mobile */
+  .theme-toggle {
+    width: 36px;
+    height: 36px;
+    background: var(--color-secondary);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-full);
+    margin-top: 0;
+    transition: all var(--duration-fast) var(--ease-standard);
+  }
+  
+  .theme-toggle:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.3);
+  }
+  
+  .theme-toggle:active {
+    transform: translateY(0);
+  }
+  
+  /* Hide the track and thumb on mobile, show icon instead */
+  .theme-toggle-track {
+    display: none;
+  }
+  
+  .theme-toggle-thumb {
+    display: none;
+  }
+  
+  /* Show sun/moon icon instead */
+  .theme-toggle::before {
+    content: "☀️";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 16px;
+    transition: all var(--duration-fast) var(--ease-standard);
+  }
+  
+  /* Dark theme icon */
+  [data-color-scheme="dark"] .theme-toggle::before {
+    content: "🌙";
+  }
+  
+  .theme-toggle:hover::before {
+    color: var(--color-white);
+    transform: scale(1.1);
+  }
+  
+  .header h1 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .header-subtitle {
+    font-size: var(--font-size-base);
   }
 }
 
@@ -4169,6 +4272,10 @@ select.form-control {
     gap: var(--space-8);
   }
 
+  .search-input-wrapper {
+    width: 100%;
+  }
+
   .search-input {
     width: 100%;
   }
@@ -4184,17 +4291,37 @@ select.form-control {
   }
 
   .filter-group {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-12);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-6);
+    justify-content: flex-start;
   }
 
   .filter-label {
-    margin-bottom: var(--space-4);
+    margin-bottom: 0;
+    margin-right: var(--space-4);
+    flex-shrink: 0;
+  }
+
+  .filter-btn {
+    font-size: var(--font-size-xs);
+    padding: var(--space-4) var(--space-8);
   }
 
   .filter-options {
     padding: var(--space-12);
+  }
+
+  /* Status tags responsive on medium screens */
+  .status-tags {
+    gap: var(--space-4);
+    margin-bottom: var(--space-10);
+  }
+
+  .status-tag {
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--font-size-xs);
   }
 
   .stats-section {
@@ -4226,6 +4353,61 @@ select.form-control {
 
   .functions-list {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Extra responsive improvements for very small screens */
+@media (max-width: 480px) {
+  .search-container {
+    gap: var(--space-6);
+  }
+  
+  .search-input-wrapper {
+    width: 100%;
+  }
+  
+  .search-input {
+    padding: var(--space-6) var(--space-12);
+    font-size: var(--font-size-sm);
+  }
+  
+  .search-button,
+  .clear-button {
+    padding: var(--space-8) var(--space-12);
+    font-size: var(--font-size-sm);
+  }
+  
+  .filter-group {
+    gap: var(--space-4);
+    justify-content: flex-start;
+  }
+  
+  .filter-label {
+    font-size: var(--font-size-xs);
+    margin-right: var(--space-2);
+  }
+  
+  .filter-btn {
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--font-size-xs);
+    white-space: nowrap;
+  }
+  
+  .container {
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
+  }
+  
+  .stat-item {
+    padding: var(--space-12);
+  }
+  
+  .stat-label {
+    font-size: var(--font-size-xs);
+  }
+  
+  .stat-value {
+    font-size: var(--font-size-lg);
   }
 }
 
@@ -4459,7 +4641,9 @@ select.form-control {
   }
 }
 
+/* Comprehensive responsive design for extra small screens (phones in portrait mode) */
 @media (max-width: 480px) {
+  /* Pagination improvements */
   .pagination {
     flex-direction: column;
     gap: var(--space-8);
@@ -4479,13 +4663,10 @@ select.form-control {
     justify-content: center;
     margin-bottom: var(--space-8);
   }
-}
-
-/* Extra small screens (phones in portrait mode) */
-@media (max-width: 480px) {
-  /* Even tighter spacing for very small screens */
+  
+  /* Layout improvements */
   .container {
-    padding: 0 var(--space-12);
+    padding: 0 var(--space-8);
   }
 
   .drivers-grid {
@@ -4520,13 +4701,29 @@ select.form-control {
     font-size: var(--font-size-xs);
     min-height: 40px;
   }
-
+  
   /* Sections with reduced spacing */
   .simple-section,
   .collapsible-section,
   .hash-section,
   .status-tags {
     margin-bottom: var(--space-8);
+  }
+
+  /* Status tags responsive */
+  .status-tags {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: var(--space-4);
+    margin-bottom: var(--space-8);
+  }
+
+  .status-tag {
+    padding: var(--space-3) var(--space-6);
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   .simple-section-content,
@@ -4580,6 +4777,74 @@ select.form-control {
   .clickable-hash,
   .status-tag {
     min-height: 40px;
+  }
+}
+
+/* Medium small screens (larger phones and small tablets) */
+@media (min-width: 481px) and (max-width: 768px) {
+  .header-controls {
+    gap: var(--space-14);
+  }
+  
+  /* Keep toggle switch style on medium screens */
+  .theme-toggle {
+    width: 55px;
+    height: 28px;
+  }
+  
+  .theme-toggle-thumb {
+    width: 20px;
+    height: 20px;
+  }
+  
+  /* Ensure the track and thumb are visible on medium screens */
+  .theme-toggle-track {
+    display: block;
+  }
+  
+  .theme-toggle-thumb {
+    display: flex;
+  }
+  
+  /* Hide the icon-based style on medium screens */
+  .theme-toggle::before {
+    display: none;
+  }
+  
+  .search-container {
+    gap: var(--space-10);
+  }
+  
+  .filter-group {
+    gap: var(--space-8);
+  }
+
+  .filter-btn {
+    padding: var(--space-4) var(--space-8);
+    font-size: var(--font-size-xs);
+  }
+
+  /* Status tags for medium screens */
+  .status-tags {
+    gap: var(--space-5);
+  }
+
+  .status-tag {
+    padding: var(--space-4) var(--space-7);
+    font-size: var(--font-size-xs);
+  }
+
+  .stats-section {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-16);
+  }
+  
+  .driver-card {
+    padding: var(--space-16);
+  }
+  
+  .container {
+    padding: 0 var(--space-16);
   }
 }
 
