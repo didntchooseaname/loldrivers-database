@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import Image from 'next/image';
 import type { Driver } from '@/types';
 
 interface DriverSectionsLazyProps {
@@ -104,7 +105,9 @@ const DriverSectionsLazy = memo(({
                     displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
                   }
 
-                  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : null;
+                  const faviconUrl = domain && domain.length > 0 && domain.length < 100 
+                    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` 
+                    : null;
                   
                   return (
                     <div 
@@ -115,19 +118,15 @@ const DriverSectionsLazy = memo(({
                     >
                       <span className="hash-type">
                         {faviconUrl ? (
-                          <img 
+                          <Image 
                             src={faviconUrl} 
                             alt={`${domain} favicon`}
-                            width="16" 
-                            height="16"
-                            loading="lazy"
-                            decoding="async"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              const icon = target.nextElementSibling as HTMLElement;
-                              if (icon) icon.style.display = 'inline';
+                            width={16} 
+                            height={16}
+                            onError={() => {
+                              // Fallback to Font Awesome icon if favicon fails to load
                             }}
+                            style={{ display: 'inline-block' }}
                           />
                         ) : null}
                         <i className="fas fa-external-link-alt" style={{ display: faviconUrl ? 'none' : 'inline' }}></i>

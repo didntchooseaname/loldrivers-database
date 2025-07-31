@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
+import type { Driver } from '@/types';
 
 // Hook pour la mémorisation des calculs coûteux
-export const useOptimizedDrivers = (drivers: any[]) => {
+export const useOptimizedDrivers = (drivers: Driver[]) => {
   return useMemo(() => {
     return drivers.map(driver => ({
       ...driver,
@@ -87,7 +88,7 @@ export const usePerformanceMonitor = (componentName: string) => {
     };
   });
   
-  const measureAsync = useCallback(async (operation: string, fn: () => Promise<any>) => {
+  const measureAsync = useCallback(async <T>(operation: string, fn: () => Promise<T>): Promise<T> => {
     const start = performance.now();
     const result = await fn();
     const end = performance.now();

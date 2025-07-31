@@ -8,7 +8,6 @@ const nextConfig = {
   // Optimisations bundle améliorées
   experimental: {
     optimizePackageImports: ['react', 'react-dom', 'swr'],
-    optimizeCss: true,
     esmExternals: true,
   },
   

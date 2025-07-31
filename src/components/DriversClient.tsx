@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import Image from 'next/image';
 import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
 import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
@@ -864,7 +865,9 @@ export default function DriversClient({
                     displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
                   }
 
-                  const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : null;
+                  const faviconUrl = domain && domain.length > 0 && domain.length < 100 
+                    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` 
+                    : null;
                   
                   return (
                     <div 
@@ -875,18 +878,15 @@ export default function DriversClient({
                     >
                       <span className="hash-type">
                         {faviconUrl ? (
-                          <img 
+                          <Image 
                             src={faviconUrl} 
                             alt={`${domain} favicon`}
-                            width="16" 
-                            height="16"
-                            onError={(e) => {
+                            width={16} 
+                            height={16}
+                            onError={() => {
                               // Fallback to Font Awesome icon if favicon fails to load
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              const icon = target.nextElementSibling as HTMLElement;
-                              if (icon) icon.style.display = 'inline';
                             }}
+                            style={{ display: 'inline-block' }}
                           />
                         ) : null}
                         <i className="fas fa-external-link-alt" style={{ display: faviconUrl ? 'none' : 'inline' }}></i>
