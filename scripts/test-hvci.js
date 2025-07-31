@@ -1,68 +1,68 @@
 #!/usr/bin/env node
 
 /**
- * Version alternative du script HVCI qui ne fait que le check sans commit
- * Utilisé pour tester ou quand les permissions Git ne sont pas disponibles
+ * Alternative version of HVCI script that only checks without committing
+ * Used for testing or when Git permissions are not available
  */
 
 import { main } from './check-vulnerable-drivers.js';
 
-console.log('🧪 Mode test - Vérification HVCI sans commit automatique\n');
+console.log('Test mode - HVCI check without automatic commit\n');
 
 try {
-    // Sauvegarder la fonction de sauvegarde originale
+    // Save original save function
     const originalWriteFileSync = (await import('fs')).default.writeFileSync;
     const fs = await import('fs');
     
     let hasChanges = false;
     let changesSummary = '';
     
-    // Intercepter les écritures pour détecter les changements
+    // Intercept writes to detect changes
     fs.default.writeFileSync = function(filePath, data, options) {
         if (filePath.includes('drv.json')) {
-            // Au lieu d'écrire directement, on sauvegarde dans un fichier temporaire
+            // Instead of writing directly, save to a temporary file
             const tempPath = filePath + '.temp';
             originalWriteFileSync.call(this, tempPath, data, options);
             
-            // Comparer avec l'original
+            // Compare with original
             if (fs.default.existsSync(filePath)) {
                 const original = fs.default.readFileSync(filePath, 'utf8');
                 if (original !== data) {
                     hasChanges = true;
-                    changesSummary = `Fichier ${filePath} modifié (${data.length} vs ${original.length} caractères)`;
-                    console.log(`📝 Changements détectés: ${changesSummary}`);
+                    changesSummary = `File ${filePath} modified (${data.length} vs ${original.length} characters)`;
+                    console.log(`Changes detected: ${changesSummary}`);
                 }
             }
             
-            // En mode test, on peut choisir d'écrire ou non
+            // In test mode, we can choose whether to write or not
             if (process.env.DRY_RUN !== 'true') {
                 originalWriteFileSync.call(this, filePath, data, options);
             } else {
-                console.log(`🔒 Mode DRY_RUN: fichier ${filePath} non modifié`);
+                console.log(`DRY_RUN mode: file ${filePath} not modified`);
             }
         } else {
-            // Pour les autres fichiers (comme check-summary.md), écrire normalement
+            // For other files (like check-summary.md), write normally
             originalWriteFileSync.call(this, filePath, data, options);
         }
     };
     
-    // Exécuter le script principal
+    // Execute main script
     await main();
     
     if (hasChanges) {
-        console.log('\n✅ Script exécuté avec des changements détectés');
-        console.log(`📊 Résumé: ${changesSummary}`);
+        console.log('\nScript executed with changes detected');
+        console.log(`Summary: ${changesSummary}`);
         
         if (process.env.DRY_RUN === 'true') {
-            console.log('ℹ️  Mode DRY_RUN activé - aucun fichier modifié');
+            console.log('DRY_RUN mode enabled - no files modified');
         } else {
-            console.log('💾 Fichiers mis à jour');
+            console.log('Files updated');
         }
     } else {
-        console.log('\n✅ Script exécuté sans changements');
+        console.log('\nScript executed without changes');
     }
     
 } catch (error) {
-    console.error('❌ Erreur:', error.message);
+    console.error('Error:', error.message);
     process.exit(1);
 }

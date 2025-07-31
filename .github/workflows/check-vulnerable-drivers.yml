@@ -74,6 +74,36 @@ jobs:
     - name: Run vulnerable drivers check
       run: node scripts/check-vulnerable-drivers.js
       
+    - name: Display check results
+      run: |
+        echo "=========================================="
+        echo "           HVCI CHECK RESULTS"
+        echo "=========================================="
+        if [ -f "check-summary.md" ]; then
+          echo "Check completed successfully!"
+          echo ""
+          echo "Quick Summary:"
+          # Extract key metrics from summary
+          if grep -q "Newly Tagged Drivers" check-summary.md; then
+            NEWLY_TAGGED=$(grep "Newly Tagged Drivers" check-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Newly tagged drivers: $NEWLY_TAGGED"
+          fi
+          if grep -q "Matched Drivers in Database" check-summary.md; then
+            MATCHED=$(grep "Matched Drivers in Database" check-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Total matched drivers: $MATCHED"
+          fi
+          if grep -q "Total Blocked Hashes" check-summary.md; then
+            BLOCKED=$(grep "Total Blocked Hashes" check-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Microsoft blocked hashes: $BLOCKED"
+          fi
+          echo ""
+          echo "Full details available in workflow summary below."
+        else
+          echo "Check summary not found - check may have failed"
+          exit 1
+        fi
+        echo "=========================================="
+      
     - name: Check for changes
       id: git-check
       run: |
@@ -113,14 +143,23 @@ jobs:
         
     - name: Create summary
       run: |
-        echo "## Vulnerable Drivers Check Summary" >> $GITHUB_STEP_SUMMARY
-        echo "Check completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "## HVCI Vulnerable Drivers Check Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Check completed at:** $(date)" >> $GITHUB_STEP_SUMMARY
         echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
         if [ "${{ github.event_name }}" = "workflow_run" ]; then
           echo "**Previous workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Previous workflow status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
         fi
+        echo "**Source:** [Microsoft HVCI Block List](https://aka.ms/VulnerableDriverBlockList)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add detailed results from the check script
         if [ -f "check-summary.md" ]; then
           cat check-summary.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No summary file generated - check may have failed" >> $GITHUB_STEP_SUMMARY
         fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) blocks drivers that are known to be vulnerable to prevent exploitation." >> $GITHUB_STEP_SUMMARY
