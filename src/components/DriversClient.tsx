@@ -343,6 +343,147 @@ export default function DriversClient({
     }, 3000); // Toast disparaît après 3 secondes
   }, []);
 
+  // Fonction pour partager la recherche actuelle
+  const shareCurrentSearch = useCallback(() => {
+    try {
+      const url = new URL(window.location.href);
+      url.search = ''; // Clear existing params
+      
+      // Add search query if present
+      if (searchQuery.trim()) {
+        url.searchParams.set('q', searchQuery.trim());
+      }
+      
+      // Add active filters
+      if (activeFilters.has('hvci')) url.searchParams.set('hvci', 'true');
+      if (activeFilters.has('killer')) url.searchParams.set('killer', 'true');
+      if (activeFilters.has('trusted-cert')) url.searchParams.set('trusted-cert', 'true');
+      if (activeFilters.has('untrusted-cert')) url.searchParams.set('untrusted-cert', 'true');
+      if (activeFilters.has('recent')) url.searchParams.set('recent', 'true');
+      if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
+      if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
+      
+      // Add current page if not page 1
+      if (currentPage > 1) {
+        url.searchParams.set('page', currentPage.toString());
+      }
+      
+      const shareUrl = url.toString();
+      
+      // Update current URL without page reload
+      window.history.replaceState({}, '', shareUrl);
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast('Link copied to clipboard!');
+      }).catch(() => {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showToast('Link copied to clipboard!');
+      });
+    } catch (error) {
+      console.error('Failed to create share URL:', error);
+      showToast('Failed to create share link');
+    }
+  }, [searchQuery, activeFilters, currentPage, showToast]);
+
+  // Fonction pour appliquer les paramètres URL
+  const applyUrlParams = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    
+    // Appliquer la recherche
+    const searchParam = params.get('q');
+    if (searchParam) {
+      setSearchQuery(searchParam);
+      setInputValue(searchParam); // Synchroniser l'input value aussi
+    } else {
+      setSearchQuery('');
+      setInputValue('');
+    }
+    
+    // Appliquer les filtres
+    const newFilters = new Set<string>();
+    if (params.get('hvci') === 'true') newFilters.add('hvci');
+    if (params.get('killer') === 'true') newFilters.add('killer');
+    if (params.get('trusted-cert') === 'true') newFilters.add('trusted-cert');
+    if (params.get('untrusted-cert') === 'true') newFilters.add('untrusted-cert');
+    if (params.get('recent') === 'true') newFilters.add('recent');
+    if (params.get('newest-first') === 'true') newFilters.add('newest-first');
+    if (params.get('oldest-first') === 'true') newFilters.add('oldest-first');
+    
+    // Toujours synchroniser activeFilters et pendingFilters
+    setActiveFilters(newFilters);
+    setPendingFilters(newFilters);
+    
+    // Appliquer la page
+    const pageParam = params.get('page');
+    if (pageParam) {
+      const pageNumber = parseInt(pageParam, 10);
+      if (pageNumber > 0) {
+        setCurrentPage(pageNumber);
+      }
+    } else {
+      setCurrentPage(1);
+    }
+  }, []);
+
+  // Appliquer les paramètres URL au chargement
+  useEffect(() => {
+    applyUrlParams();
+    
+    // Écouter les changements d'URL (boutons précédent/suivant du navigateur)
+    const handlePopState = () => {
+      applyUrlParams();
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [applyUrlParams]);
+
+  // Mettre à jour l'URL quand les filtres/recherche changent
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const url = new URL(window.location.href);
+    url.search = ''; // Clear existing params
+    
+    // Add search query if present
+    if (searchQuery.trim()) {
+      url.searchParams.set('q', searchQuery.trim());
+    }
+    
+    // Add active filters
+    if (activeFilters.has('hvci')) url.searchParams.set('hvci', 'true');
+    if (activeFilters.has('killer')) url.searchParams.set('killer', 'true');
+    if (activeFilters.has('trusted-cert')) url.searchParams.set('trusted-cert', 'true');
+    if (activeFilters.has('untrusted-cert')) url.searchParams.set('untrusted-cert', 'true');
+    if (activeFilters.has('recent')) url.searchParams.set('recent', 'true');
+    if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
+    if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
+    
+    // Add current page if not page 1
+    if (currentPage > 1) {
+      url.searchParams.set('page', currentPage.toString());
+    }
+    
+    // Update URL without page reload
+    const newUrl = url.toString();
+    if (newUrl !== window.location.href) {
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [searchQuery, activeFilters, currentPage]);
+
   // Gestion du bouton Back to Top
   useEffect(() => {
     const handleScroll = () => {
@@ -1221,6 +1362,14 @@ export default function DriversClient({
             </p>
           </div>
           <div className="header-controls">
+            <button 
+              className="share-button"
+              onClick={shareCurrentSearch}
+              title="Share current search and filters"
+              aria-label="Share current search and filters"
+            >
+              <i className="fas fa-share"></i>
+            </button>
             <button 
               className="help-button" 
               onClick={() => setShowHelpPopup(true)}
