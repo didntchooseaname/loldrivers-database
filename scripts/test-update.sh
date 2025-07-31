@@ -1,53 +1,44 @@
 #!/bin/bash
 
-# Script de test local pour l'action GitHub de mise à jour des drivers
-# Ce script reproduit le comportement de l'action GitHub localement
+# Script de test pour le système de vérification des drivers vulnérables
+# Usage: ./scripts/test-update.sh
 
-set -e
+echo "🧪 Test du système de vérification HVCI..."
+echo
 
-echo "🔧 Test local de l'action de mise à jour LOLDrivers"
-echo "================================================"
-
-# Configuration
-REMOTE_URL="https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json"
-LOCAL_FILE="data/drv.json"
-TEMP_FILE="temp_drivers.json"
-
-# Couleurs pour l'affichage
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-echo -e "${YELLOW}📥 Téléchargement des données depuis LOLDrivers...${NC}"
-curl -s -L -o "$TEMP_FILE" "$REMOTE_URL"
-
-if [ ! -f "$TEMP_FILE" ]; then
-    echo -e "${RED}❌ Échec du téléchargement${NC}"
+# Vérifier que Node.js est installé
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js n'est pas installé"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Téléchargement réussi${NC}"
+# Vérifier que les dépendances sont installées
+if [ ! -d "node_modules" ]; then
+    echo "📦 Installation des dépendances npm..."
+    npm install
+fi
 
-# Vérification de la validité JSON
-if ! python -m json.tool "$TEMP_FILE" > /dev/null 2>&1; then
-    echo -e "${RED}❌ Le fichier téléchargé n'est pas un JSON valide${NC}"
-    rm -f "$TEMP_FILE"
+# Exécuter le script de vérification
+echo "🚀 Lancement de la vérification..."
+node scripts/check-vulnerable-drivers.js
+
+if [ $? -eq 0 ]; then
+    echo "✅ Test réussi !"
+    
+    # Afficher le résumé s'il existe
+    if [ -f "check-summary.md" ]; then
+        echo
+        echo "📊 Résumé :"
+        cat check-summary.md
+        rm check-summary.md
+    fi
+else
+    echo "❌ Test échoué"
     exit 1
 fi
 
-echo -e "${GREEN}✅ JSON valide${NC}"
-
-# Comparaison avec le fichier existant
-if [ -f "$LOCAL_FILE" ]; then
-    LOCAL_MD5=$(md5sum "$LOCAL_FILE" 2>/dev/null | cut -d' ' -f1 || echo "")
-    REMOTE_MD5=$(md5sum "$TEMP_FILE" 2>/dev/null | cut -d' ' -f1 || echo "")
-    
-    echo "🔍 Comparaison des fichiers:"
-    echo "   Local:  $LOCAL_MD5"
-    echo "   Remote: $REMOTE_MD5"
-    
-    if [ "$LOCAL_MD5" = "$REMOTE_MD5" ]; then
+echo
+echo "✨ Terminé !"
         echo -e "${YELLOW}📋 Aucune modification détectée${NC}"
         rm -f "$TEMP_FILE"
         exit 0

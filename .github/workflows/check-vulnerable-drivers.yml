@@ -1,0 +1,51 @@
+name: Check Vulnerable Drivers Against Microsoft Block List
+
+on:
+  schedule:
+    # Runs twice a week: Monday and Thursday at 02:00 UTC
+    - cron: '0 2 * * 1,4'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-vulnerable-drivers:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Run vulnerable drivers check
+      run: node scripts/check-vulnerable-drivers.js
+      
+    - name: Check for changes
+      id: git-check
+      run: |
+        git diff --exit-code data/drv.json || echo "changed=true" >> $GITHUB_OUTPUT
+        
+    - name: Commit and push changes
+      if: steps.git-check.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/drv.json
+        git commit -m "🔒 Update HVCI blocked drivers from Microsoft official list"
+        git push
+        
+    - name: Create summary
+      run: |
+        echo "## Vulnerable Drivers Check Summary" >> $GITHUB_STEP_SUMMARY
+        echo "Check completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+        if [ -f "check-summary.md" ]; then
+          cat check-summary.md >> $GITHUB_STEP_SUMMARY
+        fi

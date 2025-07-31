@@ -282,13 +282,25 @@ class DriversCache {
 
     const drivers = await this.loadDrivers();
     
+    // Lire les métadonnées HVCI depuis le fichier
+    let hvciBlocklistCheck;
+    try {
+      const dataPath = path.join(process.cwd(), 'data', 'drv.json');
+      const fileContent = fs.readFileSync(dataPath, 'utf8');
+      const jsonData = JSON.parse(fileContent);
+      hvciBlocklistCheck = jsonData._metadata?.hvciBlocklistCheck;
+    } catch (error) {
+      console.warn('Could not read HVCI blocklist metadata:', error);
+    }
+    
     // Utilisation de l'index pour des stats plus rapides
     const stats = {
       total: drivers.length,
       hvciCompatible: this.indexedData.get('hvci')?.length || 0,
       killerDrivers: this.indexedData.get('killer')?.length || 0,
       signed: this.indexedData.get('signed')?.length || 0,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      ...(hvciBlocklistCheck && { hvciBlocklistCheck })
     };
 
     // Cache pour les statistiques

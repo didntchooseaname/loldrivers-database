@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
+import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());
@@ -1135,6 +1136,9 @@ export default function DriversClient({
             <span className="stat-value">{statsData?.stats?.killerDrivers || 0}</span>
           </div>
         </div>
+        
+        {/* HVCI Blocklist Information */}
+        <HVCIBlocklistInfo stats={statsData?.stats} />
       </header>
 
       <div className="search-section">

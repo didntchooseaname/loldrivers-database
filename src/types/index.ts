@@ -60,6 +60,13 @@ export interface Stats {
   killerDrivers: number;
   signed: number;
   lastUpdated: string;
+  hvciBlocklistCheck?: {
+    lastCheck: string;
+    microsoftLastModified: string;
+    totalBlockedHashes: number;
+    matchedDrivers: number;
+    source: string;
+  };
 }
 
 export interface StatsResponse {
