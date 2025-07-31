@@ -5,6 +5,10 @@ on:
     # Runs twice a week: Monday and Thursday at 02:00 UTC
     - cron: '0 2 * * 1,4'
   workflow_dispatch: # Allow manual trigger
+  workflow_run:
+    workflows: ["Update LOLDrivers Data"]  # Name of the data update workflow
+    types:
+      - completed
 
 permissions:
   contents: write
@@ -13,8 +17,23 @@ permissions:
 jobs:
   check-vulnerable-drivers:
     runs-on: ubuntu-latest
+    # Only run if previous workflow succeeded, or if triggered manually/by cron
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
+    - name: Display trigger information
+      run: |
+        echo "HVCI Check Workflow Information"
+        echo "================================="
+        echo "Triggered by: ${{ github.event_name }}"
+        if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          echo "Previous workflow: ${{ github.event.workflow_run.name }}"
+          echo "Previous workflow status: ${{ github.event.workflow_run.conclusion }}"
+          echo "Previous workflow run ID: ${{ github.event.workflow_run.id }}"
+        fi
+        echo "Current time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo ""
+        
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -66,11 +85,26 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add data/drv.json
-        git commit -m "🔒 Update HVCI blocked drivers from Microsoft official list
+        
+        # Create appropriate commit message based on trigger
+        if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          COMMIT_MSG="Update HVCI blocked drivers from Microsoft official list
         
         - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - Triggered by: LOLDrivers data update workflow
+        - Previous workflow run: ${{ github.event.workflow_run.id }}
         - Automated check against Microsoft HVCI Block List
         - Source: https://aka.ms/VulnerableDriverBlockList"
+        else
+          COMMIT_MSG="Update HVCI blocked drivers from Microsoft official list
+        
+        - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - Triggered by: ${{ github.event_name }}
+        - Automated check against Microsoft HVCI Block List
+        - Source: https://aka.ms/VulnerableDriverBlockList"
+        fi
+        
+        git commit -m "$COMMIT_MSG"
         
         echo "Pushing changes..."
         git push
@@ -81,6 +115,12 @@ jobs:
       run: |
         echo "## Vulnerable Drivers Check Summary" >> $GITHUB_STEP_SUMMARY
         echo "Check completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          echo "**Previous workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous workflow status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
         if [ -f "check-summary.md" ]; then
           cat check-summary.md >> $GITHUB_STEP_SUMMARY
         fi
