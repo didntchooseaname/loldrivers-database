@@ -1067,8 +1067,25 @@ select.form-control {
   justify-content: center;
   gap: var(--space-8);
   animation: scrollPulse 2s ease-in-out infinite;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.help-scroll-indicator:hover {
+  color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.help-scroll-indicator:active {
+  transform: translateY(0);
+}
+
+.help-scroll-indicator:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  color: var(--color-primary);
 }
 
 @keyframes scrollPulse {
@@ -1250,29 +1267,6 @@ select.form-control {
   font-weight: 700;
 }
 
-.hvci-filter {
-  color: var(--color-green-dark);
-  border-color: rgba(var(--color-green-dark-rgb), 0.4);
-  background: rgba(var(--color-green-dark-rgb), 0.05);
-  font-weight: 600;
-}
-
-.hvci-filter:hover {
-  background: rgba(var(--color-green-dark-rgb), 0.15);
-  border-color: var(--color-green-dark);
-  color: var(--color-black);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(var(--color-green-dark-rgb), 0.2);
-}
-
-.hvci-filter.active {
-  background: linear-gradient(135deg, var(--color-green-dark), var(--color-green-dark));
-  color: var(--color-black);
-  border-color: var(--color-green-dark);
-  box-shadow: 0 4px 16px rgba(var(--color-green-dark-rgb), 0.4);
-  font-weight: 700;
-}
-
 .hvci-item.active {
   border-color: var(--color-green-dark);
   background: linear-gradient(135deg, rgba(var(--color-green-dark-rgb), 0.08), rgba(var(--color-green-dark-rgb), 0.05));
@@ -1299,23 +1293,6 @@ select.form-control {
     color: var(--color-green);
   }
 
-  .hvci-filter {
-    color: var(--color-green);
-    border-color: rgba(var(--color-green-rgb), 0.4);
-    background: rgba(var(--color-green-rgb), 0.08);
-  }
-
-  .hvci-filter:hover {
-    background: rgba(var(--color-green-rgb), 0.2);
-    border-color: var(--color-green);
-    color: var(--color-white);
-  }
-
-  .hvci-filter.active {
-    background: linear-gradient(135deg, rgba(var(--color-green-rgb), 0.9), rgba(21, 128, 61, 0.8));
-    color: var(--color-white);
-  }
-
   .hvci-item.active .stat-label,
   .hvci-item.active .stat-value {
     color: var(--color-green);
@@ -1338,26 +1315,52 @@ select.form-control {
 }
 
 [data-color-scheme="dark"] .hvci-filter {
-  color: var(--color-green);
+  color: var(--color-white);
   border-color: rgba(var(--color-green-rgb), 0.4);
-  background: rgba(var(--color-green-rgb), 0.08);
+  background: var(--color-background);
+}
+
+[data-color-scheme="dark"] .hvci-filter i {
+  color: var(--color-green);
 }
 
 [data-color-scheme="dark"] .hvci-filter:hover {
-  background: rgba(var(--color-green-rgb), 0.2);
+  background: rgba(var(--color-green-rgb), 0.1);
   border-color: var(--color-green);
   color: var(--color-white);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-color-scheme="dark"] .hvci-filter:hover i {
+  opacity: 1;
+  transform: scale(1.1);
 }
 
 [data-color-scheme="dark"] .hvci-filter.active {
-  background: linear-gradient(135deg, rgba(var(--color-green-rgb), 0.9), rgba(21, 128, 61, 0.8));
+  background: var(--color-green);
   color: var(--color-white);
+  border-color: var(--color-green);
+  box-shadow: 0 2px 8px rgba(var(--color-green-rgb), 0.3);
+}
+
+[data-color-scheme="dark"] .hvci-filter.active i {
+  opacity: 1;
+  color: white !important;
 }
 
 [data-color-scheme="dark"] .hvci-item.active .stat-label,
 [data-color-scheme="dark"] .hvci-item.active .stat-value {
   color: var(--color-white);
   text-shadow: 0 1px 3px rgba(21, 128, 61, 0.3);
+}
+
+[data-color-scheme="dark"] .apply-filters-btn {
+  color: var(--color-btn-primary-text) !important;
+}
+
+[data-color-scheme="dark"] .apply-filters-btn i {
+  color: var(--color-btn-primary-text) !important;
 }
 
 .stat-item.clickable {
@@ -1550,7 +1553,9 @@ select.form-control {
 }
 
 .filter-btn.hvci-filter {
-  border-color: rgba(var(--color-white), 0.3);
+  border-color: rgba(var(--color-green-dark-rgb), 0.3);
+  background: var(--color-background);
+  color: var(--color-text);
 }
 
 .filter-btn.hvci-filter i {
@@ -1560,7 +1565,14 @@ select.form-control {
 .filter-btn.hvci-filter:hover {
   border-color: var(--color-green-dark);
   background: rgba(var(--color-green-dark-rgb), 0.1);
-  color: var(--color-white);
+  color: var(--color-text);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.filter-btn.hvci-filter:hover i {
+  opacity: 1;
+  transform: scale(1.1);
 }
 
 .filter-btn.hvci-filter.active {
@@ -1568,6 +1580,11 @@ select.form-control {
   color: var(--color-white);
   border-color: var(--color-green-dark);
   box-shadow: 0 2px 8px rgba(var(--color-green-dark-rgb), 0.3);
+}
+
+.filter-btn.hvci-filter.active i {
+  opacity: 1;
+  color: white !important;
 }
 
 /* Signed drivers filter */
@@ -1660,16 +1677,24 @@ select.form-control {
   font-weight: 500;
   background: var(--color-bg-2);
   border-color: var(--color-orange-400);
-  color: var(--color-white);
+  color: var(--color-text);
   display: flex;
   align-items: center;
   gap: var(--space-6);
+}
+
+.filter-btn.clear i {
+  color: var(--color-text);
 }
 
 .filter-btn.clear:hover {
   background: var(--color-orange-400);
   color: var(--color-white);
   border-color: var(--color-orange-500);
+}
+
+.filter-btn.clear:hover i {
+  color: var(--color-white);
 }
 
 .filter-btn.clear:disabled,
@@ -1695,6 +1720,11 @@ select.form-control {
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-standard);
   user-select: none;
+  color: white !important;
+}
+
+.apply-filters-btn i {
+  color: white !important;
 }
 
 .apply-filters-btn:disabled {
@@ -3505,7 +3535,6 @@ select.form-control {
   display: flex;
   align-items: center;
   gap: var(--space-6);
-  background-color: var(--color-bg-1);
   border: 1px solid var(--color-border);
   margin-bottom: var(--space-4);
 }

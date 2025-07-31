@@ -215,6 +215,17 @@ export default function DriversClient({
     });
   }, []);
 
+  // Function to scroll to bottom of help popup
+  const scrollHelpToBottom = useCallback(() => {
+    const helpPopup = document.querySelector('.help-popup') as HTMLDivElement;
+    if (helpPopup) {
+      helpPopup.scrollTo({
+        top: helpPopup.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
   // Fonctions de pagination
   const goToPage = useCallback((page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -1075,6 +1086,11 @@ export default function DriversClient({
               const element = e.target as HTMLDivElement;
               const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
               setShowScrollIndicator(!isAtBottom);
+              
+              // Hide scroll indicator as soon as user starts scrolling
+              if (element.scrollTop > 0) {
+                setShowScrollIndicator(false);
+              }
             }}
           >
             <button 
@@ -1187,7 +1203,19 @@ export default function DriversClient({
             </div>
 
             {showScrollIndicator && (
-              <div className="help-scroll-indicator">
+              <div 
+                className="help-scroll-indicator"
+                onClick={scrollHelpToBottom}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    scrollHelpToBottom();
+                  }
+                }}
+                aria-label="Scroll to bottom for more information"
+              >
                 <i className="fas fa-chevron-down"></i>
                 <span>Scroll for more information</span>
                 <i className="fas fa-chevron-down"></i>
