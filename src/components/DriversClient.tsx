@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
@@ -28,6 +28,35 @@ const fetcher = async (url: string) => {
   }
 };
 
+// Fonction utilitaire pour extraire les paramètres URL initiaux
+const getInitialUrlParams = () => {
+  if (typeof window === 'undefined') {
+    return { searchQuery: '', activeFilters: new Set<string>(), currentPage: 1 };
+  }
+  
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  
+  // Extraire la recherche
+  const searchQuery = params.get('q') || '';
+  
+  // Extraire les filtres
+  const activeFilters = new Set<string>();
+  if (params.get('hvci') === 'true') activeFilters.add('hvci');
+  if (params.get('killer') === 'true') activeFilters.add('killer');
+  if (params.get('trusted-cert') === 'true') activeFilters.add('trusted-cert');
+  if (params.get('untrusted-cert') === 'true') activeFilters.add('untrusted-cert');
+  if (params.get('recent') === 'true') activeFilters.add('recent');
+  if (params.get('newest-first') === 'true') activeFilters.add('newest-first');
+  if (params.get('oldest-first') === 'true') activeFilters.add('oldest-first');
+  
+  // Extraire la page
+  const pageParam = params.get('page');
+  const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10)) || 1 : 1;
+  
+  return { searchQuery, activeFilters, currentPage };
+};
+
 export default function DriversClient({ 
   initialDrivers, 
   initialStats 
@@ -35,10 +64,13 @@ export default function DriversClient({
   initialDrivers: DriversResponse;
   initialStats: { success: boolean; stats: Stats };
 }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [inputValue, setInputValue] = useState(''); // Nouvelle valeur pour l'input
-  const [activeFilters, setActiveFilters] = useState(new Set<string>());
-  const [pendingFilters, setPendingFilters] = useState(new Set<string>()); // Filtres en attente
+  // Initialiser avec les paramètres URL
+  const initialParams = getInitialUrlParams();
+  
+  const [searchQuery, setSearchQuery] = useState(initialParams.searchQuery);
+  const [inputValue, setInputValue] = useState(initialParams.searchQuery); // Synchroniser avec searchQuery
+  const [activeFilters, setActiveFilters] = useState(initialParams.activeFilters);
+  const [pendingFilters, setPendingFilters] = useState(initialParams.activeFilters); // Synchroniser avec activeFilters
   const [expandedSections, setExpandedSections] = useState(new Set<string>());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -46,7 +78,7 @@ export default function DriversClient({
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   
   // États de pagination
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialParams.currentPage);
   const ITEMS_PER_PAGE = 20;
 
   // Utilisation de SWR pour la recherche côté serveur
@@ -75,7 +107,7 @@ export default function DriversClient({
     {
       revalidateOnFocus: false,
       dedupingInterval: 5000, // Réduire le cache de déduplication à 5 secondes
-      revalidateOnMount: true, // Permettre le rechargement au montage
+      revalidateOnMount: false, // Éviter le rechargement au montage pour éviter le double chargement
       errorRetryCount: 2, // Réessayer en cas d'erreur
       errorRetryInterval: 1000, // Attendre 1 seconde avant de réessayer
     }
@@ -111,18 +143,17 @@ export default function DriversClient({
     return allDrivers.slice(startIndex, endIndex);
   }, [allDrivers, currentPage, ITEMS_PER_PAGE]);
 
-  // Réinitialiser la page à 1 quand les filtres ou la recherche changent
+  // Utiliser une ref pour tracker si c'est le premier rendu
+  const isFirstRender = useRef(true);
+
+  // Réinitialiser la page à 1 quand les filtres ou la recherche changent (sauf au premier rendu)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [searchQuery, activeFilters]);
-
-  // Supprimer l'ancien état filteredDrivers car on utilise maintenant paginatedDrivers
-  const [filteredDrivers, setFilteredDrivers] = useState<Driver[]>(paginatedDrivers);
-
-  // Mettre à jour filteredDrivers quand paginatedDrivers change
-  useEffect(() => {
-    setFilteredDrivers(paginatedDrivers);
-  }, [paginatedDrivers]);
 
   // Initialiser les sections critiques comme déroulées par défaut
   useEffect(() => {
@@ -373,75 +404,41 @@ export default function DriversClient({
       // Update current URL without page reload
       window.history.replaceState({}, '', shareUrl);
       
-      // Copy to clipboard
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        showToast('Link copied to clipboard!');
-      }).catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = shareUrl;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        showToast('Link copied to clipboard!');
-      });
+      // Copy to clipboard with graceful degradation
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast('Link copied to clipboard!');
+        }).catch((error) => {
+          console.warn('Clipboard API failed:', error);
+          showToast('Failed to copy link - please copy manually');
+        });
+      } else {
+        // For browsers without Clipboard API support
+        console.warn('Clipboard API not available');
+        showToast('Copy not supported - please copy manually from address bar');
+      }
     } catch (error) {
       console.error('Failed to create share URL:', error);
       showToast('Failed to create share link');
     }
   }, [searchQuery, activeFilters, currentPage, showToast]);
 
-  // Fonction pour appliquer les paramètres URL
-  const applyUrlParams = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    
-    const url = new URL(window.location.href);
-    const params = url.searchParams;
-    
-    // Appliquer la recherche
-    const searchParam = params.get('q');
-    if (searchParam) {
-      setSearchQuery(searchParam);
-      setInputValue(searchParam); // Synchroniser l'input value aussi
-    } else {
-      setSearchQuery('');
-      setInputValue('');
-    }
-    
-    // Appliquer les filtres
-    const newFilters = new Set<string>();
-    if (params.get('hvci') === 'true') newFilters.add('hvci');
-    if (params.get('killer') === 'true') newFilters.add('killer');
-    if (params.get('trusted-cert') === 'true') newFilters.add('trusted-cert');
-    if (params.get('untrusted-cert') === 'true') newFilters.add('untrusted-cert');
-    if (params.get('recent') === 'true') newFilters.add('recent');
-    if (params.get('newest-first') === 'true') newFilters.add('newest-first');
-    if (params.get('oldest-first') === 'true') newFilters.add('oldest-first');
-    
-    // Toujours synchroniser activeFilters et pendingFilters
-    setActiveFilters(newFilters);
-    setPendingFilters(newFilters);
-    
-    // Appliquer la page
-    const pageParam = params.get('page');
-    if (pageParam) {
-      const pageNumber = parseInt(pageParam, 10);
-      if (pageNumber > 0) {
-        setCurrentPage(pageNumber);
-      }
-    } else {
-      setCurrentPage(1);
-    }
-  }, []);
-
-  // Appliquer les paramètres URL au chargement
+  // Appliquer les paramètres URL seulement lors des changements de navigation (popstate)
   useEffect(() => {
-    applyUrlParams();
-    
-    // Écouter les changements d'URL (boutons précédent/suivant du navigateur)
+    // Fonction pour gérer les changements d'URL (boutons précédent/suivant du navigateur)
     const handlePopState = () => {
-      applyUrlParams();
+      const urlParams = getInitialUrlParams();
+      
+      // Appliquer la recherche
+      setSearchQuery(urlParams.searchQuery);
+      setInputValue(urlParams.searchQuery);
+      
+      // Appliquer les filtres
+      setActiveFilters(urlParams.activeFilters);
+      setPendingFilters(urlParams.activeFilters);
+      
+      // Appliquer la page
+      setCurrentPage(urlParams.currentPage);
     };
     
     window.addEventListener('popstate', handlePopState);
@@ -449,11 +446,16 @@ export default function DriversClient({
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [applyUrlParams]);
+  }, []);
 
-  // Mettre à jour l'URL quand les filtres/recherche changent
+  // Mettre à jour l'URL quand les filtres/recherche changent (sauf au premier rendu)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // Skip la mise à jour d'URL au premier rendu pour éviter le double chargement
+    if (isFirstRender.current) {
+      return;
+    }
     
     const url = new URL(window.location.href);
     url.search = ''; // Clear existing params
@@ -1547,7 +1549,7 @@ export default function DriversClient({
           <span>
             {isLoading 
               ? 'Searching...' 
-              : `Showing ${Math.min(ITEMS_PER_PAGE, filteredDrivers.length)} of ${totalItems} drivers (Page ${currentPage} of ${totalPages})`
+              : `Showing ${Math.min(ITEMS_PER_PAGE, paginatedDrivers.length)} of ${totalItems} drivers (Page ${currentPage} of ${totalPages})`
             }
           </span>
           {searchKey && <span className="server-search-indicator"> (Server-side search)</span>}
@@ -1556,8 +1558,8 @@ export default function DriversClient({
       </div>
 
       <div className="drivers-grid">        
-        {!isLoading && filteredDrivers.length > 0 ? (
-          filteredDrivers.map((driver, index) => {
+        {!isLoading && paginatedDrivers.length > 0 ? (
+          paginatedDrivers.map((driver, index) => {
             // Calculer l'index global pour l'unicité
             const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index;
             return createDriverCard(driver, globalIndex);
