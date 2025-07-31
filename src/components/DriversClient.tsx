@@ -7,7 +7,26 @@ import SafeDate from '@/components/SafeDate';
 import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 secondes timeout
+  
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    return res.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout');
+    }
+    throw error;
+  }
+};
 
 export default function DriversClient({ 
   initialDrivers, 
@@ -50,13 +69,15 @@ export default function DriversClient({
     return `/api/drivers?${params.toString()}`;
   }, [searchQuery, activeFilters]);
 
-  const { data: searchData, isLoading } = useSWR<DriversResponse>(
+  const { data: searchData, isLoading, mutate, error } = useSWR<DriversResponse>(
     searchKey,
-    fetcher,
+    searchKey ? fetcher : null,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 30000, // 30 secondes de cache pour les recherches
-      revalidateOnMount: false,
+      dedupingInterval: 5000, // Réduire le cache de déduplication à 5 secondes
+      revalidateOnMount: true, // Permettre le rechargement au montage
+      errorRetryCount: 2, // Réessayer en cas d'erreur
+      errorRetryInterval: 1000, // Attendre 1 seconde avant de réessayer
     }
   );
 
@@ -258,7 +279,11 @@ export default function DriversClient({
 
   const applyFilters = useCallback(() => {
     setActiveFilters(new Set(pendingFilters));
-  }, [pendingFilters]);
+    // Forcer la revalidation SWR pour les nouvelles données
+    if (mutate) {
+      mutate();
+    }
+  }, [pendingFilters, mutate]);
 
   // Fonction pour appliquer directement un filtre depuis le header
   const applyDirectFilter = useCallback((filterType: string) => {
@@ -277,19 +302,31 @@ export default function DriversClient({
       setSearchQuery('');
       setInputValue('');
     }
-  }, [activeFilters]);
+    // Forcer la revalidation SWR
+    if (mutate) {
+      mutate();
+    }
+  }, [activeFilters, mutate]);
 
   const clearAllFilters = useCallback(() => {
     setSearchQuery('');
     setInputValue('');
     setActiveFilters(new Set());
     setPendingFilters(new Set());
-  }, []);
+    // Forcer la revalidation SWR pour revenir aux données initiales
+    if (mutate) {
+      mutate();
+    }
+  }, [mutate]);
 
   // Fonction pour effectuer la recherche
   const performSearch = useCallback(() => {
     setSearchQuery(inputValue.trim());
-  }, [inputValue]);
+    // Forcer la revalidation SWR pour les nouvelles données
+    if (mutate) {
+      mutate();
+    }
+  }, [inputValue, mutate]);
 
   // Fonction pour gérer la touche Entrée
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
@@ -1340,6 +1377,23 @@ export default function DriversClient({
           </div>
         )}
         
+        {/* Affichage d'erreur */}
+        {error && (
+          <div className="error-bar-container">
+            <div className="error-message">
+              <i className="fas fa-exclamation-triangle"></i>
+              <span>Search failed. Please try again.</span>
+              <button 
+                className="retry-button"
+                onClick={() => mutate()}
+                title="Retry search"
+              >
+                <i className="fas fa-redo"></i>
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="search-stats">
           <span>
             {isLoading 
@@ -1348,6 +1402,7 @@ export default function DriversClient({
             }
           </span>
           {searchKey && <span className="server-search-indicator"> (Server-side search)</span>}
+          {error && <span className="error-indicator"> (Error occurred)</span>}
         </div>
       </div>
 

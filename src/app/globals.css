@@ -1786,6 +1786,40 @@ select.form-control {
   font-style: italic;
 }
 
+/* Error display styles */
+.error-bar-container {
+  margin-top: var(--space-12);
+  margin-bottom: var(--space-12);
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  background: rgba(var(--color-red-rgb), 0.1);
+  border: 1px solid rgba(var(--color-red-rgb), 0.3);
+  border-radius: var(--radius-base);
+  color: var(--color-red);
+  font-size: var(--font-size-sm);
+}
+
+.retry-button {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--color-red);
+  color: var(--color-red);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.retry-button:hover {
+  background: var(--color-red);
+  color: var(--color-white);
+}
+
 .search-input {
   width: 100%;
   font-size: var(--font-size-base);
@@ -1824,6 +1858,16 @@ select.form-control {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
   text-align: center;
+}
+
+.server-search-indicator {
+  color: var(--color-blue-500);
+  font-weight: 500;
+}
+
+.error-indicator {
+  color: var(--color-red);
+  font-weight: 500;
 }
 
 /* Loading and error states */
