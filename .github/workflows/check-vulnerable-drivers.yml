@@ -24,22 +24,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-dep        if [ -f "hvci-summary.md" ]; then
-          # Extract summary info for commit message
-          NEWLY_PASSED=$(grep "Newly Passed Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1 || echo "0")
-          NEWLY_BLOCKED=$(grep "Newly Blocked Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1 || echo "0")
-          NEWLY_UNKNOWN=$(grep "Newly Unknown Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1 || echo "0")
-          
-          COMMIT_MSG="$COMMIT_MSG
-        
-        - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        - Triggered by: ${{ github.event_name }}
-        - Method: Trail of Bits HVCI policy extraction
-        - Newly passed drivers: $NEWLY_PASSED
-        - Newly blocked drivers: $NEWLY_BLOCKED
-        - Newly unknown drivers: $NEWLY_UNKNOWN
-        - Cleaned up duplicate HVCI tags (case-insensitive)
-        - Analysis includes hash, signer, and version checks"
+        fetch-depth: 0
     - name: Run PowerShell script
       run: |
         # Download and run the Trail of Bits HVCI check script
