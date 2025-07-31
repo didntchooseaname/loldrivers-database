@@ -40,8 +40,8 @@ export default function DriversClient({
     if (searchQuery.trim()) params.set('q', searchQuery);
     if (activeFilters.has('hvci')) params.set('hvci', 'true');
     if (activeFilters.has('killer')) params.set('killer', 'true');
-    if (activeFilters.has('signed')) params.set('signed', 'true');
-    if (activeFilters.has('unsigned')) params.set('unsigned', 'true');
+    if (activeFilters.has('trusted-cert')) params.set('trusted-cert', 'true');
+    if (activeFilters.has('untrusted-cert')) params.set('untrusted-cert', 'true');
     if (activeFilters.has('recent')) params.set('recent', 'true');
     if (activeFilters.has('newest-first')) params.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) params.set('oldest-first', 'true');
@@ -156,16 +156,96 @@ export default function DriversClient({
     return false;
   };
 
+  // Vérifier si le driver a un certificat de confiance valide
+  const hasTrustedCertificate = (driver: Driver): boolean => {
+    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+      return false;
+    }
+
+    const trustedIssuers = [
+      'Microsoft Corporation',
+      'GlobalSign',
+      'DigiCert',
+      'VeriSign',
+      'Symantec',
+      'Thawte',
+      'GeoTrust',
+      'Comodo',
+      'Sectigo',
+      'Entrust',
+      'IdenTrust',
+      'Go Daddy',
+      'Network Solutions',
+      'Starfield Technologies'
+    ];
+
+    const now = new Date();
+
+    for (const signature of driver.Signatures) {
+      if (signature.Certificates && Array.isArray(signature.Certificates)) {
+        // Chercher un certificat de confiance valide
+        for (const cert of signature.Certificates) {
+          if (cert.Subject && cert.ValidTo) {
+            try {
+              const validTo = new Date(cert.ValidTo);
+              if (validTo > now) {
+                // Vérifier si c'est signé par une autorité de confiance
+                const isTrusted = trustedIssuers.some(issuer => 
+                  typeof cert.Subject === 'string' && cert.Subject.includes(issuer)
+                );
+                if (isTrusted) {
+                  return true;
+                }
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  // Vérifier si le driver a un certificat douteux (expiré, self-signed, etc.)
+  const hasUntrustedCertificate = (driver: Driver): boolean => {
+    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+      return false;
+    }
+
+    const now = new Date();
+    let hasAnyCertificate = false;
+    let hasTrustedCert = false;
+
+    for (const signature of driver.Signatures) {
+      if (signature.Certificates && Array.isArray(signature.Certificates)) {
+        for (const cert of signature.Certificates) {
+          if (cert.Subject) {
+            hasAnyCertificate = true;
+            
+            // Vérifier si c'est un certificat de confiance
+            if (hasTrustedCertificate(driver)) {
+              hasTrustedCert = true;
+            }
+          }
+        }
+      }
+    }
+
+    // Retourner true si le driver a des certificats mais aucun n'est de confiance
+    return hasAnyCertificate && !hasTrustedCert;
+  };
+
   // Gestion des filtres
   const toggleFilter = useCallback((filterType: string) => {
     setPendingFilters(prev => {
       const newFilters = new Set(prev);
       
-      // Logique pour les filtres mutuellement exclusifs
-      if (filterType === 'signed' && newFilters.has('unsigned')) {
-        newFilters.delete('unsigned');
-      } else if (filterType === 'unsigned' && newFilters.has('signed')) {
-        newFilters.delete('signed');
+      // Logique pour les filtres de certificats mutuellement exclusifs
+      if (filterType === 'trusted-cert' && newFilters.has('untrusted-cert')) {
+        newFilters.delete('untrusted-cert');
+      } else if (filterType === 'untrusted-cert' && newFilters.has('trusted-cert')) {
+        newFilters.delete('trusted-cert');
       }
       
       if (newFilters.has(filterType)) {
@@ -391,10 +471,24 @@ export default function DriversClient({
       }
     }
     
-    if (hasActiveCertificate(driver)) {
+    // Gestion des certificats avec priorité
+    if (hasTrustedCertificate(driver)) {
+      tags.push({
+        text: 'TRUSTED CERTIFICATE',
+        type: 'success',
+        icon: 'fas fa-certificate'
+      });
+    } else if (hasUntrustedCertificate(driver)) {
+      tags.push({
+        text: 'UNKNOWN CERTIFICATE',
+        type: 'warning',
+        icon: 'fas fa-exclamation-triangle'
+      });
+    } else if (hasActiveCertificate(driver)) {
+      // Certificat actif mais non classifié (backup)
       tags.push({
         text: 'ALIVE CERTIFICATE',
-        type: 'success',
+        type: 'info',
         icon: 'fas fa-certificate'
       });
     }
@@ -580,15 +674,15 @@ export default function DriversClient({
                   <div 
                     className="category-title critical clickable-category"
                     onClick={() => toggleSection(`critical-${index}`)}
-                    aria-expanded={expandedSections.has(`critical-${index}`) || !expandedSections.has(`critical-collapsed-${index}`)}
+                    aria-expanded={expandedSections.has(`critical-${index}`)}
                     role="button"
                     tabIndex={0}
                   >
                     <i className="fas fa-exclamation-triangle"></i> 
                     <span>Critical Functions ({categorizedFunctions.critical.length})</span>
-                    <i className={`fas ${expandedSections.has(`critical-${index}`) || !expandedSections.has(`critical-collapsed-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                    <i className={`fas ${expandedSections.has(`critical-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
                   </div>
-                  {(expandedSections.has(`critical-${index}`) || !expandedSections.has(`critical-collapsed-${index}`)) && (
+                  {expandedSections.has(`critical-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.critical.map((func, idx) => (
                         <li key={`critical-${idx}`} className="function-item dangerous">
@@ -1185,19 +1279,20 @@ export default function DriversClient({
             >
               <i className="fas fa-skull-crossbones"></i> Killer Drivers
             </button>
+
             <button 
-              className={`filter-btn ${pendingFilters.has('signed') ? 'active' : ''} ${pendingFilters.has('unsigned') ? 'disabled' : ''}`}
-              onClick={() => toggleFilter('signed')}
-              disabled={pendingFilters.has('unsigned')}
+              className={`filter-btn trusted-cert-filter ${pendingFilters.has('trusted-cert') ? 'active' : ''} ${pendingFilters.has('untrusted-cert') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('trusted-cert')}
+              disabled={pendingFilters.has('untrusted-cert')}
             >
-              <i className="fas fa-certificate"></i> Signed Drivers
+              <i className="fas fa-certificate"></i> Trusted Certificate
             </button>
             <button 
-              className={`filter-btn ${pendingFilters.has('unsigned') ? 'active' : ''} ${pendingFilters.has('signed') ? 'disabled' : ''}`}
-              onClick={() => toggleFilter('unsigned')}
-              disabled={pendingFilters.has('signed')}
+              className={`filter-btn untrusted-cert-filter ${pendingFilters.has('untrusted-cert') ? 'active' : ''} ${pendingFilters.has('trusted-cert') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('untrusted-cert')}
+              disabled={pendingFilters.has('trusted-cert')}
             >
-              <i className="fas fa-exclamation-triangle"></i> Unsigned Drivers
+              <i className="fas fa-exclamation-triangle"></i> Unknown Certificate
             </button>
             <button 
               className={`filter-btn ${pendingFilters.has('recent') ? 'active' : ''}`}
@@ -1509,32 +1604,30 @@ export default function DriversClient({
               </p>
             </div>
 
+
             <div className="help-section">
-              <h4><i className="fas fa-certificate"></i> Signed Drivers</h4>
+              <h4><i className="fas fa-certificate"></i> Trusted Certificate</h4>
               <p>
-                <strong>Definition:</strong> Drivers that have a valid digital signature from a recognized publisher, certifying their authenticity and integrity.
+                <strong>Definition:</strong> Drivers signed by well-known Certificate Authorities like Microsoft, GlobalSign, DigiCert, VeriSign, and other trusted issuers.
               </p>
               <p>
-                <strong>Advantage:</strong> Indicates verified provenance, but does not guarantee absence of vulnerabilities.
+                <strong>Trust Level:</strong> These certificates indicate the driver was signed by a recognized authority, though this doesn't guarantee the driver is safe.
               </p>
               <p>
-                <strong>Reference:</strong>{" "}
-                <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/install/driver-signing" target="_blank" rel="noopener noreferrer">
-                  Microsoft Driver Signing
-                </a>
+                <strong>Use Case:</strong> Identify drivers with legitimate code signing certificates from established CAs.
               </p>
             </div>
 
             <div className="help-section">
-              <h4><i className="fas fa-exclamation-triangle"></i> Unsigned Drivers</h4>
+              <h4><i className="fas fa-exclamation-triangle"></i> Unknown Certificate</h4>
               <p>
-                <strong>Definition:</strong> Drivers without a valid digital signature, which may indicate unverified origin or unauthorized modification.
+                <strong>Definition:</strong> Drivers with certificates that are expired, self-signed, or issued by unknown/untrusted Certificate Authorities.
               </p>
               <p>
-                <strong>Risk:</strong> More likely to be malicious or have been modified since their original creation.
+                <strong>Risk Level:</strong> Higher risk of being malicious or compromised due to questionable certificate origin.
               </p>
               <p>
-                <strong>Note:</strong> Modern Windows generally blocks loading of unsigned drivers.
+                <strong>Analysis:</strong> Requires additional verification as the certificate chain cannot be trusted through standard means.
               </p>
             </div>
 

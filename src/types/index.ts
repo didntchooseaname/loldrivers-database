@@ -58,7 +58,6 @@ export interface Stats {
   total: number;
   hvciCompatible: number;
   killerDrivers: number;
-  signed: number;
   lastUpdated: string;
   hvciBlocklistCheck?: {
     lastCheck: string;
@@ -74,7 +73,7 @@ export interface StatsResponse {
   stats: Stats;
 }
 
-export type FilterType = 'hvci' | 'killer' | 'signed' | 'unsigned' | 'recent';
+export type FilterType = 'hvci' | 'killer' | 'recent';
 
 export interface SearchFilters {
   activeFilters: Set<FilterType>;

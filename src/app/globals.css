@@ -1587,46 +1587,6 @@ select.form-control {
   color: white !important;
 }
 
-/* Signed drivers filter */
-.filter-btn:has(i.fa-certificate) {
-  border-color: rgba(var(--color-teal-500-rgb), 0.3);
-}
-
-.filter-btn:has(i.fa-certificate) i {
-  color: var(--color-teal-500);
-}
-
-.filter-btn:has(i.fa-certificate):hover {
-  border-color: var(--color-teal-500);
-  background: rgba(var(--color-teal-500-rgb), 0.1);
-}
-
-.filter-btn:has(i.fa-certificate).active {
-  background: var(--color-teal-500);
-  color: var(--color-white);
-  border-color: var(--color-teal-500);
-}
-
-/* Unsigned drivers filter */
-.filter-btn:has(i.fa-exclamation-triangle) {
-  border-color: rgba(var(--color-orange-500-rgb), 0.3);
-}
-
-.filter-btn:has(i.fa-exclamation-triangle) i {
-  color: var(--color-orange-500);
-}
-
-.filter-btn:has(i.fa-exclamation-triangle):hover {
-  border-color: var(--color-orange-500);
-  background: rgba(var(--color-orange-500-rgb), 0.1);
-}
-
-.filter-btn:has(i.fa-exclamation-triangle).active {
-  background: var(--color-orange-500);
-  color: var(--color-white);
-  border-color: var(--color-orange-500);
-}
-
 /* Recent certificates filter */
 .filter-btn:has(i.fa-clock) {
   border-color: rgba(var(--color-teal-500-rgb), 0.3);
@@ -1645,6 +1605,46 @@ select.form-control {
   background: var(--color-teal-500);
   color: var(--color-white);
   border-color: var(--color-teal-500);
+}
+
+/* Trusted certificate filter - Green */
+.filter-btn.trusted-cert-filter {
+  border-color: rgba(var(--color-green-rgb), 0.3);
+}
+
+.filter-btn.trusted-cert-filter i {
+  color: var(--color-green);
+}
+
+.filter-btn.trusted-cert-filter:hover {
+  border-color: var(--color-green);
+  background: rgba(var(--color-green-rgb), 0.1);
+}
+
+.filter-btn.trusted-cert-filter.active {
+  background: var(--color-green);
+  color: var(--color-white);
+  border-color: var(--color-green);
+}
+
+/* Unknown/Untrusted certificate filter - Orange */
+.filter-btn.untrusted-cert-filter {
+  border-color: rgba(var(--color-orange-500-rgb), 0.3);
+}
+
+.filter-btn.untrusted-cert-filter i {
+  color: var(--color-orange-500);
+}
+
+.filter-btn.untrusted-cert-filter:hover {
+  border-color: var(--color-orange-500);
+  background: rgba(var(--color-orange-500-rgb), 0.1);
+}
+
+.filter-btn.untrusted-cert-filter.active {
+  background: var(--color-orange-500);
+  color: var(--color-white);
+  border-color: var(--color-orange-500);
 }
 
 /* Sort filters */

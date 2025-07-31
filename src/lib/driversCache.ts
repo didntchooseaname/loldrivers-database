@@ -100,19 +100,9 @@ class DriversCache {
       driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) && 
       driver.ImportedFunctions.some(func => KILLER_FUNCTIONS_REGEX.test(func))
     );
-    
-    const signedDrivers = this.drivers.filter(driver => 
-      driver.Signatures && Array.isArray(driver.Signatures) && driver.Signatures.length > 0
-    );
-    
-    const unsignedDrivers = this.drivers.filter(driver => 
-      !driver.Signatures || !Array.isArray(driver.Signatures) || driver.Signatures.length === 0
-    );
 
     this.indexedData.set('hvci', hvciDrivers);
     this.indexedData.set('killer', killerDrivers);
-    this.indexedData.set('signed', signedDrivers);
-    this.indexedData.set('unsigned', unsignedDrivers);
   }
 
   async loadDrivers(): Promise<ProcessedDriver[]> {
@@ -298,7 +288,6 @@ class DriversCache {
       total: drivers.length,
       hvciCompatible: this.indexedData.get('hvci')?.length || 0,
       killerDrivers: this.indexedData.get('killer')?.length || 0,
-      signed: this.indexedData.get('signed')?.length || 0,
       lastUpdated: new Date().toISOString(),
       ...(hvciBlocklistCheck && { hvciBlocklistCheck })
     };
@@ -337,6 +326,10 @@ class DriversCache {
     switch (filterType) {
       case 'recent':
         return this.hasActiveCertificate(driver);
+      case 'trustedCert':
+        return this.hasTrustedCertificate(driver);
+      case 'untrustedCert':
+        return this.hasUntrustedCertificate(driver);
       default:
         return true;
     }
@@ -366,6 +359,76 @@ class DriversCache {
       }
     }
     return false;
+  }
+
+  private hasTrustedCertificate(driver: ProcessedDriver): boolean {
+    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+      return false;
+    }
+
+    const trustedIssuers = [
+      'Microsoft Corporation',
+      'GlobalSign',
+      'DigiCert',
+      'VeriSign',
+      'Symantec',
+      'Thawte',
+      'GeoTrust',
+      'Comodo',
+      'Sectigo',
+      'Entrust',
+      'IdenTrust',
+      'Go Daddy',
+      'Network Solutions',
+      'Starfield Technologies'
+    ];
+
+    const now = Date.now();
+
+    for (const signature of driver.Signatures) {
+      if (signature.Certificates && Array.isArray(signature.Certificates)) {
+        for (const cert of signature.Certificates) {
+          if (cert.Subject && cert.ValidTo) {
+            try {
+              const validTo = new Date(cert.ValidTo).getTime();
+              if (validTo > now) {
+                const isTrusted = trustedIssuers.some(issuer => 
+                  typeof cert.Subject === 'string' && cert.Subject.includes(issuer)
+                );
+                if (isTrusted) {
+                  return true;
+                }
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private hasUntrustedCertificate(driver: ProcessedDriver): boolean {
+    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+      return false;
+    }
+
+    let hasAnyCertificate = false;
+
+    for (const signature of driver.Signatures) {
+      if (signature.Certificates && Array.isArray(signature.Certificates)) {
+        for (const cert of signature.Certificates) {
+          if (cert.Subject) {
+            hasAnyCertificate = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Retourner true si le driver a des certificats mais aucun n'est de confiance
+    return hasAnyCertificate && !this.hasTrustedCertificate(driver);
   }
 
   private searchInDriverOptimized(driver: ProcessedDriver, searchTerm: string): boolean {

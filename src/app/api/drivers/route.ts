@@ -59,17 +59,17 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('newest-first') === 'true') filters.newestFirst = true;
     if (searchParams.get('oldest-first') === 'true') filters.oldestFirst = true;
     
-    // Exclusion mutuelle pour signed/unsigned
-    const signedParam = searchParams.get('signed');
-    const unsignedParam = searchParams.get('unsigned');
+    // Exclusion mutuelle pour trusted-cert/untrusted-cert
+    const trustedCertParam = searchParams.get('trusted-cert');
+    const untrustedCertParam = searchParams.get('untrusted-cert');
     
-    if (signedParam === 'true' && unsignedParam === 'true') {
-      // Si les deux sont présents, on privilégie signed
-      filters.signed = true;
-    } else if (signedParam === 'true') {
-      filters.signed = true;
-    } else if (unsignedParam === 'true') {
-      filters.unsigned = true;
+    if (trustedCertParam === 'true' && untrustedCertParam === 'true') {
+      // Si les deux sont présents, on privilégie trusted-cert
+      filters.trustedCert = true;
+    } else if (trustedCertParam === 'true') {
+      filters.trustedCert = true;
+    } else if (untrustedCertParam === 'true') {
+      filters.untrustedCert = true;
     }
 
     const cache = DriversCache.getInstance();
