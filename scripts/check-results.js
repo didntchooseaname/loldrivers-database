@@ -118,9 +118,5 @@ function checkHVCIResults() {
     }
 }
 
-// Exécuter si appelé directement
-if (import.meta.url === `file://${process.argv[1]}`) {
-    checkHVCIResults();
-}
-
-export { checkHVCIResults };
+// Exécuter la fonction directement
+checkHVCIResults();
