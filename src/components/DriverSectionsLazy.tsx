@@ -101,7 +101,7 @@ const DriverSectionsLazy = memo(({
                     if (displayName.length > 60) {
                       displayName = displayName.substring(0, 57) + '...';
                     }
-                  } catch (e) {
+                  } catch {
                     displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
                   }
 

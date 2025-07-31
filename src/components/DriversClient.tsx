@@ -860,7 +860,7 @@ export default function DriversClient({
                     if (displayName.length > 60) {
                       displayName = displayName.substring(0, 57) + '...';
                     }
-                  } catch (e) {
+                  } catch {
                     // If URL parsing fails, use the resource as is
                     displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
                   }

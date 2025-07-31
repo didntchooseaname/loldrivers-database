@@ -1,4 +1,4 @@
-name: Check Vulnerable Drivers Against Microsoft Block List
+name: "HVCI Tag Update"
 
 on:
   schedule:
@@ -15,94 +15,193 @@ permissions:
   actions: read
 
 jobs:
-  check-vulnerable-drivers:
+  run_powershell:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        
+    - name: Run PowerShell script
+      run: |
+        Invoke-WebRequest -Uri "https://gist.githubusercontent.com/MHaggis/8d6de45b883b338e47de08b3cb4c9819/raw/0051a329166b4b6bee29345f455640c902fdb735/HVC_LOLDrivers_check_csv.ps1" -OutFile "script.ps1"
+        ./script.ps1
+        
+    - name: Upload CSV
+      uses: actions/upload-artifact@v4
+      with:
+        name: hvci_drivers
+        path: hvci_drivers.csv
+
+  run_node:
+    needs: run_powershell
     runs-on: ubuntu-latest
     # Only run if previous workflow succeeded, or if triggered manually/by cron
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
-    - name: Display trigger information
-      run: |
-        echo "HVCI Check Workflow Information"
-        echo "================================="
-        echo "Triggered by: ${{ github.event_name }}"
-        if [ "${{ github.event_name }}" = "workflow_run" ]; then
-          echo "Previous workflow: ${{ github.event.workflow_run.name }}"
-          echo "Previous workflow status: ${{ github.event.workflow_run.conclusion }}"
-          echo "Previous workflow run ID: ${{ github.event.workflow_run.id }}"
-        fi
-        echo "Current time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-        echo ""
-        
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0 
+        fetch-depth: 0
+        
+    - name: Download CSV
+      uses: actions/download-artifact@v4
+      with:
+        name: hvci_drivers
+        path: ./
         
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 9.12.0
-        
-    - name: Get pnpm store directory
-      shell: bash
+    - name: Create HVCI tagging script
       run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        cat > hvci-tagger.js << 'EOF'
+        #!/usr/bin/env node
         
-    - name: Setup pnpm cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
+        import fs from 'fs';
+        import { createReadStream } from 'fs';
+        import { createInterface } from 'readline';
         
-    - name: Install dependencies
-      run: pnpm install
-      
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y unzip
-      
-    - name: Run vulnerable drivers check
-      run: node scripts/check-vulnerable-drivers.js
-      
-    - name: Display check results
-      run: |
-        echo "=========================================="
-        echo "           HVCI CHECK RESULTS"
-        echo "=========================================="
-        if [ -f "check-summary.md" ]; then
-          echo "Check completed successfully!"
-          echo ""
-          echo "Quick Summary:"
-          # Extract key metrics from summary
-          if grep -q "Newly Tagged Drivers" check-summary.md; then
-            NEWLY_TAGGED=$(grep "Newly Tagged Drivers" check-summary.md | grep -o '[0-9]\+' | head -1)
-            echo "Newly tagged drivers: $NEWLY_TAGGED"
-          fi
-          if grep -q "Matched Drivers in Database" check-summary.md; then
-            MATCHED=$(grep "Matched Drivers in Database" check-summary.md | grep -o '[0-9]\+' | head -1)
-            echo "Total matched drivers: $MATCHED"
-          fi
-          if grep -q "Total Blocked Hashes" check-summary.md; then
-            BLOCKED=$(grep "Total Blocked Hashes" check-summary.md | grep -o '[0-9]\+' | head -1)
-            echo "Microsoft blocked hashes: $BLOCKED"
-          fi
-          echo ""
-          echo "Full details available in workflow summary below."
-        else
-          echo "Check summary not found - check may have failed"
-          exit 1
-        fi
-        echo "=========================================="
+        const DRV_JSON_PATH = './data/drv.json';
+        const CSV_PATH = './hvci_drivers.csv';
+        
+        async function processCSV() {
+            console.log('Reading HVCI CSV results...');
+            
+            const blockedHashes = new Set();
+            const allowedHashes = new Set();
+            
+            const fileStream = createReadStream(CSV_PATH);
+            const rl = createInterface({
+                input: fileStream,
+                crlfDelay: Infinity
+            });
+            
+            let lineNumber = 0;
+            for await (const line of rl) {
+                lineNumber++;
+                if (lineNumber === 1) continue; // Skip header
+                
+                const columns = line.split(',');
+                if (columns.length >= 4) {
+                    const md5 = columns[0]?.replace(/"/g, '').trim();
+                    const sha1 = columns[1]?.replace(/"/g, '').trim();
+                    const sha256 = columns[2]?.replace(/"/g, '').trim();
+                    const status = columns[3]?.replace(/"/g, '').trim();
+                    
+                    if (status === 'Blocked') {
+                        if (md5) blockedHashes.add(md5.toLowerCase());
+                        if (sha1) blockedHashes.add(sha1.toLowerCase());
+                        if (sha256) blockedHashes.add(sha256.toLowerCase());
+                    } else if (status === 'Allowed') {
+                        if (md5) allowedHashes.add(md5.toLowerCase());
+                        if (sha1) allowedHashes.add(sha1.toLowerCase());
+                        if (sha256) allowedHashes.add(sha256.toLowerCase());
+                    }
+                }
+            }
+            
+            console.log(`Found ${blockedHashes.size} blocked hashes and ${allowedHashes.size} allowed hashes`);
+            return { blockedHashes, allowedHashes };
+        }
+        
+        async function updateDriversJSON() {
+            console.log('Loading drivers database...');
+            const driversData = JSON.parse(fs.readFileSync(DRV_JSON_PATH, 'utf8'));
+            
+            const { blockedHashes, allowedHashes } = await processCSV();
+            
+            let updatedCount = 0;
+            let hvciBlockedCount = 0;
+            let hvciAllowedCount = 0;
+            
+            driversData.forEach(driver => {
+                if (driver.KnownVulnerableSamples) {
+                    driver.KnownVulnerableSamples.forEach(sample => {
+                        const sampleHashes = [
+                            sample.MD5?.toLowerCase(),
+                            sample.SHA1?.toLowerCase(), 
+                            sample.SHA256?.toLowerCase(),
+                            sample.Authentihash?.MD5?.toLowerCase(),
+                            sample.Authentihash?.SHA1?.toLowerCase(),
+                            sample.Authentihash?.SHA256?.toLowerCase()
+                        ].filter(Boolean);
+                        
+                        let isBlocked = false;
+                        let isAllowed = false;
+                        
+                        for (const hash of sampleHashes) {
+                            if (blockedHashes.has(hash)) {
+                                isBlocked = true;
+                                break;
+                            }
+                            if (allowedHashes.has(hash)) {
+                                isAllowed = true;
+                            }
+                        }
+                        
+                        if (!driver.Tags) {
+                            driver.Tags = [];
+                        }
+                        
+                        const hasHVCIBlocked = driver.Tags.includes('HVCI Blocked');
+                        const hasHVCICompatible = driver.Tags.includes('HVCI Compatible');
+                        
+                        if (isBlocked && !hasHVCIBlocked) {
+                            driver.Tags.push('HVCI Blocked');
+                            updatedCount++;
+                            hvciBlockedCount++;
+                            
+                            // Remove HVCI Compatible if present
+                            const compatibleIndex = driver.Tags.indexOf('HVCI Compatible');
+                            if (compatibleIndex > -1) {
+                                driver.Tags.splice(compatibleIndex, 1);
+                            }
+                        } else if (isAllowed && !hasHVCICompatible && !hasHVCIBlocked) {
+                            driver.Tags.push('HVCI Compatible');
+                            updatedCount++;
+                            hvciAllowedCount++;
+                        }
+                    });
+                }
+            });
+            
+            // Add metadata
+            if (!driversData._metadata) {
+                driversData._metadata = {};
+            }
+            driversData._metadata.hvciCheck = {
+                lastCheck: new Date().toISOString(),
+                updatedDrivers: updatedCount,
+                hvciBlockedTotal: hvciBlockedCount,
+                hvciCompatibleTotal: hvciAllowedCount,
+                source: 'Microsoft HVCI Policy'
+            };
+            
+            // Save updated data
+            if (updatedCount > 0) {
+                console.log(`Updated ${updatedCount} drivers with HVCI tags`);
+                fs.writeFileSync(DRV_JSON_PATH, JSON.stringify(driversData, null, 2));
+            } else {
+                console.log('No new HVCI tags to add');
+                // Still update metadata
+                fs.writeFileSync(DRV_JSON_PATH, JSON.stringify(driversData, null, 2));
+            }
+            
+            console.log(`HVCI Blocked: ${hvciBlockedCount}, HVCI Compatible: ${hvciAllowedCount}`);
+        }
+        
+        updateDriversJSON().catch(console.error);
+        EOF
+        
+    - name: Execute HVCI tagging script
+      run: node hvci-tagger.js
       
     - name: Check for changes
       id: git-check
@@ -116,50 +215,13 @@ jobs:
         git config --local user.name "GitHub Action"
         git add data/drv.json
         
-        # Create appropriate commit message based on trigger
-        if [ "${{ github.event_name }}" = "workflow_run" ]; then
-          COMMIT_MSG="Update HVCI blocked drivers from Microsoft official list
-        
-        - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        - Triggered by: LOLDrivers data update workflow
-        - Previous workflow run: ${{ github.event.workflow_run.id }}
-        - Automated check against Microsoft HVCI Block List
-        - Source: https://aka.ms/VulnerableDriverBlockList"
-        else
-          COMMIT_MSG="Update HVCI blocked drivers from Microsoft official list
+        git commit -m "Update HVCI tags based on Microsoft HVCI policy
         
         - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         - Triggered by: ${{ github.event_name }}
-        - Automated check against Microsoft HVCI Block List
-        - Source: https://aka.ms/VulnerableDriverBlockList"
-        fi
-        
-        git commit -m "$COMMIT_MSG"
+        - Automated check against Microsoft HVCI Block List"
         
         echo "Pushing changes..."
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Create summary
-      run: |
-        echo "## HVCI Vulnerable Drivers Check Summary" >> $GITHUB_STEP_SUMMARY
-        echo "**Check completed at:** $(date)" >> $GITHUB_STEP_SUMMARY
-        echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ github.event_name }}" = "workflow_run" ]; then
-          echo "**Previous workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Previous workflow status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "**Source:** [Microsoft HVCI Block List](https://aka.ms/VulnerableDriverBlockList)" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Add detailed results from the check script
-        if [ -f "check-summary.md" ]; then
-          cat check-summary.md >> $GITHUB_STEP_SUMMARY
-        else
-          echo "No summary file generated - check may have failed" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) blocks drivers that are known to be vulnerable to prevent exploitation." >> $GITHUB_STEP_SUMMARY
