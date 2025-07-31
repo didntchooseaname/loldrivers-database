@@ -3456,8 +3456,8 @@ select.form-control {
 .function-item {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
-  padding: var(--space-4) var(--space-8);
-  background-color: var(--color-bg-8);
+  padding: var(--space-6) var(--space-8); /* Padding légèrement augmenté */
+  background-color: var(--color-bg-8); /* Remettre la couleur de fond */
   border-radius: var(--radius-sm);
   color: var(--color-text);
   transition: all var(--duration-normal) var(--ease-standard);
@@ -3465,6 +3465,7 @@ select.form-control {
   position: relative;
   overflow: hidden;
   border: 1px solid transparent;
+  margin-bottom: var(--space-2); /* Petit espace entre les éléments */
 }
 
 .function-item::before {
@@ -3479,10 +3480,10 @@ select.form-control {
 }
 
 .function-item:hover {
-  background-color: rgba(var(--color-accent-rgb), 0.08);
+  background-color: rgba(var(--color-accent-rgb), 0.08); /* Remettre la couleur de fond hover */
   border-color: rgba(var(--color-accent-rgb), 0.2);
-  transform: translateX(6px) scale(1.02);
-  box-shadow: 0 4px 12px rgba(var(--color-accent-rgb), 0.15);
+  transform: translateX(4px); /* Mouvement moins prononcé */
+  box-shadow: 0 2px 8px rgba(var(--color-accent-rgb), 0.1); /* Ombre plus douce */
   color: var(--color-accent);
 }
 
@@ -3516,9 +3517,9 @@ select.form-control {
 }
 
 .function-item.dangerous {
-  background-color: rgba(var(--color-error-rgb), 0.1);
+  background-color: rgba(var(--color-error-rgb), 0.1); /* Remettre la couleur de fond */
   color: var(--color-error);
-  border: 1px solid rgba(var(--color-error-rgb), 0.2);
+  border: 1px solid rgba(var(--color-error-rgb), 0.2); /* Remettre la bordure d'origine */
 }
 
 .function-item.dangerous::before {
@@ -3526,10 +3527,175 @@ select.form-control {
 }
 
 .function-item.dangerous:hover {
-  background-color: rgba(var(--color-error-rgb), 0.2);
+  background-color: rgba(var(--color-error-rgb), 0.2); /* Remettre la couleur de fond hover */
   border-color: var(--color-error);
   color: var(--color-error);
-  box-shadow: 0 4px 12px rgba(var(--color-error-rgb), 0.25);
+  box-shadow: 0 2px 8px rgba(var(--color-error-rgb), 0.15); /* Ombre plus douce */
+}
+
+/* Couleurs des function-item par catégorie */
+
+/* Critical functions - utilise la couleur d'erreur */
+.collapsible-category:has(.category-title.critical) .function-item {
+  border-left: 3px solid var(--color-error);
+  background-color: rgba(var(--color-error-rgb), 0.05);
+}
+
+.collapsible-category:has(.category-title.critical) .function-item:hover {
+  background-color: rgba(var(--color-error-rgb), 0.1);
+  border-color: var(--color-error);
+  color: var(--color-error);
+  box-shadow: 0 2px 8px rgba(var(--color-error-rgb), 0.15);
+}
+
+/* Process Management */
+.collapsible-category:has(.category-title.process) .function-item {
+  border-left: 3px solid rgb(59, 130, 246);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.collapsible-category:has(.category-title.process) .function-item:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgb(59, 130, 246);
+  color: rgb(59, 130, 246);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+/* Memory Management */
+.collapsible-category:has(.category-title.memory) .function-item {
+  border-left: 3px solid rgb(168, 85, 247);
+  background-color: rgba(168, 85, 247, 0.05);
+}
+
+.collapsible-category:has(.category-title.memory) .function-item:hover {
+  background-color: rgba(168, 85, 247, 0.1);
+  border-color: rgb(168, 85, 247);
+  color: rgb(168, 85, 247);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.15);
+}
+
+/* File System */
+.collapsible-category:has(.category-title.file) .function-item {
+  border-left: 3px solid rgb(34, 197, 94);
+  background-color: rgba(34, 197, 94, 0.05);
+}
+
+.collapsible-category:has(.category-title.file) .function-item:hover {
+  background-color: rgba(34, 197, 94, 0.1);
+  border-color: rgb(34, 197, 94);
+  color: rgb(34, 197, 94);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
+}
+
+/* Registry */
+.collapsible-category:has(.category-title.registry) .function-item {
+  border-left: 3px solid rgb(251, 146, 60);
+  background-color: rgba(251, 146, 60, 0.05);
+}
+
+.collapsible-category:has(.category-title.registry) .function-item:hover {
+  background-color: rgba(251, 146, 60, 0.1);
+  border-color: rgb(251, 146, 60);
+  color: rgb(251, 146, 60);
+  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.15);
+}
+
+/* Network */
+.collapsible-category:has(.category-title.network) .function-item {
+  border-left: 3px solid rgb(20, 184, 166);
+  background-color: rgba(20, 184, 166, 0.05);
+}
+
+.collapsible-category:has(.category-title.network) .function-item:hover {
+  background-color: rgba(20, 184, 166, 0.1);
+  border-color: rgb(20, 184, 166);
+  color: rgb(20, 184, 166);
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.15);
+}
+
+/* Security */
+.collapsible-category:has(.category-title.security) .function-item {
+  border-left: 3px solid rgb(244, 63, 94);
+  background-color: rgba(244, 63, 94, 0.05);
+}
+
+.collapsible-category:has(.category-title.security) .function-item:hover {
+  background-color: rgba(244, 63, 94, 0.1);
+  border-color: rgb(244, 63, 94);
+  color: rgb(244, 63, 94);
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.15);
+}
+
+/* Kernel/System */
+.collapsible-category:has(.category-title.kernel) .function-item {
+  border-left: 3px solid rgb(156, 163, 175);
+  background-color: rgba(156, 163, 175, 0.05);
+}
+
+.collapsible-category:has(.category-title.kernel) .function-item:hover {
+  background-color: rgba(156, 163, 175, 0.1);
+  border-color: rgb(156, 163, 175);
+  color: rgb(156, 163, 175);
+  box-shadow: 0 2px 8px rgba(156, 163, 175, 0.15);
+}
+
+/* Other */
+.collapsible-category:has(.category-title.other) .function-item {
+  border-left: 3px solid rgb(107, 114, 128);
+  background-color: rgba(107, 114, 128, 0.05);
+}
+
+.collapsible-category:has(.category-title.other) .function-item:hover {
+  background-color: rgba(107, 114, 128, 0.1);
+  border-color: rgb(107, 114, 128);
+  color: rgb(107, 114, 128);
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.15);
+}
+
+/* Adaptation pour le mode sombre */
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.process) .function-item:hover {
+  color: rgb(96, 165, 250);
+  border-color: rgb(96, 165, 250);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.memory) .function-item:hover {
+  color: rgb(196, 181, 253);
+  border-color: rgb(196, 181, 253);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.file) .function-item:hover {
+  color: rgb(74, 222, 128);
+  border-color: rgb(74, 222, 128);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.registry) .function-item:hover {
+  color: rgb(251, 191, 36);
+  border-color: rgb(251, 191, 36);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.network) .function-item:hover {
+  color: rgb(45, 212, 191);
+  border-color: rgb(45, 212, 191);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.security) .function-item:hover {
+  color: rgb(251, 113, 133);
+  border-color: rgb(251, 113, 133);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.kernel) .function-item:hover {
+  color: rgb(209, 213, 219);
+  border-color: rgb(209, 213, 219);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.other) .function-item:hover {
+  color: rgb(156, 163, 175);
+  border-color: rgb(156, 163, 175);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.critical) .function-item:hover {
+  color: rgb(248, 113, 113);
+  border-color: rgb(248, 113, 113);
 }
 
 /* Resources section styles */
@@ -3537,6 +3703,322 @@ select.form-control {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+}
+
+/* Function categories styling */
+.function-category {
+  margin-bottom: var(--space-16);
+}
+
+.function-category:last-child {
+  margin-bottom: 0;
+}
+
+.collapsible-category {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-12);
+  overflow: hidden;
+  transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.collapsible-category:hover {
+  border-color: rgba(var(--color-accent-rgb), 0.3);
+  box-shadow: 0 2px 8px rgba(var(--color-accent-rgb), 0.1);
+}
+
+.collapsible-category .category-title {
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-standard);
+  user-select: none;
+  position: relative;
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  overflow: hidden;
+}
+
+.collapsible-category .category-title::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left var(--duration-slow) var(--ease-standard);
+}
+
+.clickable-category:hover::before {
+  left: 100%;
+}
+
+.clickable-category:hover {
+  transform: none;
+  opacity: 1;
+}
+
+.category-chevron {
+  margin-left: auto;
+  font-size: var(--font-size-sm);
+  transition: transform var(--duration-normal) var(--ease-standard);
+  color: var(--color-text-secondary);
+}
+
+.collapsible-category:hover .category-chevron {
+  color: var(--color-text);
+}
+
+.category-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--color-text);
+  border-left: 4px solid transparent;
+  transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.category-title i:first-child {
+  font-size: var(--font-size-sm);
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Rotation du chevron quand ouvert */
+.collapsible-category .category-title[aria-expanded="true"] .category-chevron {
+  transform: rotate(90deg);
+}
+
+/* Liste de fonctions avec limitation à 5 éléments */
+.category-functions-list {
+  max-height: calc(5 * (var(--font-size-xs) + var(--space-8) + var(--space-8) + 4px) + var(--space-8)); /* Environ 5 éléments + padding supplémentaire */
+  overflow-y: auto;
+  padding: var(--space-12) var(--space-16) var(--space-16) var(--space-16);
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.category-functions-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.category-functions-list::-webkit-scrollbar-track {
+  background: var(--color-bg-1);
+  border-radius: var(--radius-sm);
+}
+
+.category-functions-list::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.category-functions-list::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Couleurs spécifiques par catégorie */
+.category-title.critical {
+  border-left-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.collapsible-category:has(.category-title.critical) {
+  border-left: 3px solid var(--color-error);
+}
+
+.collapsible-category:has(.category-title.critical):hover {
+  border-color: var(--color-error);
+  box-shadow: 0 2px 8px rgba(var(--color-error-rgb), 0.15);
+}
+
+.category-title.process {
+  border-left-color: rgb(59, 130, 246);
+  color: rgb(59, 130, 246);
+}
+
+.collapsible-category:has(.category-title.process) {
+  border-left: 3px solid rgb(59, 130, 246);
+}
+
+.collapsible-category:has(.category-title.process):hover {
+  border-color: rgb(59, 130, 246);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.category-title.memory {
+  border-left-color: rgb(168, 85, 247);
+  color: rgb(168, 85, 247);
+}
+
+.collapsible-category:has(.category-title.memory) {
+  border-left: 3px solid rgb(168, 85, 247);
+}
+
+.collapsible-category:has(.category-title.memory):hover {
+  border-color: rgb(168, 85, 247);
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.15);
+}
+
+.category-title.file {
+  border-left-color: rgb(34, 197, 94);
+  color: rgb(34, 197, 94);
+}
+
+.collapsible-category:has(.category-title.file) {
+  border-left: 3px solid rgb(34, 197, 94);
+}
+
+.collapsible-category:has(.category-title.file):hover {
+  border-color: rgb(34, 197, 94);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
+}
+
+.category-title.registry {
+  border-left-color: rgb(251, 146, 60);
+  color: rgb(251, 146, 60);
+}
+
+.collapsible-category:has(.category-title.registry) {
+  border-left: 3px solid rgb(251, 146, 60);
+}
+
+.collapsible-category:has(.category-title.registry):hover {
+  border-color: rgb(251, 146, 60);
+  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.15);
+}
+
+.category-title.network {
+  border-left-color: rgb(20, 184, 166);
+  color: rgb(20, 184, 166);
+}
+
+.collapsible-category:has(.category-title.network) {
+  border-left: 3px solid rgb(20, 184, 166);
+}
+
+.collapsible-category:has(.category-title.network):hover {
+  border-color: rgb(20, 184, 166);
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.15);
+}
+
+.category-title.security {
+  border-left-color: rgb(244, 63, 94);
+  color: rgb(244, 63, 94);
+}
+
+.collapsible-category:has(.category-title.security) {
+  border-left: 3px solid rgb(244, 63, 94);
+}
+
+.collapsible-category:has(.category-title.security):hover {
+  border-color: rgb(244, 63, 94);
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.15);
+}
+
+.category-title.kernel {
+  border-left-color: rgb(156, 163, 175);
+  color: rgb(156, 163, 175);
+}
+
+.collapsible-category:has(.category-title.kernel) {
+  border-left: 3px solid rgb(156, 163, 175);
+}
+
+.collapsible-category:has(.category-title.kernel):hover {
+  border-color: rgb(156, 163, 175);
+  box-shadow: 0 2px 8px rgba(156, 163, 175, 0.15);
+}
+
+.category-title.other {
+  border-left-color: rgb(107, 114, 128);
+  color: rgb(107, 114, 128);
+}
+
+.collapsible-category:has(.category-title.other) {
+  border-left: 3px solid rgb(107, 114, 128);
+}
+
+.collapsible-category:has(.category-title.other):hover {
+  border-color: rgb(107, 114, 128);
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.15);
+}
+
+/* Adaptation sombre - couleurs plus vives */
+[data-color-scheme="dark"] .category-title.critical {
+  color: rgb(248, 113, 113);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.critical) {
+  border-left-color: rgb(248, 113, 113);
+}
+
+[data-color-scheme="dark"] .category-title.process {
+  color: rgb(96, 165, 250);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.process) {
+  border-left-color: rgb(96, 165, 250);
+}
+
+[data-color-scheme="dark"] .category-title.memory {
+  color: rgb(196, 181, 253);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.memory) {
+  border-left-color: rgb(196, 181, 253);
+}
+
+[data-color-scheme="dark"] .category-title.file {
+  color: rgb(74, 222, 128);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.file) {
+  border-left-color: rgb(74, 222, 128);
+}
+
+[data-color-scheme="dark"] .category-title.registry {
+  color: rgb(251, 191, 36);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.registry) {
+  border-left-color: rgb(251, 191, 36);
+}
+
+[data-color-scheme="dark"] .category-title.network {
+  color: rgb(45, 212, 191);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.network) {
+  border-left-color: rgb(45, 212, 191);
+}
+
+[data-color-scheme="dark"] .category-title.security {
+  color: rgb(251, 113, 133);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.security) {
+  border-left-color: rgb(251, 113, 133);
+}
+
+[data-color-scheme="dark"] .category-title.kernel {
+  color: rgb(209, 213, 219);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.kernel) {
+  border-left-color: rgb(209, 213, 219);
+}
+
+[data-color-scheme="dark"] .category-title.other {
+  color: rgb(156, 163, 175);
+}
+
+[data-color-scheme="dark"] .collapsible-category:has(.category-title.other) {
+  border-left-color: rgb(156, 163, 175);
 }
 
 /* Resource links using hash style */

@@ -101,6 +101,33 @@ export default function DriversClient({
     setFilteredDrivers(paginatedDrivers);
   }, [paginatedDrivers]);
 
+  // Initialiser les sections critiques comme déroulées par défaut
+  useEffect(() => {
+    setExpandedSections(prev => {
+      const newExpanded = new Set(prev);
+      // Marquer toutes les sections critiques comme non-collapsed au premier rendu
+      paginatedDrivers.forEach((driver, index) => {
+        if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
+          const hasCriticalFunctions = driver.ImportedFunctions.some(func => {
+            const funcLower = func.toLowerCase();
+            return funcLower.includes('zwterminateprocess') || 
+                   funcLower.includes('zwkillprocess') || 
+                   funcLower.includes('ntterminate') ||
+                   funcLower.includes('zwsuspendprocess') ||
+                   funcLower.includes('psterminatesystemthread') ||
+                   (funcLower.includes('zwclose') && funcLower.includes('process'));
+          });
+          
+          if (hasCriticalFunctions) {
+            const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index;
+            newExpanded.add(`critical-${globalIndex}`);
+          }
+        }
+      });
+      return newExpanded;
+    });
+  }, [paginatedDrivers, currentPage, ITEMS_PER_PAGE]);
+
   // Vérifier certificat actif
   const hasActiveCertificate = (driver: Driver): boolean => {
     if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
@@ -423,9 +450,114 @@ export default function DriversClient({
       );
     }
 
-    // Si des fonctions existent, section collapsible
+    // Si des fonctions existent, section collapsible avec classification
     const sectionId = `functions-${index}`;
     const isExpanded = expandedSections.has(sectionId);
+    
+    // Classification des fonctions par catégories
+    const categorizedFunctions = {
+      critical: [] as string[],
+      process: [] as string[],
+      memory: [] as string[],
+      file: [] as string[],
+      registry: [] as string[],
+      network: [] as string[],
+      security: [] as string[],
+      kernel: [] as string[],
+      other: [] as string[]
+    };
+
+    // Regrouper les fonctions par catégorie
+    functions.forEach(func => {
+      const funcLower = func.toLowerCase();
+      
+      // Fonctions critiques/dangereuses
+      if (funcLower.includes('zwterminateprocess') || 
+          funcLower.includes('zwkillprocess') || 
+          funcLower.includes('ntterminate') ||
+          funcLower.includes('zwsuspendprocess') ||
+          funcLower.includes('psterminatesystemthread') ||
+          funcLower.includes('zwclose') && funcLower.includes('process')) {
+        categorizedFunctions.critical.push(func);
+      }
+      // Gestion des processus
+      else if (funcLower.includes('process') || 
+               funcLower.includes('thread') ||
+               funcLower.includes('zwcreate') ||
+               funcLower.includes('zwopen') ||
+               funcLower.includes('pscreate') ||
+               funcLower.includes('psget')) {
+        categorizedFunctions.process.push(func);
+      }
+      // Gestion mémoire
+      else if (funcLower.includes('memory') || 
+               funcLower.includes('virtual') ||
+               funcLower.includes('mmmap') ||
+               funcLower.includes('mmallocate') ||
+               funcLower.includes('zwmap') ||
+               funcLower.includes('zwallocate') ||
+               funcLower.includes('heap') ||
+               funcLower.includes('pool')) {
+        categorizedFunctions.memory.push(func);
+      }
+      // Système de fichiers
+      else if (funcLower.includes('file') || 
+               funcLower.includes('directory') ||
+               funcLower.includes('zwread') ||
+               funcLower.includes('zwwrite') ||
+               funcLower.includes('zwdelete') ||
+               funcLower.includes('iocreate') ||
+               funcLower.includes('ntread') ||
+               funcLower.includes('ntwrite')) {
+        categorizedFunctions.file.push(func);
+      }
+      // Registre
+      else if (funcLower.includes('registry') || 
+               funcLower.includes('regopen') ||
+               funcLower.includes('regcreate') ||
+               funcLower.includes('regset') ||
+               funcLower.includes('regquery') ||
+               funcLower.includes('zwopen') && funcLower.includes('key') ||
+               funcLower.includes('zwcreate') && funcLower.includes('key')) {
+        categorizedFunctions.registry.push(func);
+      }
+      // Réseau
+      else if (funcLower.includes('socket') || 
+               funcLower.includes('wsk') ||
+               funcLower.includes('network') ||
+               funcLower.includes('tcp') ||
+               funcLower.includes('udp') ||
+               funcLower.includes('tdi')) {
+        categorizedFunctions.network.push(func);
+      }
+      // Sécurité
+      else if (funcLower.includes('security') || 
+               funcLower.includes('token') ||
+               funcLower.includes('privilege') ||
+               funcLower.includes('seaccess') ||
+               funcLower.includes('seaudit') ||
+               funcLower.includes('sesingle') ||
+               funcLower.includes('zwsetinformation') && funcLower.includes('token')) {
+        categorizedFunctions.security.push(func);
+      }
+      // Fonctions kernel/système
+      else if (funcLower.includes('ke') ||
+               funcLower.includes('hal') ||
+               funcLower.includes('io') ||
+               funcLower.includes('ob') ||
+               funcLower.includes('ex') ||
+               funcLower.includes('rtl') ||
+               funcLower.includes('zwquery') ||
+               funcLower.includes('zwset') ||
+               funcLower.includes('ntquery') ||
+               funcLower.includes('ntset')) {
+        categorizedFunctions.kernel.push(func);
+      }
+      // Autres
+      else {
+        categorizedFunctions.other.push(func);
+      }
+    });
     
     return (
       <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
@@ -440,19 +572,239 @@ export default function DriversClient({
         {isExpanded && (
           <div className="collapsible-content">
             <div className="collapsible-inner">
-              <ul className="functions-list functions-scrollable">
-                {functions.map((func, idx) => {
-                  const isDangerous = func.toLowerCase().includes('zwterminateprocess') ||
-                                    func.toLowerCase().includes('zwkillprocess') ||
-                                    func.toLowerCase().includes('ntterminate');
-                  
-                  return (
-                    <li key={idx} className={`function-item ${isDangerous ? 'dangerous' : ''}`}>
-                      {func}
-                    </li>
-                  );
-                })}
-              </ul>
+              {/* Fonctions critiques en premier - déroulée par défaut */}
+              {categorizedFunctions.critical.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title critical clickable-category"
+                    onClick={() => toggleSection(`critical-${index}`)}
+                    aria-expanded={expandedSections.has(`critical-${index}`) || !expandedSections.has(`critical-collapsed-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-exclamation-triangle"></i> 
+                    <span>Critical Functions ({categorizedFunctions.critical.length})</span>
+                    <i className={`fas ${expandedSections.has(`critical-${index}`) || !expandedSections.has(`critical-collapsed-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {(expandedSections.has(`critical-${index}`) || !expandedSections.has(`critical-collapsed-${index}`)) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.critical.map((func, idx) => (
+                        <li key={`critical-${idx}`} className="function-item dangerous">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Gestion des processus */}
+              {categorizedFunctions.process.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title process clickable-category"
+                    onClick={() => toggleSection(`process-${index}`)}
+                    aria-expanded={expandedSections.has(`process-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-microchip"></i> 
+                    <span>Process Management ({categorizedFunctions.process.length})</span>
+                    <i className={`fas ${expandedSections.has(`process-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`process-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.process.map((func, idx) => (
+                        <li key={`process-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Gestion mémoire */}
+              {categorizedFunctions.memory.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title memory clickable-category"
+                    onClick={() => toggleSection(`memory-${index}`)}
+                    aria-expanded={expandedSections.has(`memory-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-memory"></i> 
+                    <span>Memory Management ({categorizedFunctions.memory.length})</span>
+                    <i className={`fas ${expandedSections.has(`memory-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`memory-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.memory.map((func, idx) => (
+                        <li key={`memory-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Système de fichiers */}
+              {categorizedFunctions.file.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title file clickable-category"
+                    onClick={() => toggleSection(`file-${index}`)}
+                    aria-expanded={expandedSections.has(`file-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-file"></i> 
+                    <span>File System ({categorizedFunctions.file.length})</span>
+                    <i className={`fas ${expandedSections.has(`file-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`file-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.file.map((func, idx) => (
+                        <li key={`file-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Registre */}
+              {categorizedFunctions.registry.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title registry clickable-category"
+                    onClick={() => toggleSection(`registry-${index}`)}
+                    aria-expanded={expandedSections.has(`registry-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-database"></i> 
+                    <span>Registry ({categorizedFunctions.registry.length})</span>
+                    <i className={`fas ${expandedSections.has(`registry-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`registry-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.registry.map((func, idx) => (
+                        <li key={`registry-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Réseau */}
+              {categorizedFunctions.network.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title network clickable-category"
+                    onClick={() => toggleSection(`network-${index}`)}
+                    aria-expanded={expandedSections.has(`network-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-network-wired"></i> 
+                    <span>Network ({categorizedFunctions.network.length})</span>
+                    <i className={`fas ${expandedSections.has(`network-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`network-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.network.map((func, idx) => (
+                        <li key={`network-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Sécurité */}
+              {categorizedFunctions.security.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title security clickable-category"
+                    onClick={() => toggleSection(`security-${index}`)}
+                    aria-expanded={expandedSections.has(`security-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-shield-alt"></i> 
+                    <span>Security ({categorizedFunctions.security.length})</span>
+                    <i className={`fas ${expandedSections.has(`security-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`security-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.security.map((func, idx) => (
+                        <li key={`security-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Fonctions kernel */}
+              {categorizedFunctions.kernel.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title kernel clickable-category"
+                    onClick={() => toggleSection(`kernel-${index}`)}
+                    aria-expanded={expandedSections.has(`kernel-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-cog"></i> 
+                    <span>Kernel/System ({categorizedFunctions.kernel.length})</span>
+                    <i className={`fas ${expandedSections.has(`kernel-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`kernel-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.kernel.map((func, idx) => (
+                        <li key={`kernel-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Autres fonctions */}
+              {categorizedFunctions.other.length > 0 && (
+                <div className="function-category collapsible-category">
+                  <div 
+                    className="category-title other clickable-category"
+                    onClick={() => toggleSection(`other-${index}`)}
+                    aria-expanded={expandedSections.has(`other-${index}`)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fas fa-ellipsis-h"></i> 
+                    <span>Other ({categorizedFunctions.other.length})</span>
+                    <i className={`fas ${expandedSections.has(`other-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
+                  </div>
+                  {expandedSections.has(`other-${index}`) && (
+                    <ul className="functions-list category-functions-list">
+                      {categorizedFunctions.other.map((func, idx) => (
+                        <li key={`other-${idx}`} className="function-item">
+                          {func}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
