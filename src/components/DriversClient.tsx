@@ -393,7 +393,7 @@ export default function DriversClient({
     
     if (hasActiveCertificate(driver)) {
       tags.push({
-        text: 'VALID CERTIFICATE',
+        text: 'ALIVE CERTIFICATE',
         type: 'success',
         icon: 'fas fa-certificate'
       });
