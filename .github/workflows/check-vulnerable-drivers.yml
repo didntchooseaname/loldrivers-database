@@ -6,6 +6,10 @@ on:
     - cron: '0 2 * * 1,4'
   workflow_dispatch: # Allow manual trigger
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   check-vulnerable-drivers:
     runs-on: ubuntu-latest
@@ -15,6 +19,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0 
         
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -61,8 +66,16 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add data/drv.json
-        git commit -m "🔒 Update HVCI blocked drivers from Microsoft official list"
+        git commit -m "🔒 Update HVCI blocked drivers from Microsoft official list
+        
+        - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - Automated check against Microsoft HVCI Block List
+        - Source: https://aka.ms/VulnerableDriverBlockList"
+        
+        echo "Pushing changes..."
         git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Create summary
       run: |

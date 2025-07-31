@@ -14,6 +14,8 @@
     "update-data": "node scripts/update-data.js",
     "check-vulnerable-drivers": "node scripts/check-vulnerable-drivers.js",
     "check-results": "node scripts/check-results.js",
+    "test-hvci": "node scripts/test-hvci.js",
+    "test-hvci-dry": "DRY_RUN=true node scripts/test-hvci.js",
     "postinstall": "pnpm run type-check"
   },
   "dependencies": {
