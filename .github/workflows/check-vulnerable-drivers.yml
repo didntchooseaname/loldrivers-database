@@ -296,7 +296,7 @@ jobs:
                         // - If driver has Blocked status → "LoadsDespiteHVCI": "FALSE"
                         // - If driver is not in CSV → leave as is or set to null
                         
-                        const currentLoadsDespiteHVCI = driver.LoadsDespiteHVCI;
+                        const currentLoadsDespiteHVCI = sample.LoadsDespiteHVCI;
                         let newLoadsDespiteHVCI = null;
                         
                         if (isAllowed) {
@@ -353,17 +353,17 @@ jobs:
                         
                         // Update the LoadsDespiteHVCI property if needed
                         if (newLoadsDespiteHVCI !== null) {
-                            driver.LoadsDespiteHVCI = newLoadsDespiteHVCI;
+                            sample.LoadsDespiteHVCI = newLoadsDespiteHVCI;
                         }
                         
                         // Count totals
-                        if (driver.LoadsDespiteHVCI === "TRUE") {
+                        if (sample.LoadsDespiteHVCI === "TRUE") {
                             totalHvciPassedCount++;
                         }
-                        if (driver.LoadsDespiteHVCI === "FALSE") {
+                        if (sample.LoadsDespiteHVCI === "FALSE") {
                             totalHvciBlockedCount++;
                         }
-                        if (driver.LoadsDespiteHVCI === undefined || driver.LoadsDespiteHVCI === null) {
+                        if (sample.LoadsDespiteHVCI === undefined || sample.LoadsDespiteHVCI === null) {
                             totalHvciUnknownCount++;
                         }
                     });
