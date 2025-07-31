@@ -213,7 +213,6 @@ export default function DriversClient({
       return false;
     }
 
-    const now = new Date();
     let hasAnyCertificate = false;
     let hasTrustedCert = false;
 
@@ -1611,7 +1610,7 @@ export default function DriversClient({
                 <strong>Definition:</strong> Drivers signed by well-known Certificate Authorities like Microsoft, GlobalSign, DigiCert, VeriSign, and other trusted issuers.
               </p>
               <p>
-                <strong>Trust Level:</strong> These certificates indicate the driver was signed by a recognized authority, though this doesn't guarantee the driver is safe.
+                <strong>Trust Level:</strong> These certificates indicate the driver was signed by a recognized authority, though this doesn&apos;t guarantee the driver is safe.
               </p>
               <p>
                 <strong>Use Case:</strong> Identify drivers with legitimate code signing certificates from established CAs.
