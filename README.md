@@ -2,8 +2,6 @@
 
 <div align="center">
 
-![LOLDrivers](public/favicon.svg)
-
 **A comprehensive driver security research platform addressing critical gaps in existing driver analysis tools**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)

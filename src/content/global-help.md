@@ -1,12 +1,10 @@
-# Global Help Content
-
 ## Project Vision & Core Mission
 
 **Project Vision:** I created this comprehensive driver security research platform to address critical gaps in existing driver analysis tools. This database goes beyond simple cataloging to provide advanced filtering, behavioral analysis, and HVCI compatibility verification for Windows drivers used in real-world attack campaigns.
 
 **Core Mission:** Enable security researchers, threat hunters, malware analysts, and system administrators to efficiently identify, analyze, and defend against driver-based attacks through sophisticated search and filtering capabilities that weren&apos;t available in existing solutions.
 
-## Key Innovations & Features
+## Features
 
 **Advanced Behavioral Analysis:** Unlike static driver lists, this platform analyzes imported functions to automatically detect capabilities like memory manipulation, process killing, debug bypass, registry manipulation, and file system access.
 
@@ -30,15 +28,11 @@
 
 **Responsive Design:** Optimized for security researchers working across different devices and screen sizes during investigations.
 
-## Research & Professional Use
+## Research
 
 **Research:** Support cybersecurity research, threat intelligence development, and academic studies of driver-based attack vectors.
 
-**Professional Analysis:** Advanced platform for security professionals to understand driver vulnerabilities and develop offensive and defensive techniques.
-
 **Community Contribution:** Open-source approach encourages community contributions and collaborative security research efforts.
-
-**Threat Intelligence:** Aggregates and analyzes driver-based threats to provide actionable intelligence for security teams.
 
 ## Quick Reference - Key Terms
 
@@ -52,8 +46,12 @@
 
 **Capacities Section:** Dedicated area in driver cards showing behavioral capabilities detected through function analysis.
 
+## Legal & Ethical Notice
+
 **Legal & Ethical Notice:** This database is designed for legitimate security research and defensive purposes only. Users must comply with applicable laws, organizational policies, and ethical guidelines. Misuse of this information for malicious purposes is strictly prohibited.
 
 **Community:** Join the security research community in improving driver security through responsible disclosure, collaborative research, offensive and defensive innovation.
+
+## Disclaimer
 
 **Disclaimer:** This project is provided &quot;as is&quot; without any warranty, guarantee, or reliability assurance. The maintainers are not responsible for the accuracy, completeness, or functionality of the data or platform. Users assume all risks and responsibilities when using this database and its information.

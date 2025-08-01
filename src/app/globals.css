@@ -2281,7 +2281,8 @@ select.form-control {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: var(--space-16);
-  margin-bottom: var(--space-64);
+  margin-bottom: var(--space-80);
+  padding-bottom: var(--space-32);
   
   /* Optimisations de performance */
   contain: layout style paint;
@@ -2294,7 +2295,8 @@ select.form-control {
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: var(--space-20);
     max-width: 1400px;
-    margin: 0 auto;
+    margin: 0 auto var(--space-80) auto;
+    padding-bottom: var(--space-32);
   }
 
   .driver-card {
@@ -2331,7 +2333,8 @@ select.form-control {
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: var(--space-24);
     max-width: 1800px;
-    margin: 0 auto;
+    margin: 0 auto var(--space-80) auto;
+    padding-bottom: var(--space-32);
   }
 
   .driver-card {
@@ -2753,12 +2756,12 @@ select.form-control {
 
 .driver-architecture {
   font-size: 0.6rem;
-  color: #000000;
+  color: var(--color-text-secondary);
   font-weight: var(--font-weight-medium);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   padding: 1px 4px;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--color-secondary);
   border-radius: 2px;
   flex-shrink: 0;
   margin-left: 4px;
@@ -5122,7 +5125,8 @@ select.form-control {
 
   .drivers-grid {
     gap: var(--space-6);
-    margin-bottom: var(--space-48);
+    margin-bottom: var(--space-64);
+    padding-bottom: var(--space-24);
   }
 
   .driver-card {
@@ -5742,12 +5746,16 @@ img[src*="favicons"] {
 }
 
 .markdown-content .help-section {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-8);
+  margin-top: var(--space-6);
   padding: var(--space-4);
   background: var(--color-background-secondary);
   border-radius: var(--radius-md);
-  border-left: 4px solid var(--color-primary);
   transition: all var(--duration-standard) var(--ease-standard);
+}
+
+.markdown-content .help-section:first-of-type {
+  margin-top: 0;
 }
 
 .markdown-content .help-section:hover {
@@ -5789,6 +5797,18 @@ img[src*="favicons"] {
 .markdown-content .help-section strong {
   color: var(--color-text-primary);
   font-weight: var(--font-weight-semibold);
+}
+
+/* Technical terms styling */
+.markdown-content code.tech-term {
+  background: var(--color-background-tertiary);
+  color: var(--color-primary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-border);
+  font-weight: var(--font-weight-medium);
 }
 
 /* Styles spéciaux pour les notes légales */

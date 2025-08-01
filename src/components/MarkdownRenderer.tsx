@@ -8,18 +8,26 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
   // Simple markdown to HTML conversion with help-specific styling
   const processMarkdown = (md: string): string => {
     return md
-      // Headers with automatic icons based on content
-      .replace(/^### (.*$)/gm, (match, title) => {
-        const icon = getIconForTitle(title);
-        return `<div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
-      })
-      .replace(/^## (.*$)/gm, (match, title) => {
+      // Add newlines before headers for proper spacing
+      .replace(/^(#+\s+.*$)/gm, '\n\n$1')
+      // Clean up multiple consecutive newlines
+      .replace(/\n{3,}/g, '\n\n')
+      // Trim leading/trailing whitespace
+      .trim()
+      // Headers with automatic icons based on content - treat all levels the same
+      .replace(/^###\s+(.*$)/gm, (match, title) => {
         const icon = getIconForTitle(title);
         return `</div><div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
       })
-      .replace(/^# (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^##\s+(.*$)/gm, (match, title) => {
+        const icon = getIconForTitle(title);
+        return `</div><div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
+      })
+      .replace(/^#\s+(.*$)/gm, '<h2>$1</h2>')
       // Bold text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // Code/technical terms with backticks
+      .replace(/`([^`]+)`/g, '<code class="tech-term">$1</code>')
       // Special styling for disclaimer and legal content
       .replace(/(\*\*Legal & Ethical Notice:\*\*.*?)(\*\*Community:\*\*.*?)(\*\*Disclaimer:\*\*.*?)(?=\n\n|\n$|$)/gs, 
         '<div class="help-note legal-notice">$1</div><div class="help-note community-note">$2</div><div class="help-note disclaimer-note">$3</div>')
