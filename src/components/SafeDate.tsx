@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { formatDateLocale } from '../lib/dateUtils';
@@ -27,7 +27,7 @@ export default function SafeDate({ date, fallback = 'Loading...', prefix = '' }:
     }
   }, [date, fallback]);
 
-  // Afficher le fallback jusqu'à ce que le composant soit monté côté client
+  // Display fallback until component is mounted client-side
   if (!mounted) {
     return <>{prefix}{fallback}</>;
   }

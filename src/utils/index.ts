@@ -1,18 +1,18 @@
-/**
- * Utilitaires optimisés pour les performances
+﻿/**
+ * Performance optimized utilities
  */
 
-// Cache pour les dates formatées
+// Cache for formatted dates
 const dateFormatCache = new Map<string, string>();
 const MAX_DATE_CACHE_SIZE = 1000;
 
 /**
- * Format a date string in French locale avec cache
+ * Format date string in French locale with caching
  */
 export function formatDateLocale(dateString: string | null): string {
   if (!dateString) return 'Date non disponible';
   
-  // Vérifier le cache
+  // Check cache
   if (dateFormatCache.has(dateString)) {
     return dateFormatCache.get(dateString)!;
   }
@@ -27,7 +27,7 @@ export function formatDateLocale(dateString: string | null): string {
       minute: '2-digit'
     }).format(date);
     
-    // Mise en cache avec limite de taille
+    // Cache with size limit
     if (dateFormatCache.size >= MAX_DATE_CACHE_SIZE) {
       const firstKey = dateFormatCache.keys().next().value;
       if (firstKey) {
@@ -43,18 +43,18 @@ export function formatDateLocale(dateString: string | null): string {
 }
 
 /**
- * Normalisation optimisée des chaînes pour la recherche
+ * Optimized string normalization for search
  */
 export function normalizeString(text: string): string {
   return text
     .toLowerCase()
     .trim()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, ''); // Supprime les accents
+    .replace(/[\u0300-\u036f]/g, ''); // Remove accents
 }
 
 /**
- * Escape HTML pour prévenir XSS (avec cache)
+ * Escape HTML to prevent XSS (with cache)
  */
 const htmlEscapeCache = new Map<string, string>();
 const MAX_HTML_CACHE_SIZE = 500;
@@ -72,7 +72,7 @@ export function escapeHtml(text: string | number | null | undefined): string {
   div.textContent = textStr;
   const escaped = div.innerHTML;
   
-  // Mise en cache avec limite
+  // Cache with size limit
   if (htmlEscapeCache.size >= MAX_HTML_CACHE_SIZE) {
     const firstKey = htmlEscapeCache.keys().next().value;
     if (firstKey) {

@@ -1,0 +1,24 @@
+name: Keep Changelog Fresh
+
+on:
+  schedule:
+    # Run every 30 minutes to keep the workflow active
+    # The actual refresh is handled by Next.js ISR every 5 minutes
+    - cron: '*/30 * * * *'
+
+jobs:
+  keep-active:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Keep workflow active
+      run: |
+        echo "Keeping changelog workflow active - $(date)"
+        echo "Next.js ISR handles automatic data refresh every 5 minutes"
+        echo "GitHub API rate limit: 60 requests/hour for public repos"
+        
+    - name: Log status
+      run: |
+        echo "Workflow execution completed successfully"
+        echo "Changelog page auto-refreshes via ISR at /changelog"
+        echo "Data freshness: 5 minutes via Next.js revalidate"

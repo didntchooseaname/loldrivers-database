@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+﻿import { useCallback, useMemo, useState, useEffect } from 'react';
 import type { Driver } from '@/types';
 
-// Hook pour la mémorisation des calculs coûteux
+// Hook for memoizing expensive calculations
 export const useOptimizedDrivers = (drivers: Driver[]) => {
   return useMemo(() => {
     return drivers.map(driver => ({
       ...driver,
-      // Précalculer les propriétés coûteuses
+      // Pre-calculate expensive properties
       isKiller: driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) && 
         driver.ImportedFunctions.some((func: string) => 
           func.toLowerCase().includes('zwterminateprocess') ||
@@ -61,7 +61,7 @@ export const useVirtualization = (
   }, [itemCount, itemHeight, containerHeight, scrollTop]);
 };
 
-// Hook pour gérer les callbacks optimisés
+// Hook to manage optimized callbacks
 export const useOptimizedCallbacks = () => {
   const [cache] = useState(new Map());
   

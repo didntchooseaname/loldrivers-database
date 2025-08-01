@@ -86,16 +86,6 @@
 
 **Attack Surface:** Poorly validated `IOCTL` handlers represent significant attack vectors for privilege escalation.
 
-## Verified and Unverified Filters
-
-**What it does:** Filters drivers based on their verification status in the original database.
-
-**Verified Drivers:** Drivers that have been confirmed as legitimate through various verification processes.
-
-**Unverified Drivers:** Drivers that lack proper verification or have questionable authenticity.
-
-**Mutual Exclusivity:** These filters are mutually exclusive - a driver cannot be both verified and unverified.
-
 ## Architecture Filters
 
 **What it does:** Filters drivers by their target processor architecture.
@@ -158,7 +148,6 @@
 
 - **HVCI Compatible + Recent Drivers:** Newly discovered drivers that are HVCI-compatible
 - **Memory Manipulator + Process Killer:** Highly dangerous drivers with multiple attack capabilities
-- **Unverified + File Manipulator:** Suspicious drivers with file system access
 - **Debug Bypass + Unknown Certificate:** Potential evasion tools with questionable authenticity
 
 **Behavioral Analysis:** Use the behavioral filters (Memory Manipulator, Debug Bypass, Registry Manipulator, File Manipulator) to understand driver capabilities and potential attack vectors.

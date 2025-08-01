@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import DriversCache from '../../../lib/driversCache';
 
-// Cache spécifique pour les statistiques
+// Specific cache for statistics
 let statsCache: { data: unknown; timestamp: number } | null = null;
 const STATS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export async function GET() {
   try {
-    // Vérifier le cache en mémoire
+    // Check in-memory cache
     if (statsCache && Date.now() - statsCache.timestamp < STATS_CACHE_DURATION) {
       return NextResponse.json(statsCache.data, {
         headers: {

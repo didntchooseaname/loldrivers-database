@@ -1,4 +1,4 @@
-import { memo } from 'react';
+﻿import { memo } from 'react';
 import Image from 'next/image';
 import type { Driver } from '@/types';
 
@@ -16,7 +16,7 @@ const DriverSectionsLazy = memo(({
   index 
 }: DriverSectionsLazyProps) => {
   
-  // Section des fonctions importées (lazy loaded)
+  // Imported functions section (lazy loaded)
   const renderImportedFunctionsSection = (functions: string[] | undefined) => {
     if (!functions || functions.length === 0) return null;
     

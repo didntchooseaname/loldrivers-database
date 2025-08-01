@@ -1,4 +1,4 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 
 console.log('🔍 Vérification des résultats HVCI...\n');
 
@@ -29,7 +29,7 @@ try {
         
         console.log(`🚫 Drivers avec tag "HVCI Blocked": ${hvciCount}`);
         
-        // Vérifier les métadonnées
+        // Check metadata
         if (data._metadata?.hvciBlocklistCheck) {
             const meta = data._metadata.hvciBlocklistCheck;
             console.log('\n📊 Métadonnées HVCI trouvées:');

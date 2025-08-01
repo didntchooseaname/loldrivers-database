@@ -70,7 +70,6 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     if (titleLower.includes('registry')) return 'fas fa-edit';
     if (titleLower.includes('file')) return 'fas fa-file-alt';
     if (titleLower.includes('metadata')) return 'fas fa-tags';
-    if (titleLower.includes('verified') || titleLower.includes('unverified')) return 'fas fa-check-circle';
     if (titleLower.includes('architecture')) return 'fas fa-microchip';
     if (titleLower.includes('certificate')) return 'fas fa-certificate';
     if (titleLower.includes('trusted')) return 'fas fa-check-shield';

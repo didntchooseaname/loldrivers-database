@@ -1,12 +1,13 @@
-import type { Metadata, Viewport } from 'next';
+﻿import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
 import './globals.css';
 import ThemeToggle from '@/components/ThemeToggle';
 import ClientScripts from '@/components/ClientScripts';
+import { ClientLayout } from '@/components/ClientLayout';
 
 export const metadata: Metadata = {
   title: 'LOLDrivers Database',
-  description: 'Vulnerable and malicious Windows drivers database - Search and analyze Windows driver vulnerabilities',
+  description: 'Quickly and easily find the vulnerable driver that suits your needs - Comprehensive Windows driver vulnerability database',
   keywords: 'windows drivers, vulnerabilities, security, malware, lolbins, security research',
   authors: [{ name: 'LOLDrivers Team' }],
   creator: 'LOLDrivers',
@@ -14,14 +15,14 @@ export const metadata: Metadata = {
   robots: 'index, follow',
   openGraph: {
     title: 'LOLDrivers Database',
-    description: 'Vulnerable and malicious Windows drivers database',
+    description: 'Quickly and easily find the vulnerable driver that suits your needs',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'LOLDrivers Database',
-    description: 'Vulnerable and malicious Windows drivers database',
+    description: 'Quickly and easily find the vulnerable driver that suits your needs',
   },
   icons: {
     icon: [
@@ -60,7 +61,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Script inline pour éviter le flash de thème */}
+        {/* Inline script to prevent theme flash */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -95,7 +96,7 @@ export default function RootLayout({
         <meta name="color-scheme" content="light dark" />
         <meta name="format-detection" content="telephone=no" />
         
-        {/* Sécurité */}
+        {/* Security */}
         <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
         <meta httpEquiv="X-Frame-Options" content="DENY" />
         <meta httpEquiv="X-XSS-Protection" content="1; mode=block" />
@@ -104,9 +105,12 @@ export default function RootLayout({
       <body className="antialiased">
         <Suspense fallback={<LoadingFallback />}>
           <ThemeToggle />
-          <main className="min-h-screen">
-            {children}
-          </main>
+          <ClientLayout>
+            <main className="min-h-screen">
+              {children}
+            </main>
+          </ClientLayout>
+          
           <ClientScripts />
         </Suspense>
       </body>

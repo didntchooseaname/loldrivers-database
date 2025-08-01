@@ -1,4 +1,4 @@
-# 🛡️ LOLDrivers Database - Advanced Security Research Platform
+# 🛡️ LOLDrivers Database
 
 <div align="center">
 
@@ -18,7 +18,7 @@
 
 ### Problem
 
-Traditional driver analysis tools suffer from significant limitations:
+Traditional driver analysis tools can have limitations:
 - **Static cataloging** without behavioral analysis
 - **Inaccurate HVCI compatibility** checks using outdated local lists
 - **Limited search capabilities** across driver metadata
@@ -29,12 +29,12 @@ Traditional driver analysis tools suffer from significant limitations:
 This platform goes **beyond simple cataloging** to provide:
 - **Behavioral analysis** through imported function examination
 - **Strict HVCI verification** using Microsoft's official blocklist
-- **Sophisticated filtering** by capabilities, architecture, and certificates
+- **Advanced filtering** by capabilities, architecture, and certificates
 - **Professional-grade interface** optimized for security research workflows
 
 ## ✨ Features
 
-### 🧠 Behavioral Analysis
+### 🧠 Drivers Behaviors
 Unlike static driver lists, this platform analyzes imported functions to automatically detect capabilities:
 - **Memory manipulation** (allocation, virtual memory, mapping)
 - **Process killing** (termination, suspension)

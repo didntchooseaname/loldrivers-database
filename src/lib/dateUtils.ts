@@ -1,4 +1,4 @@
-// Utilitaires pour éviter les erreurs d'hydratation
+﻿// Utilities to avoid hydration errors
 
 export function formatDateConsistent(date: string | Date): string {
   try {
@@ -15,7 +15,7 @@ export function formatDateLocale(date: string | Date): string {
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     
-    // Format français explicite pour éviter les différences de locale
+    // Explicit French format to avoid locale differences
     const day = dateObj.getDate().toString().padStart(2, '0');
     const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
     const year = dateObj.getFullYear();
@@ -29,14 +29,14 @@ export function formatDateLocale(date: string | Date): string {
   }
 }
 
-// Hook pour éviter l'erreur d'hydratation avec les dates
+// Hook to avoid hydration error with dates
 export function useSafeDate(date: string | Date | null): string {
-  // Retourner une valeur par défaut pendant l'hydratation
+  // Return default value during hydration
   if (typeof window === 'undefined') {
-    // Côté serveur - format cohérent
+    // Server-side - consistent format
     return date ? formatDateLocale(date) : 'Loading...';
   }
   
-  // Côté client - même format
+  // Client-side - same format
   return date ? formatDateLocale(date) : 'Loading...';
 }

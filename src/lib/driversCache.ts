@@ -1,4 +1,4 @@
-import cache from 'memory-cache';
+﻿import cache from 'memory-cache';
 import fs from 'fs';
 import path from 'path';
 
@@ -6,7 +6,6 @@ import path from 'path';
 interface Driver {
   Id?: string;
   Tags?: string[];
-  Verified?: string;
   Author?: string;
   Created?: string;
   MitreID?: string;
@@ -51,12 +50,12 @@ const CACHE_KEYS = {
   FILE_HASH: 'file_hash',
 } as const;
 
-// Cache TTL (en millisecondes) - augmenté pour de meilleures performances
-const CACHE_TTL = parseInt(process.env.CACHE_TTL || '7200') * 1000; // 2 heures par défaut
+// Cache TTL (in milliseconds) - increased for better performance
+const CACHE_TTL = parseInt(process.env.CACHE_TTL || '7200') * 1000; // 2 hours default
 const SEARCH_CACHE_TTL = 600000; // 10 minutes pour les recherches
 const STATS_CACHE_TTL = 1800000; // 30 minutes pour les stats
 
-// Fonctions utilitaires optimisées
+// Optimized utility functions
 const createSearchKey = (query: string, filters: Record<string, unknown>, page: number, limit: number): string => {
   const filterStr = JSON.stringify(filters);
   return `${CACHE_KEYS.SEARCH_PREFIX}${query}_${filterStr}_${page}_${limit}`;
@@ -64,7 +63,7 @@ const createSearchKey = (query: string, filters: Record<string, unknown>, page: 
 
 const normalizeString = (str: string): string => str.toLowerCase().trim();
 
-// Pré-compilation des regex pour de meilleures performances
+// Pre-compiled regex for better performance
 const KILLER_FUNCTIONS_REGEX = /zwterminateprocess|zwkillprocess|ntterminate/i;
 
 class DriversCache {
@@ -91,7 +90,7 @@ class DriversCache {
   }
 
   private buildSearchIndex(): void {
-    // Index par type de filtre pour accès rapide
+    // Index by filter type for fast access
     const hvciDrivers = this.drivers.filter(driver => 
       driver.LoadsDespiteHVCI?.toString().toUpperCase() === 'TRUE'
     );
@@ -114,7 +113,7 @@ class DriversCache {
       }
     });
 
-    // Nouveaux filtres comportementaux basés sur les fonctions importées
+    // New behavioral filters based on imported functions
     const memoryManipulatorDrivers = this.drivers.filter(driver =>
       driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
       driver.ImportedFunctions.some(func => {
@@ -168,20 +167,12 @@ class DriversCache {
       })
     );
 
-    // Filtres par architecture
+    // Architecture filters
     const amd64Drivers = this.drivers.filter(driver => driver.MachineType === 'AMD64');
     const i386Drivers = this.drivers.filter(driver => driver.MachineType === 'I386');
     const arm64Drivers = this.drivers.filter(driver => driver.MachineType === 'ARM64');
 
-    // Filtres par vérification
-    const verifiedDrivers = this.drivers.filter(driver => 
-      driver.Verified?.toString().toUpperCase() === 'TRUE'
-    );
-    const unverifiedDrivers = this.drivers.filter(driver => 
-      driver.Verified?.toString().toUpperCase() !== 'TRUE'
-    );
-
-    // Stocker dans l'index
+    // Store in index
     this.indexedData.set('hvci', hvciDrivers);
     this.indexedData.set('killer', killerDrivers);
     this.indexedData.set('recent', recentDrivers);
@@ -193,15 +184,13 @@ class DriversCache {
     this.indexedData.set('amd64', amd64Drivers);
     this.indexedData.set('i386', i386Drivers);
     this.indexedData.set('arm64', arm64Drivers);
-    this.indexedData.set('verified', verifiedDrivers);
-    this.indexedData.set('unverified', unverifiedDrivers);
   }
 
   async loadDrivers(): Promise<ProcessedDriver[]> {
     const dataPath = path.join(process.cwd(), 'data', 'drv.json');
     const currentFileHash = this.getFileHash(dataPath);
     
-    // Vérifier le cache avec hash du fichier
+    // Check cache with file hash
     const cachedHash = cache.get(CACHE_KEYS.FILE_HASH);
     const cached = cache.get(CACHE_KEYS.ALL_DRIVERS);
     
@@ -214,7 +203,7 @@ class DriversCache {
       const fileContent = fs.readFileSync(dataPath, 'utf8');
       const rawData: Driver[] = JSON.parse(fileContent);
 
-      // Traitement optimisé des données
+      // Optimized data processing
       this.drivers = rawData
         .filter(item => item && typeof item === 'object')
         .flatMap(driver => {
@@ -223,7 +212,6 @@ class DriversCache {
               ...sample,
               DriverId: driver.Id,
               Tags: driver.Tags,
-              Verified: driver.Verified,
               Author: driver.Author,
               Created: driver.Created,
               MitreID: driver.MitreID,
@@ -239,7 +227,7 @@ class DriversCache {
       // Construction de l'index de recherche
       this.buildSearchIndex();
 
-      // Mise en cache optimisée
+      // Optimized caching
       cache.put(CACHE_KEYS.ALL_DRIVERS, this.drivers, CACHE_TTL);
       cache.put(CACHE_KEYS.FILE_HASH, currentFileHash, CACHE_TTL);
       this.isLoaded = true;
@@ -301,17 +289,17 @@ class DriversCache {
       filtered = filtered.filter(driver => this.searchInDriverOptimized(driver, searchTerm));
     }
 
-    // Tri par date si demandé
+    // Sort by date if requested
     if (filters.newestFirst) {
       filtered.sort((a, b) => {
         const dateA = a.Created ? new Date(a.Created).getTime() : 0;
         const dateB = b.Created ? new Date(b.Created).getTime() : 0;
         // Si les deux dates sont invalides, maintenir l'ordre original
         if (dateA === 0 && dateB === 0) return 0;
-        // Les éléments avec date valide viennent en premier
+        // Elements with valid date come first
         if (dateA === 0) return 1;
         if (dateB === 0) return -1;
-        return dateB - dateA; // Plus récent en premier
+        return dateB - dateA; // Most recent first
       });
     } else if (filters.oldestFirst) {
       filtered.sort((a, b) => {
@@ -319,7 +307,7 @@ class DriversCache {
         const dateB = b.Created ? new Date(b.Created).getTime() : Number.MAX_SAFE_INTEGER;
         // Si les deux dates sont invalides, maintenir l'ordre original
         if (dateA === Number.MAX_SAFE_INTEGER && dateB === Number.MAX_SAFE_INTEGER) return 0;
-        // Les éléments avec date valide viennent en premier
+        // Elements with valid date come first
         if (dateA === Number.MAX_SAFE_INTEGER) return 1;
         if (dateB === Number.MAX_SAFE_INTEGER) return -1;
         return dateA - dateB; // Plus ancien en premier
@@ -351,7 +339,7 @@ class DriversCache {
       };
     }
 
-    // Cache pour les recherches fréquentes
+    // Cache for frequent searches
     cache.put(cacheKey, result, SEARCH_CACHE_TTL);
     return result;
   }
@@ -364,7 +352,7 @@ class DriversCache {
 
     const drivers = await this.loadDrivers();
     
-    // Lire les métadonnées HVCI depuis le fichier
+    // Read HVCI metadata from file
     let hvciBlocklistCheck;
     try {
       const dataPath = path.join(process.cwd(), 'data', 'drv.json');
@@ -389,8 +377,6 @@ class DriversCache {
       amd64Drivers: this.indexedData.get('amd64')?.length || 0,
       i386Drivers: this.indexedData.get('i386')?.length || 0,
       arm64Drivers: this.indexedData.get('arm64')?.length || 0,
-      verifiedDrivers: this.indexedData.get('verified')?.length || 0,
-      unverifiedDrivers: this.indexedData.get('unverified')?.length || 0,
       lastUpdated: new Date().toISOString(),
       ...(hvciBlocklistCheck && { hvciBlocklistCheck })
     };
@@ -411,7 +397,7 @@ class DriversCache {
         continue;
       }
       
-      // Gestion spéciale pour les filtres d'architecture
+      // Special handling for architecture filters
       if (filterType === 'architecture') {
         const archValue = value as string;
         const indexKey = archValue.toLowerCase();
@@ -422,13 +408,13 @@ class DriversCache {
         continue;
       }
       
-      // Utiliser l'index préconçu quand possible
+      // Use prebuilt index when possible
       const indexedResult = this.indexedData.get(filterType);
       if (indexedResult) {
-        // Intersection optimisée
+        // Optimized intersection
         result = result.filter(driver => indexedResult.includes(driver));
       } else {
-        // Fallback pour les filtres non indexés
+        // Fallback for non-indexed filters
         result = result.filter(driver => this.applyFilter(driver, filterType));
       }
     }
@@ -460,7 +446,7 @@ class DriversCache {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(now.getMonth() - 6);
       
-      // Considérer comme récent si créé dans les 6 derniers mois
+      // Consider recent if created in the last 6 months
       return createdDate >= sixMonthsAgo;
     } catch {
       return false;
@@ -538,7 +524,7 @@ class DriversCache {
   }
 
   private searchInDriverOptimized(driver: ProcessedDriver, searchTerm: string): boolean {
-    // Pré-compiler les champs de recherche pour éviter la répétition
+    // Pre-compile search fields to avoid repetition
     const searchFields = [
       driver.OriginalFilename || driver.Filename,
       driver.Company,
@@ -550,8 +536,7 @@ class DriversCache {
       driver.Copyright,
       driver.Category,
       driver.Author,
-      driver.MitreID,
-      driver.Verified
+      driver.MitreID
     ].filter(Boolean);
 
     // Authentihash
@@ -571,14 +556,14 @@ class DriversCache {
       searchFields.push(...driver.CVE);
     }
 
-    // Recherche optimisée dans les champs de base
+    // Optimized search in base fields
     const hasBasicMatch = searchFields.some(field => 
       field && normalizeString(field.toString()).includes(searchTerm)
     );
     
     if (hasBasicMatch) return true;
 
-    // ImportedFunctions avec regex optimisée
+    // ImportedFunctions with optimized regex
     if (driver.ImportedFunctions?.length) {
       const hasImportMatch = driver.ImportedFunctions.some(func => 
         normalizeString(func).includes(searchTerm)

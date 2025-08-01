@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 
 /**
- * Script de mise à jour des données LOLDrivers pour Next.js
- * Version moderne remplaçant les anciens scripts PowerShell/Bash
+ * LOLDrivers data update script for Next.js
+ * Modern replacement for PowerShell/Bash scripts
  */
 
 const https = require('https');
@@ -14,10 +14,10 @@ const LOCAL_FILE = path.join(__dirname, '..', 'data', 'drv.json');
 const BACKUP_FILE = path.join(__dirname, '..', 'data', 'drv.backup.json');
 
 /**
- * Télécharge les données depuis l'URL distante
+ * Download data from remote URL
  */
 async function downloadData(url) {
-  console.log('📥 Téléchargement des données depuis LOLDrivers...');
+  console.log('📥 Downloading data from LOLDrivers...');
   
   return new Promise((resolve, reject) => {
     https.get(url, (response) => {
@@ -42,30 +42,30 @@ async function downloadData(url) {
 }
 
 /**
- * Valide la structure des données
+ * Validate data structure
  */
 function validateData(data) {
-  console.log('🔍 Validation des données...');
+  console.log('🔍 Validating data...');
   
   if (!Array.isArray(data)) {
-    throw new Error('Les données doivent être un tableau');
+    throw new Error('Data must be an array');
   }
   
   if (data.length === 0) {
-    throw new Error('Le tableau de données est vide');
+    throw new Error('Data array is empty');
   }
   
-  // Vérification basique de la structure
+  // Basic structure check
   const firstItem = data[0];
   const requiredFields = ['OriginalFilename', 'MD5', 'SHA256'];
   
   for (const field of requiredFields) {
     if (!(field in firstItem)) {
-      throw new Error(`Champ requis manquant: ${field}`);
+      throw new Error(`Missing required field: ${field}`);
     }
   }
   
-  console.log(`✅ ${data.length} drivers validés`);
+  console.log(`✅ ${data.length} drivers validated`);
   return true;
 }
 
@@ -77,7 +77,7 @@ async function compareData(newData) {
     const currentData = JSON.parse(await fs.readFile(LOCAL_FILE, 'utf8'));
     
     if (currentData.length !== newData.length) {
-      return true; // Différence de taille
+      return true; // Size difference
     }
     
     // Comparaison simple par hash
@@ -87,67 +87,67 @@ async function compareData(newData) {
     return currentHashes.size !== newHashes.size || 
            [...currentHashes].some(hash => !newHashes.has(hash));
   } catch (error) {
-    console.log('⚠️  Impossible de lire le fichier existant, mise à jour forcée');
+    console.log('⚠️  Cannot read existing file, forcing update');
     return true;
   }
 }
 
 /**
- * Sauvegarde les données
+ * Save data to file
  */
 async function saveData(data) {
-  console.log('💾 Sauvegarde des données...');
+  console.log('💾 Saving data...');
   
-  // Créer une sauvegarde du fichier existant
+  // Create backup of existing file
   try {
     await fs.copyFile(LOCAL_FILE, BACKUP_FILE);
-    console.log('📦 Sauvegarde créée');
+    console.log('📦 Backup created');
   } catch (error) {
-    console.log('⚠️  Impossible de créer la sauvegarde');
+    console.log('⚠️  Cannot create backup');
   }
   
-  // Écrire les nouvelles données
+  // Write new data
   await fs.writeFile(LOCAL_FILE, JSON.stringify(data, null, 2), 'utf8');
-  console.log('✅ Données sauvegardées');
+  console.log('✅ Data saved');
 }
 
 /**
- * Script principal
+ * Main script
  */
 async function main() {
-  console.log('🔧 Mise à jour des données LOLDrivers');
-  console.log('=====================================');
+  console.log('🔧 LOLDrivers data update');
+  console.log('========================');
   
   try {
-    // Télécharger les nouvelles données
+    // Download new data
     const newData = await downloadData(REMOTE_URL);
     
-    // Valider les données
+    // Validate data
     validateData(newData);
     
-    // Vérifier s'il y a des changements
+    // Check for changes
     const hasChanges = await compareData(newData);
     
     if (!hasChanges) {
-      console.log('🎯 Aucun changement détecté, données déjà à jour');
+      console.log('🎯 No changes detected, data already up to date');
       return;
     }
     
-    console.log('📝 Changements détectés, mise à jour...');
+    console.log('📝 Changes detected, updating...');
     
-    // Sauvegarder les nouvelles données
+    // Save new data
     await saveData(newData);
     
-    console.log('🎉 Mise à jour terminée avec succès!');
+    console.log('🎉 Update completed successfully!');
     console.log(`📊 Total: ${newData.length} drivers`);
     
   } catch (error) {
-    console.error('❌ Erreur:', error.message);
+    console.error('❌ Error:', error.message);
     process.exit(1);
   }
 }
 
-// Exécuter le script
+// Run script
 if (require.main === module) {
   main();
 }

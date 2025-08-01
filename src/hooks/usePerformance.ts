@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 
 /**
  * Hook pour débouncer une valeur
@@ -44,7 +44,7 @@ export function useDebouncedCallback<T extends (...args: never[]) => unknown>(
     }, delay);
   }) as T;
 
-  // Cleanup au démontage
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {

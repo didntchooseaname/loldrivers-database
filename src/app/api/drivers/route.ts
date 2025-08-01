@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import DriversCache from '../../../lib/driversCache';
 
-// Cache des réponses API en mémoire
+// In-memory API response cache
 const apiCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const actualLimit = limit <= 0 ? undefined : Math.min(50000, Math.max(1, limit));
     const query = searchParams.get('q') || '';
     
-    // Filtres optimisés
+    // Optimized filters
     const filters: Record<string, boolean | string> = {};
     if (searchParams.get('hvci') === 'true') filters.hvci = true;
     if (searchParams.get('killer') === 'true') filters.killer = true;
@@ -72,16 +72,12 @@ export async function GET(request: NextRequest) {
       filters.architecture = architecture;
     }
     
-    // Filtres par vérification
-    if (searchParams.get('verified') === 'true') filters.verified = true;
-    if (searchParams.get('unverified') === 'true') filters.unverified = true;
-    
-    // Exclusion mutuelle pour trusted-cert/untrusted-cert
+    // Certificate filters - mutual exclusion
     const trustedCertParam = searchParams.get('trusted-cert');
     const untrustedCertParam = searchParams.get('untrusted-cert');
     
     if (trustedCertParam === 'true' && untrustedCertParam === 'true') {
-      // Si les deux sont présents, on privilégie trusted-cert
+      // If both are present, prioritize trusted-cert
       filters.trustedCert = true;
     } else if (trustedCertParam === 'true') {
       filters.trustedCert = true;
@@ -103,7 +99,7 @@ export async function GET(request: NextRequest) {
       ...result
     };
 
-    // Mise en cache de la réponse
+    // Cache the response
     setCache(cacheKey, response);
 
     return NextResponse.json(response, {

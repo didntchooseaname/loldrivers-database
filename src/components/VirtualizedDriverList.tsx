@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+﻿import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import type { Driver } from '@/types';
 
 interface VirtualizedDriverListProps {
@@ -37,7 +37,7 @@ const DriverItem = memo(({ driver, style, onClick }: DriverItemProps) => {
             </div>
           </div>
           
-          {/* Badges pour les propriétés importantes */}
+          {/* Badges for important properties */}
           <div className="flex flex-wrap gap-2 mt-3">
             {driver.LoadsDespiteHVCI && driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE' && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -82,9 +82,9 @@ const VirtualizedDriverList = memo(({
   const visibleRange = useMemo(() => {
     const start = Math.floor(scrollTop / itemHeight);
     const visibleCount = Math.ceil(containerHeight / itemHeight);
-    const end = Math.min(start + visibleCount + 5, drivers.length); // Buffer de 5 éléments
+    const end = Math.min(start + visibleCount + 5, drivers.length); // Buffer of 5 elements
     
-    return { start: Math.max(0, start - 5), end }; // Buffer de 5 éléments avant
+    return { start: Math.max(0, start - 5), end }; // Buffer of 5 elements avant
   }, [scrollTop, itemHeight, containerHeight, drivers.length]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {

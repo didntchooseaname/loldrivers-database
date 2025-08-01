@@ -1,4 +1,4 @@
-import { memo } from 'react';
+﻿import { memo } from 'react';
 import type { Driver } from '@/types';
 
 interface LazyDriverDetailsProps {
@@ -45,7 +45,7 @@ const LazyDriverDetails = memo(({ driver, isExpanded, onToggle }: LazyDriverDeta
 
       {isExpanded && (
         <div className="px-4 pb-4 border-t border-gray-100">
-          {/* Détails complets du driver */}
+          {/* Complete driver details */}
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
@@ -65,7 +65,7 @@ const LazyDriverDetails = memo(({ driver, isExpanded, onToggle }: LazyDriverDeta
               </div>
             )}
             
-            {/* Autres détails selon vos besoins */}
+            {/* Other details as needed */}
           </div>
         </div>
       )}

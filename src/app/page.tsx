@@ -1,12 +1,12 @@
-import DriversClient from '@/components/DriversClient';
+﻿import DriversClient from '@/components/DriversClient';
 import DriversCache from '@/lib/driversCache';
 
 export default async function HomePage() {
-  // Pré-chargement des données côté serveur (SSR)
+  // Server-side data preloading (SSR)
   const cache = DriversCache.getInstance();
   
   try {
-    // Charger les premières données et les statistiques
+    // Load initial data and statistics
     const [initialDrivers, initialStats] = await Promise.all([
       cache.getDrivers(1), // Load all drivers for SSR
       cache.getStatistics()
@@ -40,7 +40,7 @@ export default async function HomePage() {
   }
 }
 
-// Métadonnées pour SEO
+// Metadata for SEO
 export const metadata = {
   title: 'LOLDrivers Database - Vulnerable Windows Drivers',
   description: 'Comprehensive database of vulnerable and malicious Windows drivers for security research and threat hunting.',

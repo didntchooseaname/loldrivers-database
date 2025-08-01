@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -6,11 +6,12 @@ import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
 import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { ChangelogPopup } from '@/components/ChangelogPopup';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = async (url: string) => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 secondes timeout
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
   
   try {
     const res = await fetch(url, { signal: controller.signal });
@@ -29,7 +30,7 @@ const fetcher = async (url: string) => {
   }
 };
 
-// Fonction utilitaire pour extraire les paramètres URL initiaux
+// Extract initial URL parameters
 const getInitialUrlParams = () => {
   if (typeof window === 'undefined') {
     return { searchQuery: '', activeFilters: new Set<string>(), currentPage: 1 };
@@ -38,10 +39,10 @@ const getInitialUrlParams = () => {
   const url = new URL(window.location.href);
   const params = url.searchParams;
   
-  // Extraire la recherche
+  // Extract search query
   const searchQuery = params.get('q') || '';
   
-  // Extraire les filtres
+  // Extract filters
   const activeFilters = new Set<string>();
   if (params.get('hvci') === 'true') activeFilters.add('hvci');
   if (params.get('killer') === 'true') activeFilters.add('killer');
@@ -51,22 +52,20 @@ const getInitialUrlParams = () => {
   if (params.get('newest-first') === 'true') activeFilters.add('newest-first');
   if (params.get('oldest-first') === 'true') activeFilters.add('oldest-first');
   
-  // Nouveaux filtres comportementaux
+  // Behavioral filters
   if (params.get('memory-manipulator') === 'true') activeFilters.add('memory-manipulator');
   if (params.get('process-killer') === 'true') activeFilters.add('process-killer');
   if (params.get('debug-bypass') === 'true') activeFilters.add('debug-bypass');
   if (params.get('registry-manipulator') === 'true') activeFilters.add('registry-manipulator');
   if (params.get('file-manipulator') === 'true') activeFilters.add('file-manipulator');
-  if (params.get('verified') === 'true') activeFilters.add('verified');
-  if (params.get('unverified') === 'true') activeFilters.add('unverified');
   
-  // Filtre d'architecture
+  // Architecture filter
   const architecture = params.get('architecture');
   if (architecture && ['AMD64', 'I386', 'ARM64'].includes(architecture)) {
     activeFilters.add(`architecture-${architecture}`);
   }
   
-  // Extraire la page
+  // Extract page number
   const pageParam = params.get('page');
   const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10)) || 1 : 1;
   
@@ -80,35 +79,36 @@ export default function DriversClient({
   initialDrivers: DriversResponse;
   initialStats: { success: boolean; stats: Stats };
 }) {
-  // Initialiser avec les paramètres URL
+  // Initialize with URL parameters
   const initialParams = getInitialUrlParams();
   
   const [searchQuery, setSearchQuery] = useState(initialParams.searchQuery);
-  const [inputValue, setInputValue] = useState(initialParams.searchQuery); // Synchroniser avec searchQuery
+  const [inputValue, setInputValue] = useState(initialParams.searchQuery);
   const [activeFilters, setActiveFilters] = useState(initialParams.activeFilters);
-  const [pendingFilters, setPendingFilters] = useState(initialParams.activeFilters); // Synchroniser avec activeFilters
+  const [pendingFilters, setPendingFilters] = useState(initialParams.activeFilters);
   const [expandedSections, setExpandedSections] = useState(new Set<string>());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showHelpPopup, setShowHelpPopup] = useState(false);
   const [showFilterHelpPopup, setShowFilterHelpPopup] = useState(false);
+  const [showChangelogPopup, setShowChangelogPopup] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   const [showFilterHelpScrollIndicator, setShowFilterHelpScrollIndicator] = useState(true);
   
-  // États pour le contenu d'aide
+  // Help content state
   const [helpContent, setHelpContent] = useState<{
     globalHelp: string;
     filterHelp: string;
   } | null>(null);
   
-  // États de pagination
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(initialParams.currentPage);
   const ITEMS_PER_PAGE = 20;
 
-  // Utilisation de SWR pour la recherche côté serveur
+  // Server-side search with SWR
   const searchKey = useMemo(() => {
     if (!searchQuery.trim() && activeFilters.size === 0) {
-      return null; // Pas de recherche, utiliser les données initiales
+      return null; // No search, use initial data
     }
     
     const params = new URLSearchParams();
@@ -121,20 +121,17 @@ export default function DriversClient({
     if (activeFilters.has('newest-first')) params.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) params.set('oldest-first', 'true');
     
-    // Nouveaux filtres comportementaux
+    // Behavioral filters
     if (activeFilters.has('memory-manipulator')) params.set('memory-manipulator', 'true');
     if (activeFilters.has('process-killer')) params.set('process-killer', 'true');
     if (activeFilters.has('debug-bypass')) params.set('debug-bypass', 'true');
     if (activeFilters.has('registry-manipulator')) params.set('registry-manipulator', 'true');
     if (activeFilters.has('file-manipulator')) params.set('file-manipulator', 'true');
-    if (activeFilters.has('verified')) params.set('verified', 'true');
-    if (activeFilters.has('unverified')) params.set('unverified', 'true');
     
-    // Filtre d'architecture
+    // Architecture filter
     if (activeFilters.has('architecture-AMD64')) params.set('architecture', 'AMD64');
     if (activeFilters.has('architecture-I386')) params.set('architecture', 'I386');
     if (activeFilters.has('architecture-ARM64')) params.set('architecture', 'ARM64');
-    // Supprimer la limite pour récupérer tous les résultats
     
     return `/api/drivers?${params.toString()}`;
   }, [searchQuery, activeFilters]);
@@ -144,10 +141,10 @@ export default function DriversClient({
     searchKey ? fetcher : null,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 5000, // Réduire le cache de déduplication à 5 secondes
-      revalidateOnMount: false, // Éviter le rechargement au montage pour éviter le double chargement
-      errorRetryCount: 2, // Réessayer en cas d'erreur
-      errorRetryInterval: 1000, // Attendre 1 seconde avant de réessayer
+      dedupingInterval: 5000,
+      revalidateOnMount: false,
+      errorRetryCount: 2,
+      errorRetryInterval: 1000,
     }
   );
 
@@ -162,7 +159,7 @@ export default function DriversClient({
     }
   );
 
-  // Mémoriser les drivers à afficher (soit les résultats de recherche, soit les données initiales)
+  // Memoize drivers to display
   const allDrivers = useMemo(() => {
     if (searchKey && searchData) {
       return searchData.drivers || [];
@@ -170,21 +167,21 @@ export default function DriversClient({
     return initialDrivers.drivers || [];
   }, [searchKey, searchData, initialDrivers.drivers]);
 
-  // Calculs de pagination
+  // Pagination calculations
   const totalItems = allDrivers.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
   
-  // Drivers paginés pour la page actuelle
+  // Paginated drivers for current page
   const paginatedDrivers = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
     return allDrivers.slice(startIndex, endIndex);
   }, [allDrivers, currentPage, ITEMS_PER_PAGE]);
 
-  // Utiliser une ref pour tracker si c'est le premier rendu
+  // Track if this is the first render
   const isFirstRender = useRef(true);
 
-  // Réinitialiser la page à 1 quand les filtres ou la recherche changent (sauf au premier rendu)
+  // Reset to page 1 when filters or search change (except first render)
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -193,7 +190,7 @@ export default function DriversClient({
     setCurrentPage(1);
   }, [searchQuery, activeFilters]);
 
-  // Charger le contenu d'aide depuis les fichiers markdown
+  // Load help content from markdown files
   useEffect(() => {
     const loadHelpContent = async () => {
       try {
@@ -210,7 +207,7 @@ export default function DriversClient({
     loadHelpContent();
   }, []);
 
-  // Initialiser les sections critiques comme déroulées par défaut
+  // Initialize critical sections as expanded by default
   useEffect(() => {
     setExpandedSections(prev => {
       const newExpanded = new Set(prev);
@@ -237,7 +234,7 @@ export default function DriversClient({
     });
   }, [paginatedDrivers, currentPage, ITEMS_PER_PAGE]);
 
-  // Vérifier certificat actif
+  // Check active certificate
   const hasActiveCertificate = (driver: Driver): boolean => {
     if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
       return false;
@@ -263,7 +260,7 @@ export default function DriversClient({
     return false;
   };
 
-  // Vérifier si le driver a un certificat de confiance valide
+  // Check if driver has valid trusted certificate
   const hasTrustedCertificate = (driver: Driver): boolean => {
     if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
       return false;
@@ -296,7 +293,7 @@ export default function DriversClient({
             try {
               const validTo = new Date(cert.ValidTo);
               if (validTo > now) {
-                // Vérifier si c'est signé par une autorité de confiance
+                // Check if signed by trusted authority
                 const isTrusted = trustedIssuers.some(issuer => 
                   typeof cert.Subject === 'string' && cert.Subject.includes(issuer)
                 );
@@ -314,7 +311,7 @@ export default function DriversClient({
     return false;
   };
 
-  // Vérifier si le driver a un certificat douteux (expiré, self-signed, etc.)
+  // Check if driver has suspicious certificate (expired, self-signed, etc.)
   const hasUntrustedCertificate = (driver: Driver): boolean => {
     if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
       return false;
@@ -329,7 +326,7 @@ export default function DriversClient({
           if (cert.Subject) {
             hasAnyCertificate = true;
             
-            // Vérifier si c'est un certificat de confiance
+            // Check if it's a trusted certificate
             if (hasTrustedCertificate(driver)) {
               hasTrustedCert = true;
             }
@@ -354,16 +351,10 @@ export default function DriversClient({
         newFilters.delete('trusted-cert');
       }
       
-      // Logique pour les filtres de vérification mutuellement exclusifs
-      if (filterType === 'verified' && newFilters.has('unverified')) {
-        newFilters.delete('unverified');
-      } else if (filterType === 'unverified' && newFilters.has('verified')) {
-        newFilters.delete('verified');
-      }
-      
-      // Logique pour les filtres d'architecture mutuellement exclusifs
+      // Logic for mutually exclusive verification filters
+      // Logic for mutually exclusive architecture filters
       if (filterType.startsWith('architecture-')) {
-        // Supprimer tous les autres filtres d'architecture
+        // Remove all other architecture filters
         ['architecture-AMD64', 'architecture-I386', 'architecture-ARM64'].forEach(arch => {
           if (arch !== filterType) {
             newFilters.delete(arch);
@@ -389,7 +380,7 @@ export default function DriversClient({
 
   const applyFilters = useCallback(() => {
     setActiveFilters(new Set(pendingFilters));
-    // Forcer la revalidation SWR pour les nouvelles données
+    // Force SWR revalidation for new data
     if (mutate) {
       mutate();
     }
@@ -397,7 +388,7 @@ export default function DriversClient({
 
   // Fonction pour appliquer directement un filtre depuis le header
   const applyDirectFilter = useCallback((filterType: string) => {
-    // Si le filtre est déjà actif, le désactiver (toggle)
+    // If filter is already active, disable it (toggle)
     if (activeFilters.has(filterType)) {
       setActiveFilters(new Set());
       setPendingFilters(new Set());
@@ -423,7 +414,7 @@ export default function DriversClient({
     setInputValue('');
     setActiveFilters(new Set());
     setPendingFilters(new Set());
-    // Forcer la revalidation SWR pour revenir aux données initiales
+    // Force SWR revalidation to return to initial data
     if (mutate) {
       mutate();
     }
@@ -432,13 +423,13 @@ export default function DriversClient({
   // Fonction pour effectuer la recherche
   const performSearch = useCallback(() => {
     setSearchQuery(inputValue.trim());
-    // Forcer la revalidation SWR pour les nouvelles données
+    // Force SWR revalidation for new data
     if (mutate) {
       mutate();
     }
   }, [inputValue, mutate]);
 
-  // Fonction pour gérer la touche Entrée
+  // Function to handle Enter key
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       performSearch();
@@ -450,9 +441,9 @@ export default function DriversClient({
     setToastMessage(message);
     const timeoutId = setTimeout(() => {
       setToastMessage(null);
-    }, 3000); // Toast disparaît après 3 secondes
+    }, 3000); // Toast disappears after 3 seconds
     
-    // Retourner la fonction de nettoyage pour permettre l'annulation si nécessaire
+    // Return cleanup function to allow cancellation if needed
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -500,9 +491,9 @@ export default function DriversClient({
     }
   }, [searchQuery, activeFilters, currentPage, showToast]);
 
-  // Appliquer les paramètres URL seulement lors des changements de navigation (popstate)
+  // Apply URL parameters only during navigation changes (popstate)
   useEffect(() => {
-    // Fonction pour gérer les changements d'URL (boutons précédent/suivant du navigateur)
+    // Function to handle URL changes (browser back/forward buttons)
     const handlePopState = () => {
       const urlParams = getInitialUrlParams();
       
@@ -525,11 +516,11 @@ export default function DriversClient({
     };
   }, []);
 
-  // Mettre à jour l'URL quand les filtres/recherche changent (sauf au premier rendu)
+  // Update URL when filters/search change (except on first render)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Skip la mise à jour d'URL au premier rendu pour éviter le double chargement
+    // Skip URL update on first render to avoid double loading
     if (isFirstRender.current) {
       return;
     }
@@ -551,16 +542,14 @@ export default function DriversClient({
     if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
     
-    // Nouveaux filtres comportementaux
+    // Behavioral filters
     if (activeFilters.has('memory-manipulator')) url.searchParams.set('memory-manipulator', 'true');
     if (activeFilters.has('process-killer')) url.searchParams.set('process-killer', 'true');
     if (activeFilters.has('debug-bypass')) url.searchParams.set('debug-bypass', 'true');
     if (activeFilters.has('registry-manipulator')) url.searchParams.set('registry-manipulator', 'true');
     if (activeFilters.has('file-manipulator')) url.searchParams.set('file-manipulator', 'true');
-    if (activeFilters.has('verified')) url.searchParams.set('verified', 'true');
-    if (activeFilters.has('unverified')) url.searchParams.set('unverified', 'true');
     
-    // Filtres d'architecture
+    // Architecture filters
     if (activeFilters.has('architecture-AMD64')) url.searchParams.set('architecture', 'AMD64');
     if (activeFilters.has('architecture-I386')) url.searchParams.set('architecture', 'I386');
     if (activeFilters.has('architecture-ARM64')) url.searchParams.set('architecture', 'ARM64');
@@ -724,7 +713,7 @@ export default function DriversClient({
     );
   };
 
-  // Générer les status tags
+  // Generate status tags
   const generateStatusTags = (driver: Driver) => {
     const tags = [];
     
@@ -741,7 +730,7 @@ export default function DriversClient({
     if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
       const functions = driver.ImportedFunctions.map(f => f.toLowerCase());
       
-      // Détection process killer
+      // Process killer detection
       const hasProcessKiller = functions.some(func => 
         func.includes('zwterminateprocess') ||
         func.includes('zwkillprocess') ||
@@ -758,17 +747,7 @@ export default function DriversClient({
       }
     }
     
-    // Tags basés sur les métadonnées
-    if (driver.Verified) {
-      const isVerified = driver.Verified.toString().toUpperCase() === 'TRUE';
-      tags.push({
-        text: isVerified ? 'VERIFIED' : 'UNVERIFIED',
-        type: isVerified ? 'success' : 'warning',
-        icon: isVerified ? 'fas fa-check-circle' : 'fas fa-question-circle'
-      });
-    }
-    
-    // Gestion des certificats avec priorité
+    // Certificate handling with priority
     if (hasTrustedCertificate(driver)) {
       tags.push({
         text: 'TRUSTED CERTIFICATE',
@@ -782,7 +761,7 @@ export default function DriversClient({
         icon: 'fas fa-exclamation-triangle'
       });
     } else if (hasActiveCertificate(driver)) {
-      // Certificat actif mais non classifié (backup)
+      // Active but unclassified certificate (backup)
       tags.push({
         text: 'ALIVE CERTIFICATE',
         type: 'info',
@@ -800,7 +779,7 @@ export default function DriversClient({
     if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
       const functions = driver.ImportedFunctions.map(f => f.toLowerCase());
       
-      // Détection process killer
+      // Process killer detection
       const hasProcessKiller = functions.some(func => 
         func.includes('zwterminateprocess') ||
         func.includes('zwkillprocess') ||
@@ -816,7 +795,7 @@ export default function DriversClient({
         });
       }
       
-      // Détection memory manipulator
+      // Memory manipulator detection
       const hasMemoryManipulator = functions.some(func => 
         func.includes('zwmap') || func.includes('zwallocate') ||
         func.includes('mmmap') || func.includes('mmallocate') ||
@@ -831,7 +810,7 @@ export default function DriversClient({
         });
       }
       
-      // Détection debug bypass
+      // Debug bypass detection
       const hasDebugBypass = functions.some(func => 
         func.includes('zwsetinformationprocess') || func.includes('zwsetinformationthread') ||
         func.includes('zwquerysysteminformation') || func.includes('dbgkd') ||
@@ -845,7 +824,7 @@ export default function DriversClient({
         });
       }
       
-      // Détection registry manipulator
+      // Registry manipulator detection
       const hasRegistryManipulator = functions.some(func => 
         func.includes('zwcreatekey') || func.includes('zwopenkey') ||
         func.includes('zwsetvaluekey') || func.includes('zwdeletekey') ||
@@ -860,7 +839,7 @@ export default function DriversClient({
         });
       }
       
-      // Détection file manipulator
+      // File manipulator detection
       const hasFileManipulator = functions.some(func => 
         func.includes('zwcreatefile') || func.includes('zwopenfile') ||
         func.includes('zwreadfile') || func.includes('zwwritefile') ||
@@ -946,7 +925,7 @@ export default function DriversClient({
     }
   };
 
-  // Section des fonctions importées
+  // Imported functions section
   const renderImportedFunctionsSection = (functions: string[] | undefined, driver: Driver, index: number) => {
     // Si pas de fonctions ou tableau vide, affichage simple non-collapsible
     if (!functions || functions.length === 0) {
@@ -967,7 +946,7 @@ export default function DriversClient({
     const sectionId = `functions-${index}`;
     const isExpanded = expandedSections.has(sectionId);
     
-    // Classification des fonctions par catégories
+    // Function classification by categories
     const categorizedFunctions = {
       critical: [] as string[],
       process: [] as string[],
@@ -980,7 +959,7 @@ export default function DriversClient({
       other: [] as string[]
     };
 
-    // Regrouper les fonctions par catégorie
+    // Group functions by category
     functions.forEach(func => {
       const funcLower = func.toLowerCase();
       
@@ -1002,7 +981,7 @@ export default function DriversClient({
                funcLower.includes('psget')) {
         categorizedFunctions.process.push(func);
       }
-      // Gestion mémoire
+      // Memory management
       else if (funcLower.includes('memory') || 
                funcLower.includes('virtual') ||
                funcLower.includes('mmmap') ||
@@ -1013,7 +992,7 @@ export default function DriversClient({
                funcLower.includes('pool')) {
         categorizedFunctions.memory.push(func);
       }
-      // Système de fichiers
+      // File system
       else if (funcLower.includes('file') || 
                funcLower.includes('directory') ||
                funcLower.includes('zwread') ||
@@ -1034,7 +1013,7 @@ export default function DriversClient({
                funcLower.includes('zwcreate') && funcLower.includes('key')) {
         categorizedFunctions.registry.push(func);
       }
-      // Réseau
+      // Network
       else if (funcLower.includes('socket') || 
                funcLower.includes('wsk') ||
                funcLower.includes('network') ||
@@ -1043,7 +1022,7 @@ export default function DriversClient({
                funcLower.includes('tdi')) {
         categorizedFunctions.network.push(func);
       }
-      // Sécurité
+      // Security
       else if (funcLower.includes('security') || 
                funcLower.includes('token') ||
                funcLower.includes('privilege') ||
@@ -1053,7 +1032,7 @@ export default function DriversClient({
                funcLower.includes('zwsetinformation') && funcLower.includes('token')) {
         categorizedFunctions.security.push(func);
       }
-      // Fonctions kernel/système
+      // Kernel/system functions
       else if (funcLower.includes('ke') ||
                funcLower.includes('hal') ||
                funcLower.includes('io') ||
@@ -1085,7 +1064,7 @@ export default function DriversClient({
         {isExpanded && (
           <div className="collapsible-content">
             <div className="collapsible-inner">
-              {/* Fonctions critiques en premier - déroulée par défaut */}
+              {/* Critical functions first - expanded by default */}
               {categorizedFunctions.critical.length > 0 && (
                 <div className="function-category collapsible-category">
                   <div 
@@ -1165,7 +1144,7 @@ export default function DriversClient({
                 </div>
               )}
 
-              {/* Gestion mémoire */}
+              {/* Memory management */}
               {categorizedFunctions.memory.length > 0 && (
                 <div className="function-category collapsible-category">
                   <div 
@@ -1205,7 +1184,7 @@ export default function DriversClient({
                 </div>
               )}
 
-              {/* Système de fichiers */}
+              {/* File system */}
               {categorizedFunctions.file.length > 0 && (
                 <div className="function-category collapsible-category">
                   <div 
@@ -1285,7 +1264,7 @@ export default function DriversClient({
                 </div>
               )}
 
-              {/* Réseau */}
+              {/* Network */}
               {categorizedFunctions.network.length > 0 && (
                 <div className="function-category collapsible-category">
                   <div 
@@ -1325,7 +1304,7 @@ export default function DriversClient({
                 </div>
               )}
 
-              {/* Sécurité */}
+              {/* Security */}
               {categorizedFunctions.security.length > 0 && (
                 <div className="function-category collapsible-category">
                   <div 
@@ -1652,7 +1631,7 @@ export default function DriversClient({
     return driverDesc;
   };
 
-  // Fonction pour télécharger un driver
+  // Function to download a driver
   const downloadDriver = useCallback((driver: Driver) => {
     const hash = driver.MD5;
     const filename = getDriverName(driver);
@@ -1662,10 +1641,10 @@ export default function DriversClient({
       return;
     }
     
-    // Créer l'URL de téléchargement basée sur le hash MD5
+    // Create download URL based on MD5 hash
     const downloadUrl = `https://github.com/magicsword-io/LOLDrivers/raw/main/drivers/${hash}.bin`;
     
-    // Créer un lien temporaire pour déclencher le téléchargement
+    // Create temporary link to trigger download
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = filename;
@@ -1716,7 +1695,7 @@ export default function DriversClient({
     return 'Unknown Driver';
   };
 
-  // Créer une carte driver
+  // Create driver card
   const createDriverCard = (driver: Driver, index: number) => {
     const hashes = {
       MD5: driver.MD5 || (driver.Authentihash && driver.Authentihash.MD5),
@@ -1778,6 +1757,14 @@ export default function DriversClient({
             </p>
           </div>
           <div className="header-controls">
+            <button 
+              className="changelog-button"
+              onClick={() => setShowChangelogPopup(true)}
+              title="View changelog and recent updates"
+              aria-label="View changelog and recent updates"
+            >
+              <i className="fas fa-history"></i>
+            </button>
             <button 
               className="share-button"
               onClick={shareCurrentSearch}
@@ -1912,7 +1899,7 @@ export default function DriversClient({
           </div>
           
           <div className="filter-group advanced-filters">
-            <span className="filter-label"><i className="fas fa-cogs"></i> Behavioral Analysis:</span>
+            <span className="filter-label"><i className="fas fa-cogs"></i> Behaviors:</span>
             <button 
               className={`filter-btn process-killer-filter ${pendingFilters.has('process-killer') ? 'active' : ''}`}
               onClick={() => toggleFilter('process-killer')}
@@ -1946,21 +1933,7 @@ export default function DriversClient({
           </div>
           
           <div className="filter-group meta-filters">
-            <span className="filter-label"><i className="fas fa-info-circle"></i> Metadata:</span>
-            <button 
-              className={`filter-btn meta-filter ${pendingFilters.has('verified') ? 'active' : ''} ${pendingFilters.has('unverified') ? 'disabled' : ''}`}
-              onClick={() => toggleFilter('verified')}
-              disabled={pendingFilters.has('unverified')}
-            >
-              <i className="fas fa-check-circle"></i> Verified
-            </button>
-            <button 
-              className={`filter-btn meta-filter ${pendingFilters.has('unverified') ? 'active' : ''} ${pendingFilters.has('verified') ? 'disabled' : ''}`}
-              onClick={() => toggleFilter('unverified')}
-              disabled={pendingFilters.has('verified')}
-            >
-              <i className="fas fa-question-circle"></i> Unverified
-            </button>
+            <span className="filter-label"><i className="fas fa-microchip"></i> Architecture:</span>
             <button 
               className={`filter-btn arch-filter ${pendingFilters.has('architecture-AMD64') ? 'active' : ''}`}
               onClick={() => toggleFilter('architecture-AMD64')}
@@ -2048,7 +2021,7 @@ export default function DriversClient({
       <div className="drivers-grid">        
         {!isLoading && paginatedDrivers.length > 0 ? (
           paginatedDrivers.map((driver, index) => {
-            // Calculer l'index global pour l'unicité
+            // Calculate global index for uniqueness
             const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index;
             return createDriverCard(driver, globalIndex);
           })
@@ -2351,6 +2324,12 @@ export default function DriversClient({
           </div>
         </div>
       )}
+
+      {/* Changelog Popup */}
+      <ChangelogPopup 
+        isVisible={showChangelogPopup}
+        onClose={() => setShowChangelogPopup(false)}
+      />
     </div>
   );
 }

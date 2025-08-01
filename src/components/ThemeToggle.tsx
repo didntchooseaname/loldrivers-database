@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect } from 'react';
 import { useIsHydrated } from '@/hooks/useHydration';
@@ -7,11 +7,11 @@ export default function ThemeToggle() {
   const isHydrated = useIsHydrated();
 
   useEffect(() => {
-    // N'exécuter le code que après l'hydratation
+    // Only execute code after hydration
     if (!isHydrated) return;
-    // Fonction pour initialiser le thème (identique à l'original)
+    // Function to initialize theme (identical to original)
     const initializeTheme = () => {
-      // Vérifier si le thème est déjà défini par le script inline
+      // Check if theme is already defined by inline script
       const currentTheme = document.documentElement.getAttribute('data-color-scheme');
       if (currentTheme) {
         updateThemeToggle(currentTheme);
@@ -27,7 +27,7 @@ export default function ThemeToggle() {
       updateThemeToggle(theme);
     };
 
-    // Fonction pour mettre à jour l'apparence du toggle (identique à l'original)
+    // Function to update toggle appearance (identical to original)
     const updateThemeToggle = (theme: string) => {
       const toggle = document.getElementById('themeToggle');
       if (toggle) {
@@ -36,7 +36,7 @@ export default function ThemeToggle() {
       }
     };
 
-    // Fonction pour basculer le thème (identique à l'original)
+    // Function to toggle theme (identical to original)
     const toggleTheme = () => {
       const currentTheme = document.documentElement.getAttribute('data-color-scheme');
       const newTheme = currentTheme === 'light' ? 'dark' : 'light';
@@ -46,16 +46,16 @@ export default function ThemeToggle() {
       updateThemeToggle(newTheme);
     };
 
-    // Initialiser le thème
+    // Initialize theme
     initializeTheme();
 
-    // Ajouter l'événement click au toggle
+    // Add click event to toggle
     const themeToggleButton = document.getElementById('themeToggle');
     if (themeToggleButton) {
       themeToggleButton.addEventListener('click', toggleTheme);
     }
 
-    // Écouter les changements de préférence système
+    // Listen to system preference changes
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleSystemThemeChange = (e: MediaQueryListEvent) => {
       if (!localStorage.getItem('theme')) {
@@ -74,7 +74,7 @@ export default function ThemeToggle() {
       }
       mediaQuery.removeEventListener('change', handleSystemThemeChange);
     };
-  }, [isHydrated]); // Dépendance sur isHydrated
+  }, [isHydrated]); // Dependency on isHydrated
 
   return null; // Ce composant n'a pas de rendu visuel
 }

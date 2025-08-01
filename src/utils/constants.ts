@@ -1,21 +1,21 @@
-// Configuration de l'application optimisée pour les performances
+﻿// Application configuration
 export const APP_CONFIG = {
-  // Cache configuration - Durées optimisées
-  CACHE_TTL: 3600, // 1 hour in seconds
-  EXTENDED_CACHE_TTL: 7200, // 2 hours for stable data
-  CLIENT_CACHE_TIME: 300000, // 5 minutes in milliseconds  
-  STATS_REFRESH_INTERVAL: 600000, // 10 minutes in milliseconds
-  SEARCH_CACHE_TTL: 300000, // 5 minutes for search results
+  // Cache durations
+  CACHE_TTL: 3600,
+  EXTENDED_CACHE_TTL: 7200,
+  CLIENT_CACHE_TIME: 300000,
+  STATS_REFRESH_INTERVAL: 600000,
+  SEARCH_CACHE_TTL: 300000,
   
-  // Pagination optimisée
+  // Pagination
   DEFAULT_PAGE_SIZE: 50,
-  MAX_PAGE_SIZE: 1000, // Réduit pour éviter la surcharge mémoire
+  MAX_PAGE_SIZE: 1000,
   VIRTUAL_LIST_ITEM_HEIGHT: 120,
   VIRTUAL_LIST_BUFFER: 5,
   
-  // Search et performance
+  // Search performance
   SEARCH_DEBOUNCE_DELAY: 300,
-  SEARCH_MIN_LENGTH: 2, // Minimum 2 caractères pour la recherche
+  SEARCH_MIN_LENGTH: 2,
   THROTTLE_DELAY: 100,
   
   // API endpoints
@@ -41,7 +41,7 @@ export const FILTER_TYPES = {
   RECENT: 'recent'
 } as const;
 
-// Regex pré-compilées pour les performances
+// Pre-compiled regex for performance
 export const KILLER_FUNCTIONS_REGEX = /zwterminateprocess|zwkillprocess|ntterminate/i;
 
 export const KILLER_FUNCTIONS = [
@@ -50,7 +50,6 @@ export const KILLER_FUNCTIONS = [
   'ntterminate'
 ] as const;
 
-// Normalisation des chaînes optimisée
 export const NORMALIZATION_OPTIONS = {
   removeAccents: true,
   toLowerCase: true,
@@ -68,7 +67,7 @@ export const DEFAULT_STATS = {
   lastUpdated: new Date().toISOString()
 } as const;
 
-// Configuration de cache pour différents types de données
+// Cache configuration for different data types
 export const CACHE_KEYS = {
   ALL_DRIVERS: 'drivers:all',
   SEARCH_PREFIX: 'search:',
@@ -77,7 +76,7 @@ export const CACHE_KEYS = {
   INDEX: 'search:index'
 } as const;
 
-// Headers de cache optimisés
+// Optimized cache headers
 export const CACHE_HEADERS = {
   STATIC_ASSETS: 'public, max-age=31536000, immutable',
   API_SHORT: 'public, max-age=300, stale-while-revalidate=3600',

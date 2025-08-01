@@ -67,8 +67,6 @@ export interface Stats {
   amd64Drivers: number;
   i386Drivers: number;
   arm64Drivers: number;
-  verifiedDrivers: number;
-  unverifiedDrivers: number;
   lastUpdated: string;
   hvciBlocklistCheck?: {
     lastCheck: string;
@@ -84,7 +82,7 @@ export interface StatsResponse {
   stats: Stats;
 }
 
-export type FilterType = 'hvci' | 'killer' | 'recent' | 'memory-manipulator' | 'process-killer' | 'debug-bypass' | 'registry-manipulator' | 'file-manipulator' | 'verified' | 'unverified' | 'architecture';
+export type FilterType = 'hvci' | 'killer' | 'recent' | 'memory-manipulator' | 'process-killer' | 'debug-bypass' | 'registry-manipulator' | 'file-manipulator' | 'architecture';
 
 export interface SearchFilters {
   activeFilters: Set<FilterType>;

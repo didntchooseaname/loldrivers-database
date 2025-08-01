@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   /* Primitive Color Tokens */
   --color-white: rgba(255, 255, 255, 1);
   --color-black: rgba(0, 0, 0, 1);
@@ -29,7 +29,7 @@
   --color-green: rgba(34, 197, 94, 1);
   --color-green-dark: rgba(22, 163, 74, 1);
 
-  /* Nouvelles couleurs pour les tags - plus contrastées */
+  /* Enhanced colors for tags */
   --color-blue-600: rgba(37, 99, 235, 1);
   --color-blue-700: rgba(29, 78, 216, 1);
   --color-yellow-600: rgba(217, 119, 6, 1);
@@ -47,7 +47,7 @@
   --color-purple-300: rgba(196, 181, 253, 1);
   --color-green-300: rgba(134, 239, 172, 1);
 
-  /* Couleurs système - terminaux et interface sombre */
+  /* System colors - terminals and dark interface */
   --color-terminal-bg: rgba(30, 30, 30, 1);
   --color-terminal-border: rgba(51, 51, 51, 1);
   --color-terminal-header: rgba(45, 45, 45, 1);
@@ -897,7 +897,8 @@ select.form-control {
 }
 
 /* Share Button */
-.share-button {
+.share-button,
+.changelog-button {
   background: var(--color-secondary);
   color: var(--color-text);
   border: 2px solid var(--color-border);
@@ -910,9 +911,11 @@ select.form-control {
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-standard);
   font-size: var(--font-size-lg);
+  text-decoration: none;
 }
 
-.share-button:hover {
+.share-button:hover,
+.changelog-button:hover {
   background: var(--color-primary);
   color: var(--color-white);
   border-color: var(--color-primary);
@@ -920,8 +923,213 @@ select.form-control {
   box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.3);
 }
 
-.share-button:active {
+.share-button:active,
+.changelog-button:active {
   transform: translateY(0);
+}
+
+/* Changelog Popup */
+.changelog-popup {
+  width: 600px;
+  max-height: 700px;
+  max-width: 90vw;
+}
+
+.changelog-popup .popup-content {
+  max-height: none;
+  overflow-y: visible;
+}
+
+.changelog-loading,
+.changelog-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.changelog-loading i {
+  font-size: var(--font-size-xl);
+  color: var(--color-primary);
+}
+
+.changelog-error i {
+  font-size: var(--font-size-xl);
+  color: var(--color-danger);
+}
+
+.retry-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.retry-button:hover {
+  background: var(--color-primary-hover);
+}
+
+.changelog-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.changelog-item {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.changelog-item:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.commit-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  margin-top: 2px;
+}
+
+.commit-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.commit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.commit-title {
+  flex: 1;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.commit-date {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-secondary);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.commit-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.commit-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.commit-author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.author-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
+.author-name {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.commit-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.commit-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--color-secondary);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.commit-link:hover {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.changelog-footer {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.view-all-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-secondary);
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.view-all-link:hover {
+  background: var(--color-primary);
+  color: var(--color-white);
 }
 
 /* Theme Toggle Button */
@@ -1006,7 +1214,8 @@ select.form-control {
 }
 
 /* Help popup styles */
-.help-popup-overlay {
+.help-popup-overlay,
+.popup-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -1021,7 +1230,8 @@ select.form-control {
   backdrop-filter: blur(4px);
 }
 
-.help-popup {
+.help-popup,
+.popup-container {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -1034,9 +1244,49 @@ select.form-control {
   animation: helpPopupEnter 0.2s ease-out;
 }
 
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.popup-header h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.popup-close {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: all var(--duration-fast) var(--ease-standard);
+  font-size: var(--font-size-lg);
+}
+
+.popup-close:hover {
+  background: var(--color-danger);
+  color: var(--color-white);
+}
+
+.popup-content {
+  color: var(--color-text);
+}
+
 /* Dark mode help popup styles */
 @media (prefers-color-scheme: dark) {
-  .help-popup {
+  .help-popup,
+  .popup-container {
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
   }
 }
@@ -1245,7 +1495,8 @@ select.form-control {
   }
   
   .help-button,
-  .share-button {
+  .share-button,
+  .changelog-button {
     width: 36px;
     height: 36px;
     font-size: var(--font-size-base);
@@ -2104,7 +2355,7 @@ select.form-control {
   color: var(--color-blue-700);
 }
 
-/* Filtres désactivés */
+/* Disabled filters */
 .filter-btn.disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -2630,7 +2881,7 @@ select.form-control {
   }
 }
 
-/* Driver card - Definition unique consolidée */
+/* Driver card */
 .driver-card {
   background-color: var(--color-surface);
   border: 1px solid var(--color-card-border);
@@ -2670,7 +2921,7 @@ select.form-control {
   align-items: flex-start;
 }
 
-/* Délais d'animation échelonnés avec CSS stable */
+/* Staggered animation delays with stable CSS */
 .driver-card:nth-child(1) { animation-delay: 0.05s; }
 .driver-card:nth-child(2) { animation-delay: 0.1s; }
 .driver-card:nth-child(3) { animation-delay: 0.15s; }
@@ -3345,7 +3596,7 @@ select.form-control {
   border: 1px solid rgba(var(--color-error-rgb), 0.4);
 }
 
-/* Amélioration des command fields */
+/* Command fields improvement */
 .command-field {
   margin-bottom: var(--space-12);
   padding: var(--space-12);
@@ -3381,7 +3632,7 @@ select.form-control {
   overflow-wrap: break-word;
 }
 
-/* Fenêtre terminal */
+/* Terminal window */
 .terminal-window {
   background: var(--color-terminal-bg);
   border-radius: var(--radius-lg);
@@ -3913,7 +4164,7 @@ select.form-control {
   50% { opacity: 1; }
 }
 
-/* Collapsible sections avec style de box cohérent */
+/* Collapsible sections with consistent box style */
 .collapsible-section {
   margin-bottom: var(--space-12);
   padding: var(--space-12);
@@ -4167,7 +4418,7 @@ select.form-control {
   box-shadow: 0 2px 8px rgba(var(--color-error-rgb), 0.15); /* Ombre plus douce */
 }
 
-/* Couleurs des function-item par catégorie */
+/* Function-item colors by category */
 
 /* Critical functions - utilise la couleur d'erreur */
 .collapsible-category:has(.category-title.critical) .function-item {
@@ -4428,9 +4679,9 @@ select.form-control {
   transform: rotate(90deg);
 }
 
-/* Liste de fonctions avec limitation à 5 éléments */
+/* Function list limited to 5 elements */
 .category-functions-list {
-  max-height: calc(5 * (var(--font-size-xs) + var(--space-8) + var(--space-8) + 4px) + var(--space-8)); /* Environ 5 éléments + padding supplémentaire */
+  max-height: calc(5 * (var(--font-size-xs) + var(--space-8) + var(--space-8) + 4px) + var(--space-8)); /* About 5 elements + additional padding */
   overflow-y: auto;
   padding: var(--space-12) var(--space-16) var(--space-16) var(--space-16);
   margin: 0;
@@ -4455,7 +4706,7 @@ select.form-control {
   background: var(--color-text-secondary);
 }
 
-/* Couleurs spécifiques par catégorie */
+/* Specific colors by category */
 .category-title.critical {
   border-left-color: var(--color-error);
   color: var(--color-error);
@@ -5386,7 +5637,7 @@ img[src*="favicons"] {
   image-rendering: crisp-edges;
 }
 
-/* Optimisation des animations pour réduire les repaints */
+/* Animation optimization to reduce repaints */
 @media (prefers-reduced-motion: no-preference) {
   .driver-card {
     backface-visibility: hidden;
@@ -5402,7 +5653,7 @@ img[src*="favicons"] {
   }
 }
 
-/* Optimisation pour les appareils à faible performance */
+/* Optimization for low-performance devices */
 @media (max-width: 768px), (prefers-reduced-motion: reduce) {
   .driver-card,
   .driver-card:hover {
@@ -5551,7 +5802,7 @@ img[src*="favicons"] {
 
 /* ===== NOUVEAUX STYLES POUR LES TAGS COMPORTEMENTAUX ===== */
 
-/* Tags comportementaux avec couleurs spécifiques */
+/* Behavioral tags with specific colors */
 .status-tag.memory-manipulator {
   background: var(--color-bg-4); /* Rouge */
   border: 1px solid rgba(var(--color-red-600-rgb), 0.3);
@@ -5567,7 +5818,7 @@ img[src*="favicons"] {
 .status-tag.registry-manipulator {
   background: var(--color-bg-2); /* Jaune */
   border: 1px solid rgba(var(--color-yellow-600-rgb), 0.3);
-  color: var(--color-yellow-700); /* Couleur plus foncée pour meilleure lisibilité */
+  color: var(--color-yellow-700); /* Darker color for better readability */
 }
 
 .status-tag.file-manipulator {
@@ -5671,7 +5922,7 @@ img[src*="favicons"] {
   justify-content: center;
 }
 
-/* Responsive pour mobile - réduire les espacements */
+/* Mobile responsive - reduce spacing */
 @media (max-width: 768px) {
   .filter-group {
     margin-bottom: var(--space-10);
@@ -5739,7 +5990,7 @@ img[src*="favicons"] {
   }
 }
 
-/* Amélioration des menus d'aide */
+/* Help menu improvements */
 .markdown-content {
   font-family: var(--font-family-body);
   line-height: var(--line-height-relaxed);
@@ -5811,7 +6062,7 @@ img[src*="favicons"] {
   font-weight: var(--font-weight-medium);
 }
 
-/* Styles spéciaux pour les notes légales */
+/* Special styles for legal notes */
 .markdown-content .help-note {
   margin: var(--space-6) 0;
   padding: var(--space-5);
@@ -5850,7 +6101,7 @@ img[src*="favicons"] {
   color: var(--color-text-primary);
 }
 
-/* Icônes spéciales dans les notes */
+/* Special icons in notes */
 .markdown-content .legal-notice strong:before {
   content: "⚖️ ";
   margin-right: var(--space-2);
@@ -5866,7 +6117,7 @@ img[src*="favicons"] {
   margin-right: var(--space-2);
 }
 
-/* Amélioration des liens dans les notes d'aide */
+/* Link improvements in help notes */
 .markdown-content a {
   color: var(--color-primary);
   text-decoration: none;
