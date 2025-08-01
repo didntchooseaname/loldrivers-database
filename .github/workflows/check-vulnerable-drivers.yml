@@ -29,8 +29,7 @@ jobs:
       run: |
         # Download Microsoft's official HVCI blocklist
         Write-Host "Downloading Microsoft HVCI Vulnerable Driver Blocklist..."
-        Invoke-WebRequest -Uri "        echo "- **Source**: [Microsoft Official Vulnerable Driver Blocklist](https://aka.ms/VulnerableDriverBlockList)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Method**: XML blocklist parsing and hash comparison" >> $GITHUB_STEP_SUMMARYttps://aka.ms/VulnerableDriverBlockList" -OutFile "VulnerableDriverBlockList.zip"
+        Invoke-WebRequest -Uri "https://aka.ms/VulnerableDriverBlockList" -OutFile "VulnerableDriverBlockList.zip"
         
         # Extract the zip file
         Write-Host "Extracting blocklist ZIP file..."
@@ -333,54 +332,44 @@ jobs:
         $versionBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -eq "Version" }).Count
         
         $summaryContent = @"
-# Comprehensive HVCI Blocklist Analysis Summary
-
-## Analysis Details
-- **Source**: Microsoft Official Vulnerable Driver Blocklist (following Trail of Bits methodology)
-- **Blocklist URL**: https://aka.ms/VulnerableDriverBlockList
-- **Analysis Date**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-- **XML File**: SiPolicy_Enforced_Server2016.xml
-- **Local Data Source**: $localJsonPath
-- **Analysis Method**: Comprehensive HVCI policy parsing (hash, certificate, version, filename rules)
-
-## Results Summary
-- **Total Drivers Analyzed**: $totalDrivers
-- **Blocked Drivers**: $blockedCount
-- **Allowed Drivers**: $allowedCount
-- **Blocked Percentage**: $([math]::Round(($blockedCount / $totalDrivers) * 100, 2))%
-
-## Blocking Reasons Breakdown
-- **Hash-based blocks**: $hashBlocked drivers
-- **Certificate-based blocks**: $certBlocked drivers  
-- **Version-based blocks**: $versionBlocked drivers
-
-## HVCI Policy Components Analyzed
-- **Blocked Hashes**: $($blockedHashes.Count) (MD5, SHA1, SHA256, Authentihash)
-- **Blocked Signers**: $($blockedSigners.Count) (Certificate TBS hashes)
-- **Version Restrictions**: $($blockedVersions.Count) (MaximumFileVersion rules)
-- **Filename Restrictions**: $($blockedFilenames.Count) (FileName rules)
-
-## Analysis Methodology
-This comprehensive analysis follows the Trail of Bits HVCI methodology which checks:
-1. **Hash Matching**: Compares driver hashes (MD5, SHA1, SHA256, Authentihash) against blocked hash lists
-2. **Certificate Validation**: Checks driver certificates against blocked signer TBS hashes
-3. **Version Checking**: Validates driver versions against maximum allowed versions
-4. **Filename Rules**: Applies filename-specific blocking rules
-
-The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy file which contains FileRule entries with Deny rules for various driver attributes.
-"@
-- **XML File**: $($targetXmlFile.Name)
-- **XML File Path**: $($targetXmlFile.FullName)
-- **Local Data Source**: $localJsonPath
-- **Total XML Rules**: $($fileRules.Count)
-- **Extracted Hashes**: $($blockedHashes.Count)
-
-## Results
-- **Total Drivers Analyzed**: $totalDrivers
-The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy file which contains FileRule entries with Deny rules for various driver attributes.
-
-## Hash Distribution in Blocklist
-"@
+        # Comprehensive HVCI Blocklist Analysis Summary
+        
+        ## Analysis Details
+        - **Source**: Microsoft Official Vulnerable Driver Blocklist (following Trail of Bits methodology)
+        - **Blocklist URL**: https://aka.ms/VulnerableDriverBlockList
+        - **Analysis Date**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+        - **XML File**: SiPolicy_Enforced_Server2016.xml
+        - **Local Data Source**: $localJsonPath
+        - **Analysis Method**: Comprehensive HVCI policy parsing (hash, certificate, version, filename rules)
+        
+        ## Results Summary
+        - **Total Drivers Analyzed**: $totalDrivers
+        - **Blocked Drivers**: $blockedCount
+        - **Allowed Drivers**: $allowedCount
+        - **Blocked Percentage**: $([math]::Round(($blockedCount / $totalDrivers) * 100, 2))%
+        
+        ## Blocking Reasons Breakdown
+        - **Hash-based blocks**: $hashBlocked drivers
+        - **Certificate-based blocks**: $certBlocked drivers  
+        - **Version-based blocks**: $versionBlocked drivers
+        
+        ## HVCI Policy Components Analyzed
+        - **Blocked Hashes**: $($blockedHashes.Count) (MD5, SHA1, SHA256, Authentihash)
+        - **Blocked Signers**: $($blockedSigners.Count) (Certificate TBS hashes)
+        - **Version Restrictions**: $($blockedVersions.Count) (MaximumFileVersion rules)
+        - **Filename Restrictions**: $($blockedFilenames.Count) (FileName rules)
+        
+        ## Analysis Methodology
+        This comprehensive analysis follows the Trail of Bits HVCI methodology which checks:
+        1. **Hash Matching**: Compares driver hashes (MD5, SHA1, SHA256, Authentihash) against blocked hash lists
+        2. **Certificate Validation**: Checks driver certificates against blocked signer TBS hashes
+        3. **Version Checking**: Validates driver versions against maximum allowed versions
+        4. **Filename Rules**: Applies filename-specific blocking rules
+        
+        The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy file which contains FileRule entries with Deny rules for various driver attributes.
+        
+        ## Hash Distribution in Blocklist
+        "@
         
         # Add hash distribution statistics
         $hashStats = $blockedHashes.Values | Group-Object | Sort-Object Name
@@ -936,7 +925,8 @@ The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy 
           echo "**Previous workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Previous workflow status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
         fi
-        echo "**Source:** [Trail of Bits HVCI Analysis](https://github.com/trailofbits/HVCI-loldrivers-check)" >> $GITHUB_STEP_SUMMARY
+        echo "**Source:** [Microsoft Official Vulnerable Driver Blocklist](https://aka.ms/VulnerableDriverBlockList)" >> $GITHUB_STEP_SUMMARY
+        echo "**Method:** Comprehensive HVCI policy analysis (following Trail of Bits methodology)" >> $GITHUB_STEP_SUMMARY
         echo "**Property Updated:** LoadsDespiteHVCI" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
@@ -949,7 +939,7 @@ The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy 
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) uses hardware virtualization features to protect kernel mode processes against the injection and execution of malicious or unverified code. This analysis uses the official Microsoft Vulnerable Driver Blocklist which contains hash-based rules for drivers that are blocked by HVCI. The LoadsDespiteHVCI property indicates whether a driver can load despite HVCI being enabled (TRUE for drivers not in blocklist) or is blocked by HVCI (FALSE for drivers in blocklist)." >> $GITHUB_STEP_SUMMARY
+        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) uses hardware virtualization features to protect kernel mode processes against the injection and execution of malicious or unverified code. This comprehensive analysis uses the official Microsoft Vulnerable Driver Blocklist which contains multiple blocking mechanisms including hash-based rules, certificate restrictions, version limits, and filename rules. The LoadsDespiteHVCI property indicates whether a driver can load despite HVCI being enabled (TRUE for drivers not in blocklist) or is blocked by HVCI (FALSE for drivers blocked by any HVCI policy rule)." >> $GITHUB_STEP_SUMMARY
         
     - name: Upload summary artifact
       if: always()

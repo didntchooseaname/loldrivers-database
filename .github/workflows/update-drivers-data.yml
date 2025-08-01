@@ -10,7 +10,6 @@ permissions:
   contents: write
   actions: read
   pull-requests: write
-  metadata: read
   
 env:
   REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
