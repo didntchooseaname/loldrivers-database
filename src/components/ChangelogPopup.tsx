@@ -131,8 +131,8 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
   if (!isVisible) return null;
 
   return (
-    <div className="popup-overlay">
-      <div className="popup-container changelog-popup">
+    <div className="popup-overlay" onClick={onClose}>
+      <div className="popup-container changelog-popup" onClick={(e) => e.stopPropagation()}>
         <div className="popup-header">
           <h2>
             <i className="fas fa-history"></i>
