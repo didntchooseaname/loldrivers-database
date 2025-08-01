@@ -2223,6 +2223,24 @@ select.form-control {
   }
 }
 
+/* Tablet optimizations */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .driver-header {
+    gap: var(--space-12);
+  }
+  
+  .download-btn {
+    min-height: 40px;
+    min-width: 40px;
+    padding: var(--space-6) var(--space-8);
+    font-size: var(--font-size-base);
+  }
+  
+  .driver-title {
+    font-size: var(--font-size-lg);
+  }
+}
+
 @media (max-width: 768px) {
   /* Container mobile optimizations */
   .container {
@@ -2255,7 +2273,9 @@ select.form-control {
   /* Driver header mobile layout */
   .driver-header {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
     gap: var(--space-8);
     margin-bottom: var(--space-10);
   }
@@ -2272,12 +2292,15 @@ select.form-control {
   .download-btn {
     align-self: flex-start;
     min-height: var(--mobile-touch-target);
-    padding: var(--space-8) var(--space-12);
-    font-size: var(--font-size-sm);
+    min-width: var(--mobile-touch-target);
+    padding: var(--space-8);
+    font-size: var(--font-size-base);
     border-radius: var(--radius-base);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-6);
+    flex-shrink: 0;
   }
 
   /* Section content mobile stacking */
@@ -2334,7 +2357,7 @@ select.form-control {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: var(--space-4);
+    gap: var(--space-10);
     margin-bottom: var(--space-8);
   }
 
@@ -2343,11 +2366,14 @@ select.form-control {
     font-size: var(--font-size-xs);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: var(--space-2);
     width: auto;
-    height: auto;
-    min-height: 28px;
+    height: 32px;
+    min-height: 32px;
+    max-height: 32px;
     border-radius: var(--radius-sm);
+    flex-shrink: 0;
   }
 
   /* Headers and typography mobile */
@@ -2359,8 +2385,7 @@ select.form-control {
   /* Improved touch targets */
   button, 
   a, 
-  .clickable-hash,
-  .status-tag {
+  .clickable-hash {
     min-height: var(--mobile-touch-target);
     min-width: var(--mobile-touch-target);
   }
@@ -2381,6 +2406,30 @@ select.form-control {
     left: initial;
     width: initial;
     height: initial;
+  }
+}
+
+/* Small mobile screens (480px and below) */
+@media (max-width: 480px) {
+  .driver-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  
+  .download-btn {
+    align-self: flex-start;
+    min-height: 36px;
+    min-width: 36px;
+    padding: var(--space-6);
+    font-size: var(--font-size-sm);
+  }
+  
+  .driver-title {
+    font-size: var(--font-size-base);
+    flex: 1;
+    margin-right: var(--space-4);
   }
 }
 
@@ -3018,13 +3067,13 @@ select.form-control {
   gap: var(--space-8);
   margin-bottom: var(--space-6);
   color: var(--color-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
 }
 
 .command-field-content {
   color: var(--color-text);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-sm);
   line-height: 1.6;
   margin-left: var(--space-24);
   text-align: left;
@@ -4814,6 +4863,7 @@ select.form-control {
   .hash-section,
   .status-tags {
     margin-bottom: var(--space-12);
+    gap: var(--space-4);
   }
 
   .simple-section {
@@ -4961,7 +5011,7 @@ select.form-control {
 
   /* Status tags for medium screens */
   .status-tags {
-    gap: var(--space-5);
+    gap: var(--space-8);
   }
 
   .status-tag {
