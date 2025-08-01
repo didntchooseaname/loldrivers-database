@@ -1,10 +1,10 @@
 name: Update LOLDrivers Data
 
-# Exécution programmée : tous les mardis à 06:00 UTC
+# Trigger on new commits to the LOLDrivers JSON file
 on:
-  #schedule:
-  #  - cron: '0 6 * * 2'  # Chaque mardi à 6h UTC
-  workflow_dispatch:  # Permet d'exécuter manuellement
+  schedule:
+    - cron: '*/30 * * * *'  # Check every 30 minutes for new commits
+  workflow_dispatch:  # Allows manual execution
 
 permissions:
   contents: write
@@ -14,7 +14,10 @@ permissions:
   
 env:
   REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
-  LOCAL_FILE: data/drv.json
+  GITHUB_API_URL: https://api.github.com/repos/magicsword-io/LOLDrivers/commits?path=loldrivers.io/content/api/drivers.json&per_page=1
+  LOCAL_FILE: data/drvj.json
+  BACKUP_FILE: data/drv.bak
+  COMMIT_HASH_FILE: data/.last_commit_hash
 
 jobs:
   update-drivers-data:
@@ -28,143 +31,184 @@ jobs:
         fetch-depth: 0
         persist-credentials: true
         
-    - name: 🔍 Download remote file for comparison
+    - name: 🔍 Check for new commits on LOLDrivers JSON file
+      id: check_commits
+      run: |
+        echo "📡 Checking for new commits on LOLDrivers JSON file..."
+        
+        # Get the latest commit hash for the JSON file
+        latest_commit=$(curl -s -H "Accept: application/vnd.github.v3+json" "$GITHUB_API_URL" | jq -r '.[0].sha // empty')
+        
+        if [ -z "$latest_commit" ]; then
+          echo "❌ Failed to get latest commit hash"
+          exit 1
+        fi
+        
+        echo "🔐 Latest commit hash: $latest_commit"
+        
+        # Check if we have a stored commit hash
+        if [ -f "$COMMIT_HASH_FILE" ]; then
+          stored_commit=$(cat "$COMMIT_HASH_FILE")
+          echo "🔐 Stored commit hash: $stored_commit"
+          
+          if [ "$latest_commit" = "$stored_commit" ]; then
+            echo "✅ No new commits detected - skipping update"
+            echo "has_new_commit=false" >> $GITHUB_OUTPUT
+          else
+            echo "🔄 New commit detected - update needed"
+            echo "has_new_commit=true" >> $GITHUB_OUTPUT
+            echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
+            echo "stored_commit=$stored_commit" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "🆕 No stored commit hash - first run or missing file"
+          echo "has_new_commit=true" >> $GITHUB_OUTPUT
+          echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
+          echo "stored_commit=none" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: 🔄 Download and backup files
+      if: steps.check_commits.outputs.has_new_commit == 'true'
       id: download
       run: |
-        echo "📡 Downloading remote drivers.json..."
-        curl -s -L "$REMOTE_URL" -o temp_drivers.json
+        echo "� Downloading remote drivers.json..."
+        curl -s -L "$REMOTE_URL" -o temp_drvj.json
         
-        if [ ! -f temp_drivers.json ]; then
+        if [ ! -f temp_drvj.json ]; then
           echo "❌ Failed to download remote file"
           exit 1
         fi
         
         echo "✅ Remote file downloaded successfully"
-        echo "📊 Remote file size: $(stat -c%s temp_drivers.json) bytes"
+        echo "📊 Remote file size: $(stat -c%s temp_drvj.json) bytes"
         
-    - name: 📋 Compare files
-      id: compare
-      run: |
-        if [ ! -f "$LOCAL_FILE" ]; then
-          echo "🆕 Local file doesn't exist, will create it"
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "change_type=new_file" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-        echo "🔍 Comparing files..."
-        echo "📊 Local file size: $(stat -c%s $LOCAL_FILE) bytes"
-        echo "📊 Remote file size: $(stat -c%s temp_drivers.json) bytes"
-        
-        # Comparaison des hash MD5
-        local_hash=$(md5sum "$LOCAL_FILE" | cut -d' ' -f1)
-        remote_hash=$(md5sum temp_drivers.json | cut -d' ' -f1)
-        
-        echo "🔐 Local MD5: $local_hash"
-        echo "🔐 Remote MD5: $remote_hash"
-        
-        if [ "$local_hash" != "$remote_hash" ]; then
-          echo "🔄 Files are different - update needed"
-          echo "has_changes=true" >> $GITHUB_OUTPUT
-          echo "change_type=updated" >> $GITHUB_OUTPUT
-          
-          # Analyse des changements JSON (optionnel)
-          if command -v jq &> /dev/null; then
-            local_count=$(jq '. | length' "$LOCAL_FILE" 2>/dev/null || echo "unknown")
-            remote_count=$(jq '. | length' temp_drivers.json 2>/dev/null || echo "unknown")
-            echo "📈 Local entries: $local_count"
-            echo "📈 Remote entries: $remote_count"
-            echo "local_count=$local_count" >> $GITHUB_OUTPUT
-            echo "remote_count=$remote_count" >> $GITHUB_OUTPUT
-          fi
-        else
-          echo "✅ Files are identical - no update needed"
-          echo "has_changes=false" >> $GITHUB_OUTPUT
-        fi
-        
-    - name: 🔄 Update local file
-      if: steps.compare.outputs.has_changes == 'true'
-      run: |
-        echo "📝 Updating local file..."
-        
-        # Créer le répertoire data s'il n'existe pas
+        # Create data directory if it doesn't exist
         mkdir -p data
         
-        # Remplacer le fichier local
-        mv temp_drivers.json "$LOCAL_FILE"
+        # Backup existing file if it exists
+        if [ -f "$LOCAL_FILE" ]; then
+          echo "💾 Backing up existing file to $BACKUP_FILE..."
+          cp "$LOCAL_FILE" "$BACKUP_FILE"
+          echo "✅ Backup created successfully"
+          echo "backup_created=true" >> $GITHUB_OUTPUT
+        else
+          echo "🆕 No existing file to backup"
+          echo "backup_created=false" >> $GITHUB_OUTPUT
+        fi
         
-        echo "✅ Local file updated successfully"
-        echo "📊 New file size: $(stat -c%s $LOCAL_FILE) bytes"
+        # Move new file to final location
+        mv temp_drvj.json "$LOCAL_FILE"
+        echo "✅ New file saved as $LOCAL_FILE"
+        
+        # Store the new commit hash
+        echo "${{ steps.check_commits.outputs.latest_commit }}" > "$COMMIT_HASH_FILE"
+        echo "✅ Commit hash stored"
         
     - name: 📄 Generate update summary
-      if: steps.compare.outputs.has_changes == 'true'
+      if: steps.check_commits.outputs.has_new_commit == 'true'
       id: summary
       run: |
         echo "📋 Generating update summary..."
         
+        # Get commit details for better summary
+        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
+        commit_message=$(echo "$commit_info" | jq -r '.commit.message // "No message"')
+        commit_date=$(echo "$commit_info" | jq -r '.commit.committer.date // "Unknown"')
+        commit_author=$(echo "$commit_info" | jq -r '.commit.author.name // "Unknown"')
+        
         # Créer un résumé des changements
         summary="## 🔄 LOLDrivers Data Update\n\n"
-        summary+="**Update Type:** ${{ steps.compare.outputs.change_type }}\n"
+        summary+="**Update Type:** New commit detected\n"
         summary+="**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n"
         summary+="**Source:** [LOLDrivers GitHub](https://github.com/magicsword-io/LOLDrivers)\n\n"
         
-        if [ "${{ steps.compare.outputs.change_type }}" = "updated" ]; then
-          summary+="### 📊 Statistics\n"
-          summary+="- **Local entries:** ${{ steps.compare.outputs.local_count }}\n"
-          summary+="- **Remote entries:** ${{ steps.compare.outputs.remote_count }}\n\n"
+        summary+="### 📊 Commit Information\n"
+        summary+="- **Commit Hash:** \`${{ steps.check_commits.outputs.latest_commit }}\`\n"
+        summary+="- **Previous Hash:** \`${{ steps.check_commits.outputs.stored_commit }}\`\n"
+        summary+="- **Author:** $commit_author\n"
+        summary+="- **Date:** $commit_date\n"
+        summary+="- **Message:** $commit_message\n\n"
+        
+        summary+="### � File Changes\n"
+        summary+="- **New file:** \`data/drvj.json\`\n"
+        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+          summary+="- **Backup created:** \`data/drv.bak\`\n"
+        fi
+        summary+="- **Commit hash stored:** \`data/.last_commit_hash\`\n\n"
+        
+        # Analyse des changements JSON (optionnel)
+        if command -v jq &> /dev/null; then
+          new_count=$(jq '. | length' "$LOCAL_FILE" 2>/dev/null || echo "unknown")
+          summary+="### 📈 Statistics\n"
+          summary+="- **Total entries:** $new_count\n"
           
-          # Calculer la différence si possible
-          if [[ "${{ steps.compare.outputs.local_count }}" =~ ^[0-9]+$ ]] && [[ "${{ steps.compare.outputs.remote_count }}" =~ ^[0-9]+$ ]]; then
-            diff=$((${{ steps.compare.outputs.remote_count }} - ${{ steps.compare.outputs.local_count }}))
-            if [ $diff -gt 0 ]; then
-              summary+="- **New entries:** +$diff 📈\n"
-            elif [ $diff -lt 0 ]; then
-              summary+="- **Removed entries:** $diff 📉\n"
-            else
-              summary+="- **No change in count** (content updated) 🔄\n"
+          if [ -f "$BACKUP_FILE" ] && [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+            old_count=$(jq '. | length' "$BACKUP_FILE" 2>/dev/null || echo "unknown")
+            if [[ "$old_count" =~ ^[0-9]+$ ]] && [[ "$new_count" =~ ^[0-9]+$ ]]; then
+              diff=$(($new_count - $old_count))
+              if [ $diff -gt 0 ]; then
+                summary+="- **New entries:** +$diff 📈\n"
+              elif [ $diff -lt 0 ]; then
+                summary+="- **Removed entries:** $diff 📉\n"
+              else
+                summary+="- **No change in count** (content updated) 🔄\n"
+              fi
+              summary+="- **Previous entries:** $old_count\n"
             fi
           fi
+          summary+="\n"
         fi
         
         summary+="### 🔗 Links\n"
-        summary+="- [View Updated File](./data/drv.json)\n"
+        summary+="- [View Updated File](./data/drvj.json)\n"
+        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+          summary+="- [View Backup File](./data/drv.bak)\n"
+        fi
         summary+="- [LOLDrivers Website](https://loldrivers.io/)\n"
         summary+="- [Source Repository](https://github.com/magicsword-io/LOLDrivers)\n"
+        summary+="- [Commit Details](https://github.com/magicsword-io/LOLDrivers/commit/${{ steps.check_commits.outputs.latest_commit }})\n"
         
         # Sauvegarder pour le commit message
         echo -e "$summary" > update_summary.md
         echo "summary_created=true" >> $GITHUB_OUTPUT
         
     - name: 🚀 Commit and push changes
-      if: steps.compare.outputs.has_changes == 'true'
+      if: steps.check_commits.outputs.has_new_commit == 'true'
       run: |
         echo "🔧 Configuring git..."
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action - LOLDrivers Updater"
         
         echo "📝 Adding changes..."
-        git add "$LOCAL_FILE"
+        git add "$LOCAL_FILE" "$COMMIT_HASH_FILE"
         
-        # Message de commit avec résumé
-        if [ "${{ steps.compare.outputs.change_type }}" = "new_file" ]; then
-          commit_msg="🆕 Add initial LOLDrivers data file"
-        else
-          commit_msg="🔄 Update LOLDrivers data"
-          if [[ "${{ steps.compare.outputs.local_count }}" =~ ^[0-9]+$ ]] && [[ "${{ steps.compare.outputs.remote_count }}" =~ ^[0-9]+$ ]]; then
-            diff=$((${{ steps.compare.outputs.remote_count }} - ${{ steps.compare.outputs.local_count }}))
-            if [ $diff -gt 0 ]; then
-              commit_msg+=": +$diff new entries"
-            elif [ $diff -lt 0 ]; then
-              commit_msg+=": $diff entries removed"
-            else
-              commit_msg+=": content updated"
-            fi
-          fi
+        # Add backup file if created
+        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+          git add "$BACKUP_FILE"
         fi
         
-        commit_msg+="\n\nAutomated update from LOLDrivers repository"
+        # Get commit info for commit message
+        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
+        commit_message=$(echo "$commit_info" | jq -r '.commit.message // "No message"' | head -1)
+        
+        # Message de commit avec résumé
+        commit_msg="🔄 Update LOLDrivers data: $commit_message"
+        commit_msg+="\n\nAutomated update triggered by new commit in LOLDrivers repository"
+        commit_msg+="\nCommit: ${{ steps.check_commits.outputs.latest_commit }}"
+        commit_msg+="\nPrevious: ${{ steps.check_commits.outputs.stored_commit }}"
         commit_msg+="\nSource: $REMOTE_URL"
         commit_msg+="\nTimestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        
+        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+          commit_msg+="\n\nFiles updated:"
+          commit_msg+="\n- data/drvj.json (new data)"
+          commit_msg+="\n- data/drv.bak (backup of previous)"
+          commit_msg+="\n- data/.last_commit_hash (tracking)"
+        else
+          commit_msg+="\n\nFiles created:"
+          commit_msg+="\n- data/drvj.json (initial data)"
+          commit_msg+="\n- data/.last_commit_hash (tracking)"
+        fi
         
         echo "💾 Committing changes..."
         git commit -m "$commit_msg"
@@ -178,7 +222,7 @@ jobs:
       if: always()
       run: |
         echo "🧹 Cleaning up temporary files..."
-        rm -f temp_drivers.json update_summary.md
+        rm -f temp_drvj.json update_summary.md
         echo "✅ Cleanup completed"
         
     - name: 📊 Job Summary
@@ -190,13 +234,24 @@ jobs:
         echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         
-        if [ "${{ steps.compare.outputs.has_changes }}" = "true" ]; then
+        if [ "${{ steps.check_commits.outputs.has_new_commit }}" = "true" ]; then
           echo "- **Result:** ✅ Data updated successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- **Change Type:** ${{ steps.compare.outputs.change_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New Commit:** \`${{ steps.check_commits.outputs.latest_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous Commit:** \`${{ steps.check_commits.outputs.stored_commit }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+            echo "- **Backup Created:** ✅ data/drv.bak" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **First Run:** 🆕 No backup needed" >> $GITHUB_STEP_SUMMARY
+          fi
         else
-          echo "- **Result:** ℹ️ No changes detected" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result:** ℹ️ No new commits detected" >> $GITHUB_STEP_SUMMARY
         fi
         
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📁 Files" >> $GITHUB_STEP_SUMMARY
+        echo "- **Main Data:** \`data/drvj.json\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Backup:** \`data/drv.bak\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit Tracking:** \`data/.last_commit_hash\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🔗 Resources" >> $GITHUB_STEP_SUMMARY
         echo "- [LOLDrivers Website](https://loldrivers.io/)" >> $GITHUB_STEP_SUMMARY

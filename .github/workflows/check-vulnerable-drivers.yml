@@ -27,90 +27,393 @@ jobs:
         fetch-depth: 0
     - name: Run PowerShell script
       run: |
-        # Download and run the Trail of Bits HVCI check script
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1" -OutFile "check_allowed_drivers.ps1"
-        $output = ./check_allowed_drivers.ps1
+        # Download Microsoft's official HVCI blocklist
+        Write-Host "Downloading Microsoft HVCI Vulnerable Driver Blocklist..."
+        Invoke-WebRequest -Uri "        echo "- **Source**: [Microsoft Official Vulnerable Driver Blocklist](https://aka.ms/VulnerableDriverBlockList)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Method**: XML blocklist parsing and hash comparison" >> $GITHUB_STEP_SUMMARYttps://aka.ms/VulnerableDriverBlockList" -OutFile "VulnerableDriverBlockList.zip"
         
-        # Parse the output and create a structured CSV
-        $lines = $output -split "`n"
-        $inAllowedSection = $false
-        $allowedDrivers = @()
+        # Extract the zip file
+        Write-Host "Extracting blocklist ZIP file..."
+        Expand-Archive -Path "VulnerableDriverBlockList.zip" -DestinationPath "blocklist" -Force
+        
+        # Find XML files in the extracted content
+        $xmlFiles = Get-ChildItem -Path "blocklist" -Filter "*.xml" -Recurse
+        Write-Host "Found $($xmlFiles.Count) XML file(s):"
+        $xmlFiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
+        
+        # Look specifically for SiPolicy_Enforced_Server2016.xml in VulnerableDriverBlockList folder
+        $targetXmlFile = Get-ChildItem -Path "blocklist" -Filter "SiPolicy_Enforced_Server2016.xml" -Recurse | Select-Object -First 1
+        
+        if (-not $targetXmlFile) {
+            Write-Host "SiPolicy_Enforced_Server2016.xml not found, looking for any XML file in VulnerableDriverBlockList folder..."
+            $targetXmlFile = Get-ChildItem -Path "blocklist\VulnerableDriverBlockList" -Filter "*.xml" -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+        
+        if (-not $targetXmlFile) {
+            Write-Error "No SiPolicy_Enforced_Server2016.xml or other XML files found in VulnerableDriverBlockList folder"
+            exit 1
+        }
+        
+        $xmlFile = $targetXmlFile.FullName
+        Write-Host "Using XML file: $xmlFile"
+        
+        # Parse the XML HVCI policy (following Trail of Bits logic)
+        Write-Host "Parsing XML HVCI policy..."
+        [xml]$policy = Get-Content -Path $xmlFile -Raw
+        
+        # Extract policy components following Trail of Bits approach
+        $fileRules = $policy.SiPolicy.FileRules
+        $signers = $policy.SiPolicy.Signers.Signer
+        
+        Write-Host "Found file rules: $($fileRules.ChildNodes.Count)"
+        Write-Host "Found signers: $($signers.Count)"
+        
+        # Initialize collections for policy analysis
+        $blockedHashes = @{}
+        $blockedSigners = @{}
+        $blockedVersions = @{}
+        $blockedFilenames = @{}
+        
+        # Extract blocked hashes from Deny rules
+        if ($fileRules.Deny) {
+            foreach ($denyRule in $fileRules.Deny) {
+                if ($denyRule.Hash) {
+                    $hashValue = $denyRule.Hash.Trim().ToUpper() -replace '[^A-F0-9]', ''
+                    if ($hashValue.Length -ge 32) {
+                        if ($hashValue.Length -eq 32) {
+                            $blockedHashes[$hashValue] = "MD5"
+                        } elseif ($hashValue.Length -eq 40) {
+                            $blockedHashes[$hashValue] = "SHA1"
+                        } elseif ($hashValue.Length -eq 64) {
+                            $blockedHashes[$hashValue] = "SHA256"
+                        }
+                    }
+                }
+                
+                # Extract filename restrictions
+                if ($denyRule.FileName) {
+                    $blockedFilenames[$denyRule.FileName] = $denyRule.MaximumFileVersion
+                    if ($denyRule.MaximumFileVersion) {
+                        $blockedVersions[$denyRule.FileName] = $denyRule.MaximumFileVersion
+                    }
+                }
+            }
+        }
+        
+        # Extract blocked signers/certificates
+        if ($signers) {
+            foreach ($signer in $signers) {
+                if ($signer.CertRoot -and $signer.CertRoot.Value) {
+                    $tbsHash = $signer.CertRoot.Value.ToLower()
+                    $blockedSigners[$tbsHash] = @{
+                        Name = $signer.Name
+                        FileAttribRef = $signer.FileAttribRef
+                    }
+                }
+            }
+        }
+        
+        # Create helper functions following Trail of Bits logic
+        function Test-BlockedHash($driver) {
+            $driverHashes = @(
+                $driver.MD5,
+                $driver.SHA1, 
+                $driver.SHA256,
+                $driver.Authentihash.MD5,
+                $driver.Authentihash.SHA1,
+                $driver.Authentihash.SHA256
+            ) | Where-Object { $_ -and $_.Length -ge 32 }
+            
+            foreach ($hash in $driverHashes) {
+                $cleanHash = $hash.Trim().ToUpper() -replace '[^A-F0-9]', ''
+                if ($blockedHashes.ContainsKey($cleanHash)) {
+                    return @{
+                        IsBlocked = $true
+                        MatchedHash = $cleanHash
+                        HashType = $blockedHashes[$cleanHash]
+                        Reason = "Hash blocked"
+                    }
+                }
+            }
+            return @{ IsBlocked = $false }
+        }
+        
+        function Test-BlockedSigner($driver) {
+            if (-not $driver.Signatures -or -not $driver.Signatures.Certificates) {
+                return @{ IsBlocked = $false }
+            }
+            
+            # Get file attribute for this filename
+            $fileAttrib = $fileRules.FileAttrib | Where-Object { $_.FileName -eq $driver.OriginalFilename }
+            
+            foreach ($cert in $driver.Signatures.Certificates) {
+                $certHashes = @(
+                    $cert.TBS.MD5,
+                    $cert.TBS.SHA1,
+                    $cert.TBS.SHA256,
+                    $cert.TBS.SHA384
+                ) | Where-Object { $_ } | ForEach-Object { $_.ToLower() }
+                
+                foreach ($certHash in $certHashes) {
+                    if ($blockedSigners.ContainsKey($certHash)) {
+                        $signer = $blockedSigners[$certHash]
+                        $blockedFiles = $signer.FileAttribRef
+                        
+                        # If no specific file restrictions or this file is in the blocked list
+                        if (-not $blockedFiles -or ($blockedFiles.RuleID -contains $fileAttrib.ID)) {
+                            return @{
+                                IsBlocked = $true
+                                MatchedCert = $certHash
+                                SignerName = $signer.Name
+                                Reason = "Certificate blocked"
+                            }
+                        }
+                    }
+                }
+            }
+            return @{ IsBlocked = $false }
+        }
+        
+        function Test-BlockedVersion($driver) {
+            if (-not $driver.OriginalFilename -or -not $driver.FileVersion) {
+                return @{ IsBlocked = $false }
+            }
+            
+            $maxVersion = $blockedVersions[$driver.OriginalFilename]
+            if ($maxVersion) {
+                try {
+                    # Clean and parse version string
+                    $driverVersion = ($driver.FileVersion -replace ',\s*', '.').Split(' ')[0]
+                    if ([version]$driverVersion -le [version]$maxVersion) {
+                        return @{
+                            IsBlocked = $true
+                            MaxVersion = $maxVersion
+                            DriverVersion = $driverVersion
+                            Reason = "Version blocked"
+                        }
+                    }
+                } catch {
+                    # Version parsing failed, skip version check
+                }
+            }
+            return @{ IsBlocked = $false }
+        }
+        
+        Write-Host "Extracted HVCI policy components:"
+        Write-Host "  - Blocked hashes: $($blockedHashes.Count)"
+        Write-Host "  - Blocked signers: $($blockedSigners.Count)"  
+        Write-Host "  - Version restrictions: $($blockedVersions.Count)"
+        Write-Host "  - Filename restrictions: $($blockedFilenames.Count)"
+        
+        # Load local LOLDrivers data from the repository
+        Write-Host "Loading local LOLDrivers data from repository..."
+        
+        # Check if we're in a git repository and load the local file
+        $localJsonPath = "data\drv.json"
+        if (-not (Test-Path $localJsonPath)) {
+            $localJsonPath = "data\drvj.json"  # Try alternative name
+        }
+        
+        if (-not (Test-Path $localJsonPath)) {
+            Write-Error "Could not find local drv.json or drvj.json file in data folder"
+            exit 1
+        }
+        
+        Write-Host "Loading drivers from: $localJsonPath"
+        $loldrivers = Get-Content -Path $localJsonPath -Raw | ConvertFrom-Json
+        
+        if (-not $loldrivers) {
+            Write-Error "Could not load LOLDrivers data from local file"
+            exit 1
+        }
+        
+        Write-Host "Processing $($loldrivers.Count) drivers from local LOLDrivers database..."
+        
+        # Analyze drivers using comprehensive HVCI logic (following Trail of Bits approach)
+        $totalDrivers = 0
+        $blockedCount = 0
+        $allowedCount = 0
         $blockedDrivers = @()
+        $allowedDrivers = @()
         
-        # First, get the LOLDrivers data to identify all hashes
-        $loldrivers = Invoke-WebRequest -Uri https://www.loldrivers.io/api/drivers.json | ConvertFrom-Json -AsHashTable
-        $allDriverHashes = @{}
+        foreach ($driver in $loldrivers) {
+            if ($driver.KnownVulnerableSamples) {
+                foreach ($sample in $driver.KnownVulnerableSamples) {
+                    $totalDrivers++
+                    
+                    # Test all HVCI blocking conditions following Trail of Bits logic
+                    $hashResult = Test-BlockedHash $sample
+                    $signerResult = Test-BlockedSigner $sample  
+                    $versionResult = Test-BlockedVersion $sample
+                    
+                    $isBlocked = $false
+                    $blockReason = "Allowed by HVCI policy"
+                    $matchedDetail = "N/A"
+                    $matchedType = "N/A"
+                    
+                    # Check blocking conditions in order (following original script logic)
+                    if ($hashResult.IsBlocked) {
+                        $isBlocked = $true
+                        $blockReason = $hashResult.Reason
+                        $matchedDetail = $hashResult.MatchedHash
+                        $matchedType = $hashResult.HashType
+                    }
+                    elseif ($versionResult.IsBlocked) {
+                        $isBlocked = $true
+                        $blockReason = $versionResult.Reason
+                        $matchedDetail = "$($versionResult.DriverVersion) <= $($versionResult.MaxVersion)"
+                        $matchedType = "Version"
+                    }
+                    elseif ($signerResult.IsBlocked) {
+                        $isBlocked = $true
+                        $blockReason = $signerResult.Reason
+                        $matchedDetail = $signerResult.MatchedCert
+                        $matchedType = "Certificate"
+                    }
+                    
+                    # Create comprehensive driver result object
+                    $driverResult = [PSCustomObject]@{
+                        MD5 = $sample.MD5 -or "N/A"
+                        SHA1 = $sample.SHA1 -or "N/A"
+                        SHA256 = $sample.SHA256 -or "N/A"
+                        AuthentiMD5 = if ($sample.Authentihash -and $sample.Authentihash.MD5) { $sample.Authentihash.MD5 } else { "N/A" }
+                        AuthentiSHA1 = if ($sample.Authentihash -and $sample.Authentihash.SHA1) { $sample.Authentihash.SHA1 } else { "N/A" }
+                        AuthentiSHA256 = if ($sample.Authentihash -and $sample.Authentihash.SHA256) { $sample.Authentihash.SHA256 } else { "N/A" }
+                        Status = if ($isBlocked) { "Blocked" } else { "Allowed" }
+                        BlockReason = $blockReason
+                        MatchedDetail = $matchedDetail
+                        MatchedType = $matchedType
+                        DriverId = $driver.Id
+                        Company = $sample.Company -or "Unknown"
+                        Filename = $sample.Filename -or $sample.OriginalFilename -or "Unknown"
+                        OriginalFilename = $sample.OriginalFilename -or "Unknown"
+                        FileVersion = $sample.FileVersion -or "Unknown"
+                        Description = $sample.Description -or "Unknown"
+                    }
+                    
+                    if ($isBlocked) {
+                        $blockedDrivers += $driverResult
+                        $blockedCount++
+                    } else {
+                        $allowedDrivers += $driverResult
+                        $allowedCount++
         
-        foreach ($driver in $loldrivers.KnownVulnerableSamples) {
-            $hashes = @($driver.MD5, $driver.SHA1, $driver.SHA256)
-            foreach ($hash in $hashes) {
-                if ($hash) {
-                    $allDriverHashes["$($driver.MD5):$($driver.SHA1):$($driver.SHA256)"] = $true
-                }
-            }
-        }
+        # Output comprehensive analysis summary
+        Write-Host "=========================================="
+        Write-Host "        COMPREHENSIVE HVCI ANALYSIS"
+        Write-Host "=========================================="
+        Write-Host "Total drivers analyzed: $totalDrivers"
+        Write-Host "Blocked drivers (blocked by HVCI): $blockedCount"
+        Write-Host "Allowed drivers (can load with HVCI): $allowedCount"
+        Write-Host ""
+        Write-Host "HVCI Policy Components Found:"
+        Write-Host "  - Blocked hashes: $($blockedHashes.Count)"
+        Write-Host "  - Blocked signers/certificates: $($blockedSigners.Count)"  
+        Write-Host "  - Version restrictions: $($blockedVersions.Count)"
+        Write-Host "  - Filename restrictions: $($blockedFilenames.Count)"
+        Write-Host "=========================================="
         
-        # Parse allowed drivers from Trail of Bits output
-        foreach ($line in $lines) {
-            if ($line -match "^Allowed drivers:") {
-                $inAllowedSection = $true
-                continue
-            }
-            if ($inAllowedSection -and $line -match "MD5:(\w+) SHA1:(\w+) SHA256:(\w+)") {
-                $allowedDrivers += [PSCustomObject]@{
-                    MD5 = $matches[1]
-                    SHA1 = $matches[2] 
-                    SHA256 = $matches[3]
-                    Status = "Allowed"
-                }
-            }
-        }
+        # Create comprehensive CSV with all analysis information
+        $csvContent = "MD5,SHA1,SHA256,AuthentiMD5,AuthentiSHA1,AuthentiSHA256,Status,BlockReason,MatchedDetail,MatchedType,DriverId,Company,Filename,OriginalFilename,FileVersion,Description`n"
         
-        # Identify blocked drivers (those in LOLDrivers but NOT in allowed list)
-        $allowedHashSet = @{}
-        foreach ($allowed in $allowedDrivers) {
-            $allowedHashSet["$($allowed.MD5):$($allowed.SHA1):$($allowed.SHA256)"] = $true
-        }
-        
-        foreach ($hashKey in $allDriverHashes.Keys) {
-            if (-not $allowedHashSet.ContainsKey($hashKey)) {
-                $hashParts = $hashKey -split ":"
-                $blockedDrivers += [PSCustomObject]@{
-                    MD5 = $hashParts[0]
-                    SHA1 = $hashParts[1]
-                    SHA256 = $hashParts[2]
-                    Status = "Blocked"
-                }
-            }
-        }
-        
-        # Output summary
-        $totalOutput = $output | Out-String
-        if ($totalOutput -match "Number of blocked drivers: (\d+)") {
-            Write-Host "Found $($matches[1]) blocked drivers from Trail of Bits analysis"
-        }
-        if ($totalOutput -match "Number of allowed drivers: (\d+)") {
-            Write-Host "Found $($matches[1]) allowed drivers from Trail of Bits analysis"
-        }
-        Write-Host "Parsed $($allowedDrivers.Count) allowed and $($blockedDrivers.Count) blocked drivers for CSV"
-        
-        # Create CSV with both allowed and blocked results
-        $csvContent = "MD5,SHA1,SHA256,Status`n"
-        foreach ($driver in $allowedDrivers) {
-            $csvContent += "$($driver.MD5),$($driver.SHA1),$($driver.SHA256),$($driver.Status)`n"
-        }
         foreach ($driver in $blockedDrivers) {
-            $csvContent += "$($driver.MD5),$($driver.SHA1),$($driver.SHA256),$($driver.Status)`n"
+            $csvContent += "`"$($driver.MD5)`",`"$($driver.SHA1)`",`"$($driver.SHA256)`",`"$($driver.AuthentiMD5)`",`"$($driver.AuthentiSHA1)`",`"$($driver.AuthentiSHA256)`",`"$($driver.Status)`",`"$($driver.BlockReason)`",`"$($driver.MatchedDetail)`",`"$($driver.MatchedType)`",`"$($driver.DriverId)`",`"$($driver.Company)`",`"$($driver.Filename)`",`"$($driver.OriginalFilename)`",`"$($driver.FileVersion)`",`"$($driver.Description)`"`n"
+        }
+        
+        foreach ($driver in $allowedDrivers) {
+            $csvContent += "`"$($driver.MD5)`",`"$($driver.SHA1)`",`"$($driver.SHA256)`",`"$($driver.AuthentiMD5)`",`"$($driver.AuthentiSHA1)`",`"$($driver.AuthentiSHA256)`",`"$($driver.Status)`",`"$($driver.BlockReason)`",`"$($driver.MatchedDetail)`",`"$($driver.MatchedType)`",`"$($driver.DriverId)`",`"$($driver.Company)`",`"$($driver.Filename)`",`"$($driver.OriginalFilename)`",`"$($driver.FileVersion)`",`"$($driver.Description)`"`n"
         }
         
         # Write CSV file
         $csvContent | Out-File -FilePath "hvci_drivers.csv" -Encoding UTF8
         
+        # Create detailed analysis summary with breakdown by blocking reason
+        $hashBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -like "*Hash*" }).Count
+        $certBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -eq "Certificate" }).Count
+        $versionBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -eq "Version" }).Count
+        
+        $summaryContent = @"
+# Comprehensive HVCI Blocklist Analysis Summary
+
+## Analysis Details
+- **Source**: Microsoft Official Vulnerable Driver Blocklist (following Trail of Bits methodology)
+- **Blocklist URL**: https://aka.ms/VulnerableDriverBlockList
+- **Analysis Date**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+- **XML File**: SiPolicy_Enforced_Server2016.xml
+- **Local Data Source**: $localJsonPath
+- **Analysis Method**: Comprehensive HVCI policy parsing (hash, certificate, version, filename rules)
+
+## Results Summary
+- **Total Drivers Analyzed**: $totalDrivers
+- **Blocked Drivers**: $blockedCount
+- **Allowed Drivers**: $allowedCount
+- **Blocked Percentage**: $([math]::Round(($blockedCount / $totalDrivers) * 100, 2))%
+
+## Blocking Reasons Breakdown
+- **Hash-based blocks**: $hashBlocked drivers
+- **Certificate-based blocks**: $certBlocked drivers  
+- **Version-based blocks**: $versionBlocked drivers
+
+## HVCI Policy Components Analyzed
+- **Blocked Hashes**: $($blockedHashes.Count) (MD5, SHA1, SHA256, Authentihash)
+- **Blocked Signers**: $($blockedSigners.Count) (Certificate TBS hashes)
+- **Version Restrictions**: $($blockedVersions.Count) (MaximumFileVersion rules)
+- **Filename Restrictions**: $($blockedFilenames.Count) (FileName rules)
+
+## Analysis Methodology
+This comprehensive analysis follows the Trail of Bits HVCI methodology which checks:
+1. **Hash Matching**: Compares driver hashes (MD5, SHA1, SHA256, Authentihash) against blocked hash lists
+2. **Certificate Validation**: Checks driver certificates against blocked signer TBS hashes
+3. **Version Checking**: Validates driver versions against maximum allowed versions
+4. **Filename Rules**: Applies filename-specific blocking rules
+
+The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy file which contains FileRule entries with Deny rules for various driver attributes.
+"@
+- **XML File**: $($targetXmlFile.Name)
+- **XML File Path**: $($targetXmlFile.FullName)
+- **Local Data Source**: $localJsonPath
+- **Total XML Rules**: $($fileRules.Count)
+- **Extracted Hashes**: $($blockedHashes.Count)
+
+## Results
+- **Total Drivers Analyzed**: $totalDrivers
+The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy file which contains FileRule entries with Deny rules for various driver attributes.
+
+## Hash Distribution in Blocklist
+"@
+        
+        # Add hash distribution statistics
+        $hashStats = $blockedHashes.Values | Group-Object | Sort-Object Name
+        foreach ($stat in $hashStats) {
+            $summaryContent += "`n- **$($stat.Name)**: $($stat.Count) hashes"
+        }
+        
+        # Add certificate distribution statistics
+        if ($blockedSigners.Count -gt 0) {
+            $summaryContent += "`n`n## Certificate/Signer Distribution"
+            $summaryContent += "`n- **Total Blocked Signers**: $($blockedSigners.Count)"
+        }
+        
+        # Add version restriction statistics  
+        if ($blockedVersions.Count -gt 0) {
+            $summaryContent += "`n`n## Version Restrictions"
+            $summaryContent += "`n- **Files with Version Limits**: $($blockedVersions.Count)"
+        }
+        
+        $summaryContent | Out-File -FilePath "hvci_analysis_summary.txt" -Encoding UTF8
+        
+        Write-Host "Comprehensive CSV file created: hvci_drivers.csv"
+        Write-Host "Detailed summary file created: hvci_analysis_summary.txt"
+        Write-Host ""
+        Write-Host "Analysis complete! Found $blockedCount blocked and $allowedCount allowed drivers using comprehensive HVCI methodology."
+        
     - name: Upload CSV
       uses: actions/upload-artifact@v4
       with:
         name: hvci_drivers
-        path: hvci_drivers.csv
+        path: |
+          hvci_drivers.csv
+          hvci_analysis_summary.txt
 
   run_node:
     needs: run_powershell
@@ -146,6 +449,7 @@ jobs:
         import { createInterface } from 'readline';
         
         const DRV_JSON_PATH = './data/drv.json';
+        const FALLBACK_JSON_PATH = './data/drvj.json';
         const CSV_PATH = './hvci_drivers.csv';
         
         async function processCSV() {
@@ -219,7 +523,24 @@ jobs:
         
         async function updateDriversJSON() {
             console.log('Loading drivers database...');
-            const driversData = JSON.parse(fs.readFileSync(DRV_JSON_PATH, 'utf8'));
+            
+            let driversData;
+            let sourceFile;
+            try {
+                driversData = JSON.parse(fs.readFileSync(DRV_JSON_PATH, 'utf8'));
+                sourceFile = DRV_JSON_PATH;
+                console.log(`Loaded drivers from ${DRV_JSON_PATH}`);
+            } catch (error) {
+                console.log(`Failed to load ${DRV_JSON_PATH}, trying fallback...`);
+                try {
+                    driversData = JSON.parse(fs.readFileSync(FALLBACK_JSON_PATH, 'utf8'));
+                    sourceFile = FALLBACK_JSON_PATH;
+                    console.log(`Loaded drivers from ${FALLBACK_JSON_PATH}`);
+                } catch (fallbackError) {
+                    console.error('Failed to load drivers data from both paths');
+                    throw fallbackError;
+                }
+            }
             
             // Clean up any existing HVCI tags that might be present
             console.log('Cleaning up any existing HVCI tags...');
@@ -382,8 +703,9 @@ jobs:
                 totalLoadsTrue: totalHvciPassedCount,
                 totalLoadsFalse: totalHvciBlockedCount,
                 totalLoadsUnknown: totalHvciUnknownCount,
-                source: 'Microsoft HVCI Policy',
-                method: 'LoadsDespiteHVCI property update',
+                source: 'Microsoft Official Vulnerable Driver Blocklist',
+                sourceUrl: 'https://aka.ms/VulnerableDriverBlockList',
+                method: 'LoadsDespiteHVCI property update via XML blocklist',
                 triggerEvent: process.env.GITHUB_EVENT_NAME || 'manual'
             };
             
@@ -391,7 +713,8 @@ jobs:
             let summaryContent = '# HVCI LoadsDespiteHVCI Update Summary\n\n';
             summaryContent += `**Date:** ${new Date().toISOString()}\n`;
             summaryContent += `**Trigger:** ${process.env.GITHUB_EVENT_NAME || 'manual'}\n`;
-            summaryContent += `**Method:** Trail of Bits HVCI Policy Analysis\n`;
+            summaryContent += `**Method:** Microsoft Official Vulnerable Driver Blocklist\n`;
+            summaryContent += `**Blocklist Source:** https://aka.ms/VulnerableDriverBlockList\n`;
             summaryContent += `**Property Updated:** LoadsDespiteHVCI\n`;
             summaryContent += `**Newly Allowed Drivers:** ${newlyPassedCount}\n`;
             summaryContent += `**Newly Blocked Drivers:** ${newlyBlockedCount}\n`;
@@ -401,21 +724,21 @@ jobs:
             summaryContent += `**Total LoadsDespiteHVCI = null/undefined:** ${totalHvciUnknownCount}\n\n`;
             
             summaryContent += '## Analysis Method\n\n';
-            summaryContent += 'This analysis uses the Trail of Bits HVCI check script which:\n';
-            summaryContent += '1. Extracts the actual Microsoft HVCI policy from the system\n';
-            summaryContent += '2. Checks each driver against hash-based rules\n';
-            summaryContent += '3. Validates signer certificate chains\n';
-            summaryContent += '4. Applies version-based blocking rules\n';
-            summaryContent += '5. Determines final allowed/blocked status\n\n';
+            summaryContent += 'This analysis uses the official Microsoft Vulnerable Driver Blocklist which:\n';
+            summaryContent += '1. Downloads the official blocklist from https://aka.ms/VulnerableDriverBlockList\n';
+            summaryContent += '2. Extracts XML files from the ZIP archive\n';
+            summaryContent += '3. Parses XML FileRule entries to extract blocked driver hashes\n';
+            summaryContent += '4. Compares LOLDrivers database against the blocklist\n';
+            summaryContent += '5. Determines blocked/allowed status based on hash matches\n\n';
             summaryContent += '**LoadsDespiteHVCI Logic:**\n';
-            summaryContent += '- Drivers with "Allowed" status → **LoadsDespiteHVCI = "TRUE"**\n';
-            summaryContent += '- Drivers with "Blocked" status → **LoadsDespiteHVCI = "FALSE"**\n';
-            summaryContent += '- Drivers not in analysis results → **LoadsDespiteHVCI = unchanged**\n\n';
+            summaryContent += '- Drivers **NOT** in Microsoft blocklist → **LoadsDespiteHVCI = "TRUE"**\n';
+            summaryContent += '- Drivers **IN** Microsoft blocklist → **LoadsDespiteHVCI = "FALSE"**\n';
+            summaryContent += '- Drivers with insufficient hash data → **LoadsDespiteHVCI = unchanged**\n\n';
             
-            if (changes.newlyPassed.length > 0) {
-                summaryContent += '## Newly Allowed Drivers (LoadsDespiteHVCI = TRUE)\n\n';
-                summaryContent += '*These drivers can load despite HVCI being enabled:*\n\n';
-                changes.newlyPassed.forEach((item, index) => {
+            if (changes.newlyBlocked.length > 0) {
+                summaryContent += '## Newly Blocked Drivers (LoadsDespiteHVCI = FALSE)\n\n';
+                summaryContent += '*These drivers are in the Microsoft blocklist and cannot load with HVCI:*\n\n';
+                changes.newlyBlocked.forEach((item, index) => {
                     summaryContent += `${index + 1}. **${item.driverName}**\n`;
                     summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
                     summaryContent += `   - ${item.hashType}: \`${item.hash}\`\n`;
@@ -424,10 +747,10 @@ jobs:
                 });
             }
             
-            if (changes.newlyBlocked.length > 0) {
-                summaryContent += '## Newly Blocked Drivers (LoadsDespiteHVCI = FALSE)\n\n';
-                summaryContent += '*These drivers are blocked by HVCI and cannot load:*\n\n';
-                changes.newlyBlocked.forEach((item, index) => {
+            if (changes.newlyPassed.length > 0) {
+                summaryContent += '## Newly Allowed Drivers (LoadsDespiteHVCI = TRUE)\n\n';
+                summaryContent += '*These drivers are NOT in the Microsoft blocklist and can load with HVCI:*\n\n';
+                changes.newlyPassed.forEach((item, index) => {
                     summaryContent += `${index + 1}. **${item.driverName}**\n`;
                     summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
                     summaryContent += `   - ${item.hashType}: \`${item.hash}\`\n`;
@@ -438,11 +761,11 @@ jobs:
             
             if (changes.newlyUnknown.length > 0) {
                 summaryContent += '## Newly Detected Unknown Drivers\n\n';
-                summaryContent += '*These drivers were not found in the HVCI policy analysis:*\n\n';
+                summaryContent += '*These drivers have insufficient hash data for blocklist comparison:*\n\n';
                 changes.newlyUnknown.forEach((item, index) => {
                     summaryContent += `${index + 1}. **${item.driverName}**\n`;
                     summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
-                    summaryContent += `   - Status: Not in HVCI policy data\n`;
+                    summaryContent += `   - Status: Insufficient hash data for comparison\n`;
                     summaryContent += `   - Company: ${item.company}\n`;
                     summaryContent += `   - LoadsDespiteHVCI: ${item.newValue}\n\n`;
                 });
@@ -455,14 +778,15 @@ jobs:
             
             fs.writeFileSync('hvci-summary.md', summaryContent);
             
-            // Save updated data
+            // Save updated data to the correct file
+            const targetFile = sourceFile || (fs.existsSync(DRV_JSON_PATH) ? DRV_JSON_PATH : FALLBACK_JSON_PATH);
             const totalChanges = newlyPassedCount + newlyBlockedCount + newlyUnknownCount;
             if (totalChanges > 0 || cleanupCount > 0) {
                 console.log(`Updated LoadsDespiteHVCI for ${totalChanges} drivers (${newlyPassedCount} allowed, ${newlyBlockedCount} blocked, ${newlyUnknownCount} unknown)`);
                 if (cleanupCount > 0) {
                     console.log(`Cleaned up HVCI tags in ${cleanupCount} drivers`);
                 }
-                fs.writeFileSync(DRV_JSON_PATH, JSON.stringify(driversData, null, 2));
+                fs.writeFileSync(targetFile, JSON.stringify(driversData, null, 2));
                 
                 // Set output for GitHub Actions
                 console.log(`::set-output name=changes::${totalChanges}`);
@@ -473,7 +797,7 @@ jobs:
             } else {
                 console.log('No LoadsDespiteHVCI properties to update');
                 // Still update metadata
-                fs.writeFileSync(DRV_JSON_PATH, JSON.stringify(driversData, null, 2));
+                fs.writeFileSync(targetFile, JSON.stringify(driversData, null, 2));
                 console.log(`::set-output name=changes::0`);
                 console.log(`::set-output name=cleanup_count::0`);
             }
@@ -538,17 +862,35 @@ jobs:
     - name: Check for changes
       id: git-check
       run: |
-        git diff --exit-code data/drv.json || echo "changed=true" >> $GITHUB_OUTPUT
+        if [ -f "data/drv.json" ]; then
+          git diff --exit-code data/drv.json || echo "changed=true" >> $GITHUB_OUTPUT
+        elif [ -f "data/drvj.json" ]; then
+          git diff --exit-code data/drvj.json || echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "No JSON file found to check for changes"
+          exit 1
+        fi
         
     - name: Commit and push changes
       if: steps.git-check.outputs.changed == 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add data/drv.json
+        
+        # Add the correct JSON file
+        if [ -f "data/drv.json" ]; then
+          git add data/drv.json
+          JSON_FILE="data/drv.json"
+        elif [ -f "data/drvj.json" ]; then
+          git add data/drvj.json
+          JSON_FILE="data/drvj.json"
+        else
+          echo "No JSON file found to commit"
+          exit 1
+        fi
         
         # Create detailed commit message
-        COMMIT_MSG="Update LoadsDespiteHVCI using Trail of Bits policy analysis"
+        COMMIT_MSG="Update LoadsDespiteHVCI using Microsoft Official Blocklist"
         
         if [ -f "hvci-summary.md" ]; then
           # Extract summary info for commit message
@@ -560,19 +902,22 @@ jobs:
         
         - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         - Triggered by: ${{ github.event_name }}
-        - Method: Trail of Bits HVCI policy extraction
+        - Method: Microsoft Official Vulnerable Driver Blocklist
+        - Source: https://aka.ms/VulnerableDriverBlockList
         - Property updated: LoadsDespiteHVCI
+        - File updated: $JSON_FILE
         - Newly allowed drivers (TRUE): $NEWLY_ALLOWED
         - Newly blocked drivers (FALSE): $NEWLY_BLOCKED
         - Newly detected unknown: $NEWLY_UNKNOWN
         - Cleaned up legacy HVCI tags
-        - Analysis includes hash, signer, and version checks"
+        - Analysis based on official Microsoft XML blocklist"
         else
           COMMIT_MSG="$COMMIT_MSG
         
         - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
         - Triggered by: ${{ github.event_name }}
-        - Method: Trail of Bits HVCI policy extraction"
+        - Method: Microsoft Official Vulnerable Driver Blocklist
+        - Source: https://aka.ms/VulnerableDriverBlockList"
         fi
         
         git commit -m "$COMMIT_MSG"
@@ -604,7 +949,7 @@ jobs:
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
-        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) uses hardware virtualization features to protect kernel mode processes against the injection and execution of malicious or unverified code. This analysis extracts the actual HVCI policy from the system and performs comprehensive checks including hash validation, certificate chain analysis, and version-based rules. The LoadsDespiteHVCI property indicates whether a driver can load despite HVCI being enabled (TRUE) or is blocked by HVCI (FALSE)." >> $GITHUB_STEP_SUMMARY
+        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) uses hardware virtualization features to protect kernel mode processes against the injection and execution of malicious or unverified code. This analysis uses the official Microsoft Vulnerable Driver Blocklist which contains hash-based rules for drivers that are blocked by HVCI. The LoadsDespiteHVCI property indicates whether a driver can load despite HVCI being enabled (TRUE for drivers not in blocklist) or is blocked by HVCI (FALSE for drivers in blocklist)." >> $GITHUB_STEP_SUMMARY
         
     - name: Upload summary artifact
       if: always()
@@ -614,4 +959,5 @@ jobs:
         path: |
           hvci-summary.md
           hvci_drivers.csv
+          hvci_analysis_summary.txt
         retention-days: 30

@@ -1,0 +1,617 @@
+name: "HVCI Tag Update"
+
+on:
+  schedule:
+    # Runs weekly on Mondays at 02:00 UTC
+    - cron: '0 2 * * 1'
+  workflow_dispatch: # Allow manual trigger
+  workflow_run:
+    workflows: ["Update LOLDrivers Data"]  # Name of the data update workflow
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  run_powershell:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    - name: Run PowerShell script
+      run: |
+        # Download and run the Trail of Bits HVCI check script
+        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1" -OutFile "check_allowed_drivers.ps1"
+        $output = ./check_allowed_drivers.ps1
+        
+        # Parse the output and create a structured CSV
+        $lines = $output -split "`n"
+        $inAllowedSection = $false
+        $allowedDrivers = @()
+        $blockedDrivers = @()
+        
+        # First, get the LOLDrivers data to identify all hashes
+        $loldrivers = Invoke-WebRequest -Uri https://www.loldrivers.io/api/drivers.json | ConvertFrom-Json -AsHashTable
+        $allDriverHashes = @{}
+        
+        foreach ($driver in $loldrivers.KnownVulnerableSamples) {
+            $hashes = @($driver.MD5, $driver.SHA1, $driver.SHA256)
+            foreach ($hash in $hashes) {
+                if ($hash) {
+                    $allDriverHashes["$($driver.MD5):$($driver.SHA1):$($driver.SHA256)"] = $true
+                }
+            }
+        }
+        
+        # Parse allowed drivers from Trail of Bits output
+        foreach ($line in $lines) {
+            if ($line -match "^Allowed drivers:") {
+                $inAllowedSection = $true
+                continue
+            }
+            if ($inAllowedSection -and $line -match "MD5:(\w+) SHA1:(\w+) SHA256:(\w+)") {
+                $allowedDrivers += [PSCustomObject]@{
+                    MD5 = $matches[1]
+                    SHA1 = $matches[2] 
+                    SHA256 = $matches[3]
+                    Status = "Allowed"
+                }
+            }
+        }
+        
+        # Identify blocked drivers (those in LOLDrivers but NOT in allowed list)
+        $allowedHashSet = @{}
+        foreach ($allowed in $allowedDrivers) {
+            $allowedHashSet["$($allowed.MD5):$($allowed.SHA1):$($allowed.SHA256)"] = $true
+        }
+        
+        foreach ($hashKey in $allDriverHashes.Keys) {
+            if (-not $allowedHashSet.ContainsKey($hashKey)) {
+                $hashParts = $hashKey -split ":"
+                $blockedDrivers += [PSCustomObject]@{
+                    MD5 = $hashParts[0]
+                    SHA1 = $hashParts[1]
+                    SHA256 = $hashParts[2]
+                    Status = "Blocked"
+                }
+            }
+        }
+        
+        # Output summary
+        $totalOutput = $output | Out-String
+        if ($totalOutput -match "Number of blocked drivers: (\d+)") {
+            Write-Host "Found $($matches[1]) blocked drivers from Trail of Bits analysis"
+        }
+        if ($totalOutput -match "Number of allowed drivers: (\d+)") {
+            Write-Host "Found $($matches[1]) allowed drivers from Trail of Bits analysis"
+        }
+        Write-Host "Parsed $($allowedDrivers.Count) allowed and $($blockedDrivers.Count) blocked drivers for CSV"
+        
+        # Create CSV with both allowed and blocked results
+        $csvContent = "MD5,SHA1,SHA256,Status`n"
+        foreach ($driver in $allowedDrivers) {
+            $csvContent += "$($driver.MD5),$($driver.SHA1),$($driver.SHA256),$($driver.Status)`n"
+        }
+        foreach ($driver in $blockedDrivers) {
+            $csvContent += "$($driver.MD5),$($driver.SHA1),$($driver.SHA256),$($driver.Status)`n"
+        }
+        
+        # Write CSV file
+        $csvContent | Out-File -FilePath "hvci_drivers.csv" -Encoding UTF8
+        
+    - name: Upload CSV
+      uses: actions/upload-artifact@v4
+      with:
+        name: hvci_drivers
+        path: hvci_drivers.csv
+
+  run_node:
+    needs: run_powershell
+    runs-on: ubuntu-latest
+    # Only run if previous workflow succeeded, or if triggered manually/by cron
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+        
+    - name: Download CSV
+      uses: actions/download-artifact@v4
+      with:
+        name: hvci_drivers
+        path: ./
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Create HVCI tagging script
+      run: |
+        cat > hvci-tagger.js << 'EOF'
+        #!/usr/bin/env node
+        
+        import fs from 'fs';
+        import { createReadStream } from 'fs';
+        import { createInterface } from 'readline';
+        
+        const DRV_JSON_PATH = './data/drv.json';
+        const CSV_PATH = './hvci_drivers.csv';
+        
+        async function processCSV() {
+            console.log('Reading HVCI CSV results...');
+            
+            const allowedHashes = new Set();
+            const blockedHashes = new Set();
+            const hashDetails = new Map(); // Store hash -> details mapping
+            
+            // Check if CSV exists and has content
+            if (!fs.existsSync(CSV_PATH)) {
+                console.log('No CSV file found, assuming no HVCI status available');
+                return { allowedHashes, blockedHashes, hashDetails };
+            }
+            
+            const fileStream = createReadStream(CSV_PATH);
+            const rl = createInterface({
+                input: fileStream,
+                crlfDelay: Infinity
+            });
+            
+            let lineNumber = 0;
+            for await (const line of rl) {
+                lineNumber++;
+                if (lineNumber === 1) continue; // Skip header
+                
+                const columns = line.split(',');
+                if (columns.length >= 4) {
+                    const md5 = columns[0]?.replace(/"/g, '').trim();
+                    const sha1 = columns[1]?.replace(/"/g, '').trim();
+                    const sha256 = columns[2]?.replace(/"/g, '').trim();
+                    const status = columns[3]?.replace(/"/g, '').trim();
+                    
+                    const hashes = [md5, sha1, sha256].filter(Boolean);
+                    
+                    hashes.forEach(hash => {
+                        if (hash) {
+                            const lowerHash = hash.toLowerCase();
+                            hashDetails.set(lowerHash, {
+                                md5, sha1, sha256, status,
+                                type: hash === md5 ? 'MD5' : hash === sha1 ? 'SHA1' : 'SHA256'
+                            });
+                            
+                            if (status === 'Allowed') {
+                                allowedHashes.add(lowerHash);
+                            } else if (status === 'Blocked') {
+                                blockedHashes.add(lowerHash);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            console.log(`Found ${allowedHashes.size} allowed hashes and ${blockedHashes.size} blocked hashes from HVCI policy`);
+            return { allowedHashes, blockedHashes, hashDetails };
+        }
+        
+        function getDriverDisplayName(driver, sample) {
+            // Get the best available name for the driver
+            if (sample.Filename) return sample.Filename;
+            if (sample.OriginalFilename) return sample.OriginalFilename;
+            if (driver.Tags && driver.Tags.length > 0) {
+                // Find a meaningful tag (not just HVCI tags)
+                const meaningfulTag = driver.Tags.find(tag => 
+                    !tag.includes('HVCI') && tag.length > 3
+                );
+                if (meaningfulTag) return meaningfulTag;
+            }
+            return 'Unknown Driver';
+        }
+        
+        async function updateDriversJSON() {
+            console.log('Loading drivers database...');
+            const driversData = JSON.parse(fs.readFileSync(DRV_JSON_PATH, 'utf8'));
+            
+            // Clean up any existing HVCI tags that might be present
+            console.log('Cleaning up any existing HVCI tags...');
+            let cleanupCount = 0;
+            driversData.forEach(driver => {
+                if (driver.Tags && Array.isArray(driver.Tags)) {
+                    const originalLength = driver.Tags.length;
+                    
+                    // Remove any HVCI tags since we now use LoadsDespiteHVCI property
+                    driver.Tags = driver.Tags.filter(tag => 
+                        !tag.toLowerCase().includes('hvci')
+                    );
+                    
+                    if (originalLength !== driver.Tags.length) {
+                        cleanupCount++;
+                        console.log(`Removed ${originalLength - driver.Tags.length} HVCI tags from driver ${driver.Id}`);
+                    }
+                }
+            });
+            
+            console.log(`Cleaned up HVCI tags in ${cleanupCount} drivers (now using LoadsDespiteHVCI property)`);
+            
+            const { allowedHashes, blockedHashes, hashDetails } = await processCSV();
+            
+            let newlyPassedCount = 0;
+            let newlyBlockedCount = 0;
+            let newlyUnknownCount = 0;
+            let totalHvciPassedCount = 0;
+            let totalHvciBlockedCount = 0;
+            let totalHvciUnknownCount = 0;
+            
+            const changes = {
+                newlyPassed: [],
+                newlyBlocked: [],
+                newlyUnknown: [],
+                summary: []
+            };
+            
+            driversData.forEach(driver => {
+                if (driver.KnownVulnerableSamples) {
+                    driver.KnownVulnerableSamples.forEach(sample => {
+                        const sampleHashes = [
+                            sample.MD5?.toLowerCase(),
+                            sample.SHA1?.toLowerCase(), 
+                            sample.SHA256?.toLowerCase(),
+                            sample.Authentihash?.MD5?.toLowerCase(),
+                            sample.Authentihash?.SHA1?.toLowerCase(),
+                            sample.Authentihash?.SHA256?.toLowerCase()
+                        ].filter(Boolean);
+                        
+                        let isAllowed = false;
+                        let isBlocked = false;
+                        let matchedHash = null;
+                        let matchedHashType = null;
+                        
+                        // Check if any hash is in the allowed or blocked lists
+                        for (const hash of sampleHashes) {
+                            if (allowedHashes.has(hash)) {
+                                isAllowed = true;
+                                matchedHash = hash;
+                                matchedHashType = hashDetails.get(hash)?.type || 'Unknown';
+                                break;
+                            }
+                            if (blockedHashes.has(hash)) {
+                                isBlocked = true;
+                                matchedHash = hash;
+                                matchedHashType = hashDetails.get(hash)?.type || 'Unknown';
+                                break;
+                            }
+                        }
+                        
+                        // HVCI LoadsDespiteHVCI logic:
+                        // - If driver has Allowed status → "LoadsDespiteHVCI": "TRUE"
+                        // - If driver has Blocked status → "LoadsDespiteHVCI": "FALSE"
+                        // - If driver is not in CSV → leave as is or set to null
+                        
+                        const currentLoadsDespiteHVCI = sample.LoadsDespiteHVCI;
+                        let newLoadsDespiteHVCI = null;
+                        
+                        if (isAllowed) {
+                            // Driver is allowed by HVCI policy
+                            newLoadsDespiteHVCI = "TRUE";
+                            if (currentLoadsDespiteHVCI !== "TRUE") {
+                                newlyPassedCount++;
+                                const driverName = getDriverDisplayName(driver, sample);
+                                changes.newlyPassed.push({
+                                    driverId: driver.Id,
+                                    driverName,
+                                    hash: matchedHash.toUpperCase(),
+                                    hashType: matchedHashType,
+                                    company: sample.Company || 'Unknown',
+                                    previousValue: currentLoadsDespiteHVCI || 'null',
+                                    newValue: 'TRUE'
+                                });
+                            }
+                            
+                        } else if (isBlocked) {
+                            // Driver is blocked by HVCI policy
+                            newLoadsDespiteHVCI = "FALSE";
+                            if (currentLoadsDespiteHVCI !== "FALSE") {
+                                newlyBlockedCount++;
+                                const driverName = getDriverDisplayName(driver, sample);
+                                changes.newlyBlocked.push({
+                                    driverId: driver.Id,
+                                    driverName,
+                                    hash: matchedHash.toUpperCase(),
+                                    hashType: matchedHashType,
+                                    company: sample.Company || 'Unknown',
+                                    previousValue: currentLoadsDespiteHVCI || 'null',
+                                    newValue: 'FALSE'
+                                });
+                            }
+                            
+                        } else {
+                            // Driver is not in CSV, leave LoadsDespiteHVCI as is
+                            if (currentLoadsDespiteHVCI === undefined || currentLoadsDespiteHVCI === null) {
+                                newlyUnknownCount++;
+                                const driverName = getDriverDisplayName(driver, sample);
+                                const firstHash = sampleHashes[0] || 'Unknown';
+                                changes.newlyUnknown.push({
+                                    driverId: driver.Id,
+                                    driverName,
+                                    hash: firstHash.toUpperCase(),
+                                    hashType: 'N/A',
+                                    company: sample.Company || 'Unknown',
+                                    previousValue: 'undefined',
+                                    newValue: 'unchanged'
+                                });
+                            }
+                        }
+                        
+                        // Update the LoadsDespiteHVCI property if needed
+                        if (newLoadsDespiteHVCI !== null) {
+                            sample.LoadsDespiteHVCI = newLoadsDespiteHVCI;
+                        }
+                        
+                        // Count totals
+                        if (sample.LoadsDespiteHVCI === "TRUE") {
+                            totalHvciPassedCount++;
+                        }
+                        if (sample.LoadsDespiteHVCI === "FALSE") {
+                            totalHvciBlockedCount++;
+                        }
+                        if (sample.LoadsDespiteHVCI === undefined || sample.LoadsDespiteHVCI === null) {
+                            totalHvciUnknownCount++;
+                        }
+                    });
+                }
+            });
+            
+            // Add metadata
+            if (!driversData._metadata) {
+                driversData._metadata = {};
+            }
+            driversData._metadata.hvciCheck = {
+                lastCheck: new Date().toISOString(),
+                newlyAllowedDrivers: newlyPassedCount,
+                newlyBlockedDrivers: newlyBlockedCount,
+                newlyUnknownDrivers: newlyUnknownCount,
+                totalLoadsTrue: totalHvciPassedCount,
+                totalLoadsFalse: totalHvciBlockedCount,
+                totalLoadsUnknown: totalHvciUnknownCount,
+                source: 'Microsoft HVCI Policy',
+                method: 'LoadsDespiteHVCI property update',
+                triggerEvent: process.env.GITHUB_EVENT_NAME || 'manual'
+            };
+            
+            // Create detailed summary
+            let summaryContent = '# HVCI LoadsDespiteHVCI Update Summary\n\n';
+            summaryContent += `**Date:** ${new Date().toISOString()}\n`;
+            summaryContent += `**Trigger:** ${process.env.GITHUB_EVENT_NAME || 'manual'}\n`;
+            summaryContent += `**Method:** Trail of Bits HVCI Policy Analysis\n`;
+            summaryContent += `**Property Updated:** LoadsDespiteHVCI\n`;
+            summaryContent += `**Newly Allowed Drivers:** ${newlyPassedCount}\n`;
+            summaryContent += `**Newly Blocked Drivers:** ${newlyBlockedCount}\n`;
+            summaryContent += `**Newly Unknown Drivers:** ${newlyUnknownCount}\n`;
+            summaryContent += `**Total LoadsDespiteHVCI = TRUE:** ${totalHvciPassedCount}\n`;
+            summaryContent += `**Total LoadsDespiteHVCI = FALSE:** ${totalHvciBlockedCount}\n`;
+            summaryContent += `**Total LoadsDespiteHVCI = null/undefined:** ${totalHvciUnknownCount}\n\n`;
+            
+            summaryContent += '## Analysis Method\n\n';
+            summaryContent += 'This analysis uses the Trail of Bits HVCI check script which:\n';
+            summaryContent += '1. Extracts the actual Microsoft HVCI policy from the system\n';
+            summaryContent += '2. Checks each driver against hash-based rules\n';
+            summaryContent += '3. Validates signer certificate chains\n';
+            summaryContent += '4. Applies version-based blocking rules\n';
+            summaryContent += '5. Determines final allowed/blocked status\n\n';
+            summaryContent += '**LoadsDespiteHVCI Logic:**\n';
+            summaryContent += '- Drivers with "Allowed" status → **LoadsDespiteHVCI = "TRUE"**\n';
+            summaryContent += '- Drivers with "Blocked" status → **LoadsDespiteHVCI = "FALSE"**\n';
+            summaryContent += '- Drivers not in analysis results → **LoadsDespiteHVCI = unchanged**\n\n';
+            
+            if (changes.newlyPassed.length > 0) {
+                summaryContent += '## Newly Allowed Drivers (LoadsDespiteHVCI = TRUE)\n\n';
+                summaryContent += '*These drivers can load despite HVCI being enabled:*\n\n';
+                changes.newlyPassed.forEach((item, index) => {
+                    summaryContent += `${index + 1}. **${item.driverName}**\n`;
+                    summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
+                    summaryContent += `   - ${item.hashType}: \`${item.hash}\`\n`;
+                    summaryContent += `   - Company: ${item.company}\n`;
+                    summaryContent += `   - Previous: ${item.previousValue} → New: ${item.newValue}\n\n`;
+                });
+            }
+            
+            if (changes.newlyBlocked.length > 0) {
+                summaryContent += '## Newly Blocked Drivers (LoadsDespiteHVCI = FALSE)\n\n';
+                summaryContent += '*These drivers are blocked by HVCI and cannot load:*\n\n';
+                changes.newlyBlocked.forEach((item, index) => {
+                    summaryContent += `${index + 1}. **${item.driverName}**\n`;
+                    summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
+                    summaryContent += `   - ${item.hashType}: \`${item.hash}\`\n`;
+                    summaryContent += `   - Company: ${item.company}\n`;
+                    summaryContent += `   - Previous: ${item.previousValue} → New: ${item.newValue}\n\n`;
+                });
+            }
+            
+            if (changes.newlyUnknown.length > 0) {
+                summaryContent += '## Newly Detected Unknown Drivers\n\n';
+                summaryContent += '*These drivers were not found in the HVCI policy analysis:*\n\n';
+                changes.newlyUnknown.forEach((item, index) => {
+                    summaryContent += `${index + 1}. **${item.driverName}**\n`;
+                    summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
+                    summaryContent += `   - Status: Not in HVCI policy data\n`;
+                    summaryContent += `   - Company: ${item.company}\n`;
+                    summaryContent += `   - LoadsDespiteHVCI: ${item.newValue}\n\n`;
+                });
+            }
+            
+            if (changes.newlyPassed.length === 0 && changes.newlyBlocked.length === 0 && changes.newlyUnknown.length === 0) {
+                summaryContent += '## No Changes\n\nNo LoadsDespiteHVCI properties were updated in this run.\n';
+                summaryContent += 'All drivers already have current HVCI policy status.\n';
+            }
+            
+            fs.writeFileSync('hvci-summary.md', summaryContent);
+            
+            // Save updated data
+            const totalChanges = newlyPassedCount + newlyBlockedCount + newlyUnknownCount;
+            if (totalChanges > 0 || cleanupCount > 0) {
+                console.log(`Updated LoadsDespiteHVCI for ${totalChanges} drivers (${newlyPassedCount} allowed, ${newlyBlockedCount} blocked, ${newlyUnknownCount} unknown)`);
+                if (cleanupCount > 0) {
+                    console.log(`Cleaned up HVCI tags in ${cleanupCount} drivers`);
+                }
+                fs.writeFileSync(DRV_JSON_PATH, JSON.stringify(driversData, null, 2));
+                
+                // Set output for GitHub Actions
+                console.log(`::set-output name=changes::${totalChanges}`);
+                console.log(`::set-output name=newly_allowed::${newlyPassedCount}`);
+                console.log(`::set-output name=newly_blocked::${newlyBlockedCount}`);
+                console.log(`::set-output name=newly_unknown::${newlyUnknownCount}`);
+                console.log(`::set-output name=cleanup_count::${cleanupCount}`);
+            } else {
+                console.log('No LoadsDespiteHVCI properties to update');
+                // Still update metadata
+                fs.writeFileSync(DRV_JSON_PATH, JSON.stringify(driversData, null, 2));
+                console.log(`::set-output name=changes::0`);
+                console.log(`::set-output name=cleanup_count::0`);
+            }
+            
+            console.log(`Total LoadsDespiteHVCI status: ${totalHvciPassedCount} TRUE, ${totalHvciBlockedCount} FALSE, ${totalHvciUnknownCount} null/undefined`);
+        }
+        
+        updateDriversJSON().catch(console.error);
+        EOF
+        
+    - name: Execute HVCI tagging script
+      id: hvci-check
+      run: node hvci-tagger.js
+      
+    - name: Display results
+      run: |
+        echo "=========================================="
+        echo "           HVCI UPDATE RESULTS"
+        echo "=========================================="
+        if [ -f "hvci-summary.md" ]; then
+          echo "HVCI check completed successfully!"
+          echo ""
+          
+          # Extract key metrics from summary
+          if grep -q "Newly Allowed Drivers:" hvci-summary.md; then
+            NEWLY_ALLOWED=$(grep "Newly Allowed Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Newly allowed drivers (LoadsDespiteHVCI = TRUE): $NEWLY_ALLOWED"
+          fi
+          
+          if grep -q "Newly Blocked Drivers:" hvci-summary.md; then
+            NEWLY_BLOCKED=$(grep "Newly Blocked Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Newly blocked drivers (LoadsDespiteHVCI = FALSE): $NEWLY_BLOCKED"
+          fi
+          
+          if grep -q "Newly Unknown Drivers:" hvci-summary.md; then
+            NEWLY_UNKNOWN=$(grep "Newly Unknown Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Newly unknown drivers: $NEWLY_UNKNOWN"
+          fi
+          
+          if grep -q "Total LoadsDespiteHVCI = TRUE:" hvci-summary.md; then
+            TOTAL_TRUE=$(grep "Total LoadsDespiteHVCI = TRUE:" hvci-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Total LoadsDespiteHVCI = TRUE: $TOTAL_TRUE"
+          fi
+          
+          if grep -q "Total LoadsDespiteHVCI = FALSE:" hvci-summary.md; then
+            TOTAL_FALSE=$(grep "Total LoadsDespiteHVCI = FALSE:" hvci-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Total LoadsDespiteHVCI = FALSE: $TOTAL_FALSE"
+          fi
+          
+          if grep -q "Total LoadsDespiteHVCI = null/undefined:" hvci-summary.md; then
+            TOTAL_NULL=$(grep "Total LoadsDespiteHVCI = null/undefined:" hvci-summary.md | grep -o '[0-9]\+' | head -1)
+            echo "Total LoadsDespiteHVCI = null/undefined: $TOTAL_NULL"
+          fi
+          
+          echo ""
+          echo "Detailed summary available in workflow summary."
+        else
+          echo "No summary file generated - check may have failed"
+        fi
+        echo "=========================================="
+      
+    - name: Check for changes
+      id: git-check
+      run: |
+        git diff --exit-code data/drv.json || echo "changed=true" >> $GITHUB_OUTPUT
+        
+    - name: Commit and push changes
+      if: steps.git-check.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/drv.json
+        
+        # Create detailed commit message
+        COMMIT_MSG="Update LoadsDespiteHVCI using Trail of Bits policy analysis"
+        
+        if [ -f "hvci-summary.md" ]; then
+          # Extract summary info for commit message
+          NEWLY_ALLOWED=$(grep "Newly Allowed Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1 || echo "0")
+          NEWLY_BLOCKED=$(grep "Newly Blocked Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1 || echo "0")
+          NEWLY_UNKNOWN=$(grep "Newly Unknown Drivers:" hvci-summary.md | grep -o '[0-9]\+' | head -1 || echo "0")
+          
+          COMMIT_MSG="$COMMIT_MSG
+        
+        - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - Triggered by: ${{ github.event_name }}
+        - Method: Trail of Bits HVCI policy extraction
+        - Property updated: LoadsDespiteHVCI
+        - Newly allowed drivers (TRUE): $NEWLY_ALLOWED
+        - Newly blocked drivers (FALSE): $NEWLY_BLOCKED
+        - Newly detected unknown: $NEWLY_UNKNOWN
+        - Cleaned up legacy HVCI tags
+        - Analysis includes hash, signer, and version checks"
+        else
+          COMMIT_MSG="$COMMIT_MSG
+        
+        - Updated $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        - Triggered by: ${{ github.event_name }}
+        - Method: Trail of Bits HVCI policy extraction"
+        fi
+        
+        git commit -m "$COMMIT_MSG"
+        
+        echo "Pushing changes..."
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Create workflow summary
+      run: |
+        echo "## HVCI LoadsDespiteHVCI Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          echo "**Previous workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous workflow status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "**Source:** [Trail of Bits HVCI Analysis](https://github.com/trailofbits/HVCI-loldrivers-check)" >> $GITHUB_STEP_SUMMARY
+        echo "**Property Updated:** LoadsDespiteHVCI" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Add detailed results from the check script
+        if [ -f "hvci-summary.md" ]; then
+          cat hvci-summary.md >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No summary file generated - check may have failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "**About HVCI**: Hypervisor-protected Code Integrity (HVCI) uses hardware virtualization features to protect kernel mode processes against the injection and execution of malicious or unverified code. This analysis extracts the actual HVCI policy from the system and performs comprehensive checks including hash validation, certificate chain analysis, and version-based rules. The LoadsDespiteHVCI property indicates whether a driver can load despite HVCI being enabled (TRUE) or is blocked by HVCI (FALSE)." >> $GITHUB_STEP_SUMMARY
+        
+    - name: Upload summary artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: hvci-update-summary
+        path: |
+          hvci-summary.md
+          hvci_drivers.csv
+        retention-days: 30
