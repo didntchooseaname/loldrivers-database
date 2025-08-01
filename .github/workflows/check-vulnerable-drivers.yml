@@ -296,6 +296,10 @@ jobs:
                     } else {
                         $allowedDrivers += $driverResult
                         $allowedCount++
+                    }
+                }
+            }
+        }
         
         # Output comprehensive analysis summary
         Write-Host "=========================================="
@@ -466,20 +470,30 @@ jobs:
                 if (lineNumber === 1) continue; // Skip header
                 
                 const columns = line.split(',');
-                if (columns.length >= 4) {
+                // New CSV format: MD5,SHA1,SHA256,AuthentiMD5,AuthentiSHA1,AuthentiSHA256,Status,BlockReason,MatchedDetail,MatchedType,DriverId,Company,Filename,OriginalFilename,FileVersion,Description
+                if (columns.length >= 7) {
                     const md5 = columns[0]?.replace(/"/g, '').trim();
                     const sha1 = columns[1]?.replace(/"/g, '').trim();
                     const sha256 = columns[2]?.replace(/"/g, '').trim();
-                    const status = columns[3]?.replace(/"/g, '').trim();
+                    const authentiMD5 = columns[3]?.replace(/"/g, '').trim();
+                    const authentiSHA1 = columns[4]?.replace(/"/g, '').trim();
+                    const authentiSHA256 = columns[5]?.replace(/"/g, '').trim();
+                    const status = columns[6]?.replace(/"/g, '').trim();
                     
-                    const hashes = [md5, sha1, sha256].filter(Boolean);
+                    // Collect all hashes (including Authentihash)
+                    const hashes = [md5, sha1, sha256, authentiMD5, authentiSHA1, authentiSHA256].filter(hash => hash && hash !== 'N/A');
                     
                     hashes.forEach(hash => {
                         if (hash) {
                             const lowerHash = hash.toLowerCase();
                             hashDetails.set(lowerHash, {
-                                md5, sha1, sha256, status,
-                                type: hash === md5 ? 'MD5' : hash === sha1 ? 'SHA1' : 'SHA256'
+                                md5, sha1, sha256, authentiMD5, authentiSHA1, authentiSHA256, status,
+                                type: hash === md5 ? 'MD5' : 
+                                      hash === sha1 ? 'SHA1' : 
+                                      hash === sha256 ? 'SHA256' :
+                                      hash === authentiMD5 ? 'AuthentiMD5' :
+                                      hash === authentiSHA1 ? 'AuthentiSHA1' :
+                                      hash === authentiSHA256 ? 'AuthentiSHA256' : 'Unknown'
                             });
                             
                             if (status === 'Allowed') {
