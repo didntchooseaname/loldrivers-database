@@ -470,6 +470,18 @@ export default function DriversClient({
       if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
       if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
       
+      // Behavioral filters
+      if (activeFilters.has('memory-manipulator')) url.searchParams.set('memory-manipulator', 'true');
+      if (activeFilters.has('process-killer')) url.searchParams.set('process-killer', 'true');
+      if (activeFilters.has('debug-bypass')) url.searchParams.set('debug-bypass', 'true');
+      if (activeFilters.has('registry-manipulator')) url.searchParams.set('registry-manipulator', 'true');
+      if (activeFilters.has('file-manipulator')) url.searchParams.set('file-manipulator', 'true');
+      
+      // Architecture filters
+      if (activeFilters.has('architecture-AMD64')) url.searchParams.set('architecture', 'AMD64');
+      if (activeFilters.has('architecture-I386')) url.searchParams.set('architecture', 'I386');
+      if (activeFilters.has('architecture-ARM64')) url.searchParams.set('architecture', 'ARM64');
+      
       // Add current page if not page 1
       if (currentPage > 1) {
         url.searchParams.set('page', currentPage.toString());
