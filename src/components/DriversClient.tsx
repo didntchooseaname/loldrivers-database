@@ -75,7 +75,9 @@ export default function DriversClient({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showHelpPopup, setShowHelpPopup] = useState(false);
+  const [showFilterHelpPopup, setShowFilterHelpPopup] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
+  const [showFilterHelpScrollIndicator, setShowFilterHelpScrollIndicator] = useState(true);
   
   // États de pagination
   const [currentPage, setCurrentPage] = useState(initialParams.currentPage);
@@ -509,6 +511,17 @@ export default function DriversClient({
     if (helpPopup) {
       helpPopup.scrollTo({
         top: helpPopup.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  // Function to scroll to bottom of filter help popup
+  const scrollFilterHelpToBottom = useCallback(() => {
+    const filterHelpPopup = document.querySelectorAll('.help-popup')[1] as HTMLDivElement; // Second popup (filter help)
+    if (filterHelpPopup) {
+      filterHelpPopup.scrollTo({
+        top: filterHelpPopup.scrollHeight,
         behavior: 'smooth'
       });
     }
@@ -1181,12 +1194,12 @@ export default function DriversClient({
     if (!commands || !commands.Description) return null;
     
     return (
-      <div className="command-field">
-        <div className="command-field-header">
+      <div className="simple-section">
+        <div className="simple-section-header">
           <i className="fas fa-file-text"></i>
-          <strong>Description</strong>
+          <span className="simple-section-title">Description</span>
         </div>
-        <div className="command-field-content">{commands.Description}</div>
+        <div className="simple-section-content">{commands.Description}</div>
       </div>
     );
   };
@@ -1375,8 +1388,8 @@ export default function DriversClient({
             <button 
               className="help-button" 
               onClick={() => setShowHelpPopup(true)}
-              aria-label="Aide - Définitions des termes"
-              title="Aide - Définitions des termes"
+              aria-label="Help - Technical Definitions"
+              title="Help - Technical Definitions"
             >
               <i className="fas fa-question-circle"></i>
             </button>
@@ -1514,6 +1527,13 @@ export default function DriversClient({
               disabled={!searchQuery.trim() && activeFilters.size === 0}
             >
               <i className="fas fa-times"></i> Clear Filters
+            </button>
+            <button 
+              className="filter-btn help-filter-btn"
+              onClick={() => setShowFilterHelpPopup(true)}
+              title="How filters work"
+            >
+              <i className="fas fa-question-circle"></i> Filter Help
             </button>
           </div>
         </div>
@@ -1867,6 +1887,191 @@ export default function DriversClient({
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     scrollHelpToBottom();
+                  }
+                }}
+                aria-label="Scroll to bottom for more information"
+              >
+                <i className="fas fa-chevron-down"></i>
+                <span>Scroll for more information</span>
+                <i className="fas fa-chevron-down"></i>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Filter Help Popup */}
+      {showFilterHelpPopup && (
+        <div className="help-popup-overlay" onClick={() => {
+          setShowFilterHelpPopup(false);
+          setShowFilterHelpScrollIndicator(true); // Reset scroll indicator when closing
+        }}>
+          <div 
+            className="help-popup" 
+            onClick={(e) => e.stopPropagation()}
+            onScroll={(e) => {
+              const element = e.target as HTMLDivElement;
+              const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
+              setShowFilterHelpScrollIndicator(!isAtBottom);
+              
+              // Hide scroll indicator as soon as user starts scrolling
+              if (element.scrollTop > 0) {
+                setShowFilterHelpScrollIndicator(false);
+              }
+            }}
+          >
+            <button 
+              className="help-popup-close"
+              onClick={() => {
+                setShowFilterHelpPopup(false);
+                setShowFilterHelpScrollIndicator(true); // Reset scroll indicator when closing
+              }}
+              aria-label="Close filter help"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+            
+            <h3>
+              <i className="fas fa-filter"></i> Filter Help - How Each Filter Works
+            </h3>
+            
+            <div className="help-intro">
+              <p>
+                <strong>Information Notice:</strong> This implementation was inspired by the work from loldrivers.com for the HVCI check functionality, but their implementation wasn't accurate. Unlike the Trail of Bits script that compares against a local version of the driver blocklist, our HVCI check uses Microsoft's direct link to the vulnerable driver blocklist for more precise comparison and testing.
+              </p>
+              <p>
+                <strong>Reference:</strong> Trail of Bits script: <a href="https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1" target="_blank" rel="noopener noreferrer">check_allowed_drivers.ps1</a>
+              </p>
+              <p>
+                <strong>Microsoft Blocklist:</strong> <a href="https://aka.ms/VulnerableDriverBlockList" target="_blank" rel="noopener noreferrer">https://aka.ms/VulnerableDriverBlockList</a>
+              </p>
+            </div>
+            
+            <div className="help-section">
+              <h4><i className="fas fa-check"></i> HVCI PASSED Filter</h4>
+              <p>
+                <strong>What it does:</strong> Shows only drivers that are compatible with Hypervisor-protected Code Integrity (HVCI) and are NOT present in Microsoft's vulnerable driver blocklist.
+              </p>
+              <p>
+                <strong>Technical Details:</strong> This filter uses a GitHub Action workflow that automatically fetches Microsoft's official vulnerable driver blocklist from <code>https://aka.ms/VulnerableDriverBlockList</code> and cross-references it with our driver database. The check runs on a scheduled basis to ensure up-to-date results.
+              </p>
+              <p>
+                <strong>Use Case:</strong> Identify drivers that can safely run on systems with HVCI enabled, which is crucial for Windows 11 and enterprise security configurations.
+              </p>
+              <p>
+                <strong>GitHub Workflow:</strong> The automated process downloads the latest XML blocklist, parses the driver hashes, and marks drivers accordingly. This ensures real-time accuracy compared to static local lists.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-skull-crossbones"></i> Killer Drivers Filter</h4>
+              <p>
+                <strong>What it does:</strong> Displays drivers that are known to be exploitable and have been used in real-world attacks.
+              </p>
+              <p>
+                <strong>Technical Details:</strong> These are legitimate drivers with security vulnerabilities that attackers exploit to gain elevated privileges or perform malicious actions. They're catalogued based on public threat intelligence and security research.
+              </p>
+              <p>
+                <strong>Attack Vector:</strong> Commonly used in BYOVD (Bring Your Own Vulnerable Driver) attacks where attackers load these legitimate-but-vulnerable drivers to bypass security controls.
+              </p>
+              <p>
+                <strong>Detection:</strong> Security teams can use this filter to identify potentially dangerous drivers in their environment and prioritize them for blocking or monitoring.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-certificate"></i> Trusted Certificate Filter</h4>
+              <p>
+                <strong>What it does:</strong> Shows drivers signed by well-established Certificate Authorities like Microsoft, GlobalSign, DigiCert, VeriSign, and other recognized issuers.
+              </p>
+              <p>
+                <strong>Certificate Validation:</strong> The system analyzes the certificate chain and issuer information to determine if the signing authority is from a trusted root CA.
+              </p>
+              <p>
+                <strong>Business Logic:</strong> Mutually exclusive with "Unknown Certificate" filter - you can only select one at a time since a certificate cannot be both trusted and untrusted.
+              </p>
+              <p>
+                <strong>Security Note:</strong> While a trusted certificate indicates legitimate signing, it doesn't guarantee the driver is safe - legitimate certificates can sign vulnerable or malicious drivers.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-exclamation-triangle"></i> Unknown Certificate Filter</h4>
+              <p>
+                <strong>What it does:</strong> Displays drivers with certificates that are expired, self-signed, revoked, or issued by unrecognized Certificate Authorities.
+              </p>
+              <p>
+                <strong>Risk Assessment:</strong> These drivers require additional scrutiny as their certificate chain cannot be validated through standard trust mechanisms.
+              </p>
+              <p>
+                <strong>Common Scenarios:</strong> Self-signed certificates, expired certificates, certificates from compromised CAs, or test certificates that made it into production.
+              </p>
+              <p>
+                <strong>Mutual Exclusivity:</strong> Cannot be used simultaneously with "Trusted Certificate" filter due to conflicting logic.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-clock"></i> Recent Certificates Filter</h4>
+              <p>
+                <strong>What it does:</strong> Shows drivers whose signing certificates were issued within a recent timeframe (typically last 3-6 months).
+              </p>
+              <p>
+                <strong>Threat Hunting:</strong> Useful for identifying newly signed drivers that might be part of recent attack campaigns or emerging threats.
+              </p>
+              <p>
+                <strong>Date Logic:</strong> Based on the certificate's "Not Before" date, not the driver compilation date or when it was added to the database.
+              </p>
+              <p>
+                <strong>Analysis Value:</strong> Recent certificates combined with suspicious behavior patterns can indicate active threat campaigns.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-sort-amount-down"></i> Newest First / <i className="fas fa-sort-amount-up"></i> Oldest First</h4>
+              <p>
+                <strong>What it does:</strong> Sorts the entire result set by the date the driver was added to our database.
+              </p>
+              <p>
+                <strong>Newest First:</strong> Shows recently discovered or updated drivers at the top - useful for tracking emerging threats and latest additions.
+              </p>
+              <p>
+                <strong>Oldest First:</strong> Shows historically known drivers first - useful for studying long-term attack patterns and established threats.
+              </p>
+              <p>
+                <strong>Mutual Exclusivity:</strong> You can only sort in one direction at a time. These filters affect the entire result ordering, not just filtering.
+              </p>
+              <p>
+                <strong>Performance Note:</strong> Sorting is applied after filtering, so combining with other filters will sort only the filtered results.
+              </p>
+            </div>
+
+            <div className="help-section">
+              <h4><i className="fas fa-cogs"></i> How to Use Filters Effectively</h4>
+              <p>
+                <strong>Combination Strategy:</strong> Filters can be combined (except mutually exclusive ones) to create precise queries. For example: "HVCI PASSED" + "Recent Certificates" shows newly signed drivers that are HVCI-compatible.
+              </p>
+              <p>
+                <strong>Apply vs Clear:</strong> Changes are staged until you click "Apply Filters". Use "Clear Filters" to reset both search terms and active filters.
+              </p>
+              <p>
+                <strong>URL Integration:</strong> Filter states are preserved in the URL, so you can bookmark specific filter combinations or share them with colleagues.
+              </p>
+              <p>
+                <strong>Performance:</strong> Server-side filtering ensures fast results even with large datasets. Pagination maintains performance with extensive result sets.
+              </p>
+            </div>
+
+            {showFilterHelpScrollIndicator && (
+              <div 
+                className="help-scroll-indicator"
+                onClick={scrollFilterHelpToBottom}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    scrollFilterHelpToBottom();
                   }
                 }}
                 aria-label="Scroll to bottom for more information"

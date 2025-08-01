@@ -1499,6 +1499,26 @@ select.form-control {
   color: var(--color-btn-primary-text) !important;
 }
 
+[data-color-scheme="dark"] .filter-btn.help-filter-btn {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--color-blue-300);
+}
+
+[data-color-scheme="dark"] .filter-btn.help-filter-btn i {
+  color: var(--color-blue-400);
+}
+
+[data-color-scheme="dark"] .filter-btn.help-filter-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: var(--color-blue-200);
+}
+
+[data-color-scheme="dark"] .filter-btn.help-filter-btn:hover i {
+  color: var(--color-blue-300);
+}
+
 .stat-item.clickable {
   cursor: pointer;
   user-select: none;
@@ -1611,7 +1631,7 @@ select.form-control {
 .filter-group {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-8);
+  gap: var(--space-6);
   align-items: center;
 }
 
@@ -1619,7 +1639,7 @@ select.form-control {
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-text-secondary);
-  margin-right: var(--space-8);
+  margin-right: var(--space-6);
 }
 
 .filter-btn {
@@ -1852,7 +1872,7 @@ select.form-control {
   align-items: center;
   gap: var(--space-6);
   white-space: nowrap;
-  margin-left: var(--space-12);
+  margin-left: var(--space-6);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-standard);
   user-select: none;
@@ -1866,6 +1886,28 @@ select.form-control {
 .apply-filters-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Filter help button */
+.filter-btn.help-filter-btn {
+  background: var(--color-blue-50);
+  border-color: var(--color-blue-200);
+  color: var(--color-blue-700);
+  margin-left: var(--space-4);
+}
+
+.filter-btn.help-filter-btn i {
+  color: var(--color-blue-600);
+}
+
+.filter-btn.help-filter-btn:hover {
+  background: var(--color-blue-100);
+  border-color: var(--color-blue-300);
+  color: var(--color-blue-800);
+}
+
+.filter-btn.help-filter-btn:hover i {
+  color: var(--color-blue-700);
 }
 
 /* Filtres désactivés */
@@ -2248,8 +2290,19 @@ select.form-control {
 
   .simple-section-content,
   .hash-section-content {
-    font-size: calc(var(--font-size-base) * var(--mobile-font-scale));
+    font-size: var(--font-size-sm);
     line-height: var(--line-height-normal);
+  }
+
+  /* Simple section headers mobile */
+  .simple-section-header {
+    font-size: var(--font-size-base);
+    gap: var(--space-6);
+    margin-bottom: var(--space-6);
+  }
+
+  .simple-section-title {
+    font-size: var(--font-size-base);
   }
 
   /* Collapsible sections mobile */
@@ -2432,7 +2485,7 @@ select.form-control {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-16);
+  gap: var(--space-8);
   text-align: left;
   justify-content: flex-start;
 }
@@ -4728,8 +4781,19 @@ select.form-control {
 
   .simple-section-content,
   .hash-section-content {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     padding: var(--space-6);
+  }
+
+  /* Simple section headers extra small */
+  .simple-section-header {
+    font-size: var(--font-size-sm);
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+  }
+
+  .simple-section-title {
+    font-size: var(--font-size-sm);
   }
 
   /* Collapsible sections extra small */
@@ -4816,7 +4880,7 @@ select.form-control {
   }
   
   .filter-group {
-    gap: var(--space-8);
+    gap: var(--space-6);
   }
 
   .filter-btn {
