@@ -1,177 +1,214 @@
-# 🛡️ LOLDrivers Database - Next.js Edition
+# 🛡️ LOLDrivers Database - Advanced Security Research Platform
+
+<div align="center">
 
 ![LOLDrivers](public/favicon.svg)
 
-Une application Next.js moderne pour la base de données LOLDrivers (Living Off The Land Drivers) avec Server-Side Rendering, cache avancé et interface utilisateur optimisée.
+**A comprehensive driver security research platform addressing critical gaps in existing driver analysis tools**
 
-## ✨ Fonctionnalités
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://typescriptlang.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-- 🚀 **Server-Side Rendering (SSR)** - Chargement initial ultra-rapide
-- 💾 **Cache intelligent** - Cache mémoire côté serveur + cache client avec SWR
-- 🔍 **Recherche avancée** - Recherche en temps réel dans tous les champs
-- 🏷️ **Filtrage sophistiqué** - HVCI, Killer Drivers, Certificats, etc.
-- 🌙 **Thème sombre/clair** - Basculement automatique ou manuel
-- 📱 **Design responsive** - Optimisé mobile et desktop
-- ⚡ **Performance optimale** - Bundle optimisé, lazy loading
-- 🎯 **TypeScript** - Typage strict pour une meilleure robustesse
+[🚀 Live Demo](https://loldb.xsec.fr) | [📚 Documentation](#features) | [🤝 Contributing](#contributing)
 
-## 🏗️ Architecture
-
-Cette application utilise une architecture moderne avec les dernières bonnes pratiques :
-
-- **Next.js 15** avec App Router
-- **React 18** avec Server Components
-- **TypeScript** pour la sécurité des types
-- **pnpm** pour la gestion des dépendances
-- **SWR** pour le cache et la synchronisation des données
-- **CSS moderne** avec variables custom properties
-
-## 🚀 Démarrage rapide
-
-### Prérequis
-
-- Node.js 18+ 
-- pnpm 9+
-
-### Installation
-
-```bash
-# Cloner le repository
-git clone <repository-url>
-cd loldrivers-database
-
-# Installer pnpm si nécessaire
-npm install -g pnpm@latest
-
-# Installer les dépendances
-pnpm install
-
-# Démarrer en mode développement
-pnpm dev
-```
-
-L'application sera disponible sur [http://localhost:3000](http://localhost:3000)
-
-### Production
-
-```bash
-# Construire pour la production
-pnpm build
-
-# Démarrer le serveur de production
-pnpm start
-```
-
-## 📁 Structure du projet
-
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── globals.css        # Styles globaux
-│   ├── layout.tsx         # Layout principal
-│   ├── page.tsx          # Page d'accueil avec SSR
-│   └── api/              # API Routes
-├── components/            # Composants React
-├── lib/                  # Logique métier
-├── hooks/                # Hooks React personnalisés
-├── types/                # Définitions TypeScript
-└── utils/                # Utilitaires
-
-public/                   # Assets statiques
-data/                     # Données des drivers
-```
-
-## ⚙️ Configuration
-
-### Variables d'environnement
-
-Copiez `.env.example` vers `.env.local` et configurez :
-
-```bash
-# Durée de cache en secondes
-CACHE_TTL=3600
-
-# Configuration Next.js
-NEXT_TELEMETRY_DISABLED=1
-```
-
-### Cache
-
-Le système de cache est configuré pour :
-- **Serveur** : Cache mémoire 1h avec TTL configurable
-- **Client** : Cache SWR avec revalidation intelligente
-- **API** : Headers de cache HTTP optimisés
-
-## 🛠️ Scripts disponibles
-
-```bash
-pnpm dev          # Mode développement
-pnpm build        # Build production
-pnpm start        # Serveur production
-pnpm lint         # Linting ESLint
-pnpm type-check   # Vérification TypeScript
-pnpm clean        # Nettoyage des fichiers générés
-```
-
-## 🚀 Déploiement
-
-### Vercel (Recommandé)
-
-1. Connectez votre repository à Vercel
-2. Configurez les variables d'environnement
-3. Déployez automatiquement
-
-Le projet est optimisé pour Vercel avec :
-- Configuration automatique Next.js
-- Headers de cache optimisés
-- Tâches cron pour actualisation du cache
-
-### Autres plateformes
-
-Le projet peut être déployé sur toute plateforme supportant Next.js :
-- Netlify
-- AWS Amplify
-- Docker
-
-## � Performance
-
-| Métrique | Avant (Vanilla) | Après (Next.js) |
-|----------|----------------|-----------------|
-| Chargement initial | ~5-10s | ~0.5-1s |
-| Taille du bundle | ~2MB | ~500KB |
-| Time to Interactive | ~10s | ~1-2s |
-| Cache hit ratio | 0% | 90%+ |
-
-## 🤝 Contribution
-
-1. Fork le projet
-2. Créez une branche (`git checkout -b feature/amazing-feature`)
-3. Commitez vos changements (`git commit -m 'Add amazing feature'`)
-4. Push la branche (`git push origin feature/amazing-feature`)
-5. Ouvrez une Pull Request
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
-
-## 🔗 Liens utiles
-
-- [Documentation Next.js](https://nextjs.org/docs)
-- [LOLDrivers Original](https://loldrivers.io)
-- [Deploiement Vercel](https://vercel.com/docs)
+</div>
 
 ---
 
-Made with ❤️ by the LOLDrivers team
+## 🎯 Project Vision & Mission
 
-## ⚠️ Note sur la sécurité
+### The Problem
 
-Les navigateurs modernes bloquent l'accès aux fichiers locaux pour des raisons de sécurité (CORS). C'est pourquoi un serveur local est nécessaire pour charger les données JSON.
+Traditional driver analysis tools suffer from significant limitations:
+- **Static cataloging** without behavioral analysis
+- **Inaccurate HVCI compatibility** checks using outdated local lists
+- **Limited search capabilities** across driver metadata
+- **Poor user experience** for security researchers
 
-## 🔧 Dépannage
+### Our Solution
 
-Si vous voyez "Error Loading Data":
-1. Vérifiez que Python est installé
-2. Utilisez un serveur local (voir méthodes ci-dessus)
-3. Vérifiez que le fichier `data/drv.json` existe
-4. Consultez la console du navigateur (F12) pour plus de détails
+This platform goes **beyond simple cataloging** to provide:
+- **Behavioral analysis** through imported function examination
+- **Strict HVCI verification** using Microsoft's official blocklist
+- **Sophisticated filtering** by capabilities, architecture, and certificates
+- **Professional-grade interface** optimized for security research workflows
+
+## ✨ Features
+
+### 🧠 Advanced Behavioral Analysis
+Unlike static driver lists, this platform analyzes imported functions to automatically detect capabilities:
+- **Memory manipulation** (allocation, virtual memory, mapping)
+- **Process killing** (termination, suspension)
+- **Debug bypass** (anti-debugging, information hiding)
+- **Registry manipulation** (key creation, modification, deletion)
+- **File system access** (file creation, modification, I/O operations)
+
+### 🛡️ Strict HVCI Verification
+- **Direct Microsoft integration** - Queries official vulnerable driver blocklist
+- **Automated workflows** - GitHub Actions fetch latest XML blocklist
+- **Up-to-date accuracy** - No reliance on static local lists (Trails of bit script)
+
+### 🔍 Intelligent Search & Filtering
+- **Multi-attribute search** - Hashes, company names, descriptions
+- **Behavioral filters** - Search by detected capabilities
+- **Certificate analysis** - Trusted vs. unknown authorities
+- **Architecture-aware** - Filter by x64, x32, ARM64 with visual indicators
+- **URL state management** - Bookmark and share search queries
+
+### 📊 Certificate Analysis System
+- **Comprehensive validation** - Analyzes complete certificate chains
+- **Trust categorization** - Trusted CAs vs. unknown/expired certificates
+- **Risk assessment** - Identifies self-signed, revoked, or compromised certificates
+- **Visual indicators** - Clear trust status in driver cards
+
+## 🏗️ Technical Implementation
+
+### Modern Architecture
+- **Next.js 15** with App Router and React 18
+- **TypeScript** for type safety and better development experience
+- **Server-side processing** for optimal performance with large datasets
+- **SWR caching** for intelligent data fetching and synchronization
+
+### Performance Optimizations
+- **Server-Side Rendering (SSR)** for lightning-fast initial loads
+- **Intelligent caching** - Multi-layer cache strategy (memory + HTTP)
+- **Bundle optimization** - Code splitting and lazy loading
+- **Responsive design** - Optimized for all devices and screen sizes
+
+### Data Pipeline
+- **Automated integration** with LOLDrivers project
+- **Continuous updates** - Fresh threat intelligence
+- **GitHub Actions** - Scheduled HVCI blocklist synchronization
+- **Error handling** - Robust data processing and validation
+
+## 🎯 Use Cases & Applications
+
+### 🔬 Security Research
+- **BYOVD attack research** - Investigate Bring Your Own Vulnerable Driver campaigns
+- **Threat hunting** - Discover suspicious drivers in enterprise environments
+- **Malware analysis** - Research driver-based malware families and capabilities
+- **Academic studies** - Support cybersecurity research and publications
+
+
+### 🌐 Community & Collaboration
+- **Open-source approach** - Encourages community contributions
+- **Knowledge sharing** - Collaborative security research platform
+- **Threat intelligence** - Aggregated analysis for security teams
+- **Research publishing** - Support for responsible disclosure practices
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- pnpm 9+
+
+### Installation
+```bash
+# Clone the repository
+git clone https://github.com/didntchooseaname/loldrivers-database.git
+cd loldrivers-database
+
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) to see the application.
+
+### Production Deployment
+```bash
+# Build for production
+pnpm build
+
+# Start production server
+pnpm start
+```
+
+## 📖 Key Terms & Concepts
+
+- **HVCI** - Hypervisor-protected Code Integrity, Windows security feature using hypervisor technology
+- **Process Killer Drivers** - Legitimate drivers exploitable for terminating processes with elevated privileges
+- **Behavioral Analysis** - Automated capability detection through imported function analysis
+- **BYOVD** - Bring Your Own Vulnerable Driver attacks using legitimate-but-vulnerable drivers
+- **Certificate Trust** - Validation of driver signing authorities and certificate chains
+
+## �️ Available Scripts
+
+```bash
+pnpm dev          # Development server
+pnpm build        # Production build
+pnpm start        # Production server
+pnpm lint         # ESLint checking
+pnpm type-check   # TypeScript validation
+```
+
+## 📊 Performance Metrics
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Initial Load | ~5-10s | ~0.5-1s |
+| Bundle Size | ~2MB | ~500KB |
+| Time to Interactive | ~10s | ~1-2s |
+| Cache Hit Ratio | 0% | 90%+ |
+
+## 🤝 Contributing
+
+We welcome contributions from the security research community:
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+### Contribution Guidelines
+- Follow TypeScript best practices
+- Add tests for new features
+- Update documentation as needed
+- Ensure compatibility with existing features
+
+## ⚖️ Legal & Ethical Notice
+
+**Purpose**: This database is designed for **legitimate security research and defensive purposes only**.
+
+**Compliance**: Users must comply with applicable laws, organizational policies, and ethical guidelines.
+
+**Prohibition**: Misuse of this information for malicious purposes is **strictly prohibited**.
+
+**Community**: Join the security research community in improving driver security through responsible disclosure and collaborative research.
+
+## 📄 Disclaimer
+
+This project is provided **"as is"** without any warranty, guarantee, or reliability assurance. The maintainers are not responsible for the accuracy, completeness, or functionality of the data or platform. Users assume all risks and responsibilities when using this database and its information.
+
+## 🔗 Related Projects & Resources
+
+- [LOLDrivers.io](https://loldrivers.io) - Original project and data source
+- [magicsword-io/LOLDrivers](https://github.com/magicsword-io/LOLDrivers) - Source repository
+- [Microsoft HVCI Blocklist](https://aka.ms/VulnerableDriverBlockList) - Official vulnerability list
+
+## � Contributors & Acknowledgments
+
+**Special thanks** to the original LOLDrivers project and its contributors:
+- **Michael Haag** - Project leadership and development
+- **Jose Hernandez** - Security research and analysis
+- **Nasreddine Bencherchali** - Detection engineering and rules
+
+## 📧 Contact & Support
+
+- **Issues**: [GitHub Issues](https://github.com/didntchooseaname/loldrivers-database/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/didntchooseaname/loldrivers-database/discussions)
+- **Security**: Please report security vulnerabilities responsibly
+
+---
+
+<div align="center">
+
+**Made with ❤️ for the cybersecurity research community**
+
+[⭐ Star this project](https://github.com/didntchooseaname/loldrivers-database) if it helps your security research!
+
+</div>

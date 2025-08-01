@@ -52,12 +52,29 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('q') || '';
     
     // Filtres optimisés
-    const filters: Record<string, boolean> = {};
+    const filters: Record<string, boolean | string> = {};
     if (searchParams.get('hvci') === 'true') filters.hvci = true;
     if (searchParams.get('killer') === 'true') filters.killer = true;
     if (searchParams.get('recent') === 'true') filters.recent = true;
     if (searchParams.get('newest-first') === 'true') filters.newestFirst = true;
     if (searchParams.get('oldest-first') === 'true') filters.oldestFirst = true;
+    
+    // Nouveaux filtres comportementaux
+    if (searchParams.get('memory-manipulator') === 'true') filters.memoryManipulator = true;
+    if (searchParams.get('process-killer') === 'true') filters.processKiller = true;
+    if (searchParams.get('debug-bypass') === 'true') filters.debugBypass = true;
+    if (searchParams.get('registry-manipulator') === 'true') filters.registryManipulator = true;
+    if (searchParams.get('file-manipulator') === 'true') filters.fileManipulator = true;
+    
+    // Filtres par architecture
+    const architecture = searchParams.get('architecture');
+    if (architecture && ['AMD64', 'I386', 'ARM64'].includes(architecture)) {
+      filters.architecture = architecture;
+    }
+    
+    // Filtres par vérification
+    if (searchParams.get('verified') === 'true') filters.verified = true;
+    if (searchParams.get('unverified') === 'true') filters.unverified = true;
     
     // Exclusion mutuelle pour trusted-cert/untrusted-cert
     const trustedCertParam = searchParams.get('trusted-cert');

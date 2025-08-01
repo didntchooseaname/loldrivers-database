@@ -101,8 +101,100 @@ class DriversCache {
       driver.ImportedFunctions.some(func => KILLER_FUNCTIONS_REGEX.test(func))
     );
 
+    const recentDrivers = this.drivers.filter(driver => {
+      if (!driver.Created) return false;
+      try {
+        const createdDate = new Date(driver.Created);
+        const now = new Date();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(now.getMonth() - 6);
+        return createdDate >= sixMonthsAgo;
+      } catch {
+        return false;
+      }
+    });
+
+    // Nouveaux filtres comportementaux basés sur les fonctions importées
+    const memoryManipulatorDrivers = this.drivers.filter(driver =>
+      driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
+      driver.ImportedFunctions.some(func => {
+        const funcLower = func.toLowerCase();
+        return funcLower.includes('zwmap') || funcLower.includes('zwallocate') ||
+               funcLower.includes('mmmap') || funcLower.includes('mmallocate') ||
+               funcLower.includes('virtualalloc') || funcLower.includes('virtualprotect') ||
+               funcLower.includes('heap') || funcLower.includes('pool');
+      })
+    );
+
+    const processKillerDrivers = this.drivers.filter(driver =>
+      driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
+      driver.ImportedFunctions.some(func => {
+        const funcLower = func.toLowerCase();
+        return funcLower.includes('zwterminateprocess') || funcLower.includes('zwkillprocess') ||
+               funcLower.includes('ntterminate') || funcLower.includes('zwsuspendprocess') ||
+               funcLower.includes('psterminatesystemthread');
+      })
+    );
+
+    const debugBypassDrivers = this.drivers.filter(driver =>
+      driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
+      driver.ImportedFunctions.some(func => {
+        const funcLower = func.toLowerCase();
+        return funcLower.includes('zwsetinformationprocess') || funcLower.includes('zwsetinformationthread') ||
+               funcLower.includes('zwquerysysteminformation') || funcLower.includes('dbgkd') ||
+               funcLower.includes('kddebugger') || funcLower.includes('debugport');
+      })
+    );
+
+    const registryManipulatorDrivers = this.drivers.filter(driver =>
+      driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
+      driver.ImportedFunctions.some(func => {
+        const funcLower = func.toLowerCase();
+        return funcLower.includes('zwcreatekey') || funcLower.includes('zwopenkey') ||
+               funcLower.includes('zwsetvaluekey') || funcLower.includes('zwdeletekey') ||
+               funcLower.includes('regcreate') || funcLower.includes('regopen') ||
+               funcLower.includes('regset') || funcLower.includes('regdelete');
+      })
+    );
+
+    const fileManipulatorDrivers = this.drivers.filter(driver =>
+      driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
+      driver.ImportedFunctions.some(func => {
+        const funcLower = func.toLowerCase();
+        return funcLower.includes('zwcreatefile') || funcLower.includes('zwopenfile') ||
+               funcLower.includes('zwreadfile') || funcLower.includes('zwwritefile') ||
+               funcLower.includes('zwdeletefile') || funcLower.includes('iocreate') ||
+               funcLower.includes('ntread') || funcLower.includes('ntwrite');
+      })
+    );
+
+    // Filtres par architecture
+    const amd64Drivers = this.drivers.filter(driver => driver.MachineType === 'AMD64');
+    const i386Drivers = this.drivers.filter(driver => driver.MachineType === 'I386');
+    const arm64Drivers = this.drivers.filter(driver => driver.MachineType === 'ARM64');
+
+    // Filtres par vérification
+    const verifiedDrivers = this.drivers.filter(driver => 
+      driver.Verified?.toString().toUpperCase() === 'TRUE'
+    );
+    const unverifiedDrivers = this.drivers.filter(driver => 
+      driver.Verified?.toString().toUpperCase() !== 'TRUE'
+    );
+
+    // Stocker dans l'index
     this.indexedData.set('hvci', hvciDrivers);
     this.indexedData.set('killer', killerDrivers);
+    this.indexedData.set('recent', recentDrivers);
+    this.indexedData.set('memoryManipulator', memoryManipulatorDrivers);
+    this.indexedData.set('processKiller', processKillerDrivers);
+    this.indexedData.set('debugBypass', debugBypassDrivers);
+    this.indexedData.set('registryManipulator', registryManipulatorDrivers);
+    this.indexedData.set('fileManipulator', fileManipulatorDrivers);
+    this.indexedData.set('amd64', amd64Drivers);
+    this.indexedData.set('i386', i386Drivers);
+    this.indexedData.set('arm64', arm64Drivers);
+    this.indexedData.set('verified', verifiedDrivers);
+    this.indexedData.set('unverified', unverifiedDrivers);
   }
 
   async loadDrivers(): Promise<ProcessedDriver[]> {
@@ -288,6 +380,17 @@ class DriversCache {
       total: drivers.length,
       hvciCompatible: this.indexedData.get('hvci')?.length || 0,
       killerDrivers: this.indexedData.get('killer')?.length || 0,
+      recentDrivers: this.indexedData.get('recent')?.length || 0,
+      memoryManipulatorDrivers: this.indexedData.get('memoryManipulator')?.length || 0,
+      processKillerDrivers: this.indexedData.get('processKiller')?.length || 0,
+      debugBypassDrivers: this.indexedData.get('debugBypass')?.length || 0,
+      registryManipulatorDrivers: this.indexedData.get('registryManipulator')?.length || 0,
+      fileManipulatorDrivers: this.indexedData.get('fileManipulator')?.length || 0,
+      amd64Drivers: this.indexedData.get('amd64')?.length || 0,
+      i386Drivers: this.indexedData.get('i386')?.length || 0,
+      arm64Drivers: this.indexedData.get('arm64')?.length || 0,
+      verifiedDrivers: this.indexedData.get('verified')?.length || 0,
+      unverifiedDrivers: this.indexedData.get('unverified')?.length || 0,
       lastUpdated: new Date().toISOString(),
       ...(hvciBlocklistCheck && { hvciBlocklistCheck })
     };
@@ -308,6 +411,17 @@ class DriversCache {
         continue;
       }
       
+      // Gestion spéciale pour les filtres d'architecture
+      if (filterType === 'architecture') {
+        const archValue = value as string;
+        const indexKey = archValue.toLowerCase();
+        const indexedResult = this.indexedData.get(indexKey);
+        if (indexedResult) {
+          result = result.filter(driver => indexedResult.includes(driver));
+        }
+        continue;
+      }
+      
       // Utiliser l'index préconçu quand possible
       const indexedResult = this.indexedData.get(filterType);
       if (indexedResult) {
@@ -325,7 +439,7 @@ class DriversCache {
   private applyFilter(driver: ProcessedDriver, filterType: string): boolean {
     switch (filterType) {
       case 'recent':
-        return this.hasActiveCertificate(driver);
+        return this.isRecentDriver(driver);
       case 'trustedCert':
         return this.hasTrustedCertificate(driver);
       case 'untrustedCert':
@@ -335,30 +449,22 @@ class DriversCache {
     }
   }
 
-  private hasActiveCertificate(driver: ProcessedDriver): boolean {
-    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+  private isRecentDriver(driver: ProcessedDriver): boolean {
+    if (!driver.Created) {
       return false;
     }
 
-    const now = Date.now();
-    
-    for (const signature of driver.Signatures) {
-      if (signature.Certificates && Array.isArray(signature.Certificates)) {
-        for (const cert of signature.Certificates) {
-          if (cert.ValidTo) {
-            try {
-              const validTo = new Date(cert.ValidTo).getTime();
-              if (validTo > now) {
-                return true;
-              }
-            } catch {
-              continue;
-            }
-          }
-        }
-      }
+    try {
+      const createdDate = new Date(driver.Created);
+      const now = new Date();
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      
+      // Considérer comme récent si créé dans les 6 derniers mois
+      return createdDate >= sixMonthsAgo;
+    } catch {
+      return false;
     }
-    return false;
   }
 
   private hasTrustedCertificate(driver: ProcessedDriver): boolean {

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import useSWR from 'swr';
 import SafeDate from '@/components/SafeDate';
 import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = async (url: string) => {
@@ -50,6 +51,21 @@ const getInitialUrlParams = () => {
   if (params.get('newest-first') === 'true') activeFilters.add('newest-first');
   if (params.get('oldest-first') === 'true') activeFilters.add('oldest-first');
   
+  // Nouveaux filtres comportementaux
+  if (params.get('memory-manipulator') === 'true') activeFilters.add('memory-manipulator');
+  if (params.get('process-killer') === 'true') activeFilters.add('process-killer');
+  if (params.get('debug-bypass') === 'true') activeFilters.add('debug-bypass');
+  if (params.get('registry-manipulator') === 'true') activeFilters.add('registry-manipulator');
+  if (params.get('file-manipulator') === 'true') activeFilters.add('file-manipulator');
+  if (params.get('verified') === 'true') activeFilters.add('verified');
+  if (params.get('unverified') === 'true') activeFilters.add('unverified');
+  
+  // Filtre d'architecture
+  const architecture = params.get('architecture');
+  if (architecture && ['AMD64', 'I386', 'ARM64'].includes(architecture)) {
+    activeFilters.add(`architecture-${architecture}`);
+  }
+  
   // Extraire la page
   const pageParam = params.get('page');
   const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10)) || 1 : 1;
@@ -79,6 +95,12 @@ export default function DriversClient({
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   const [showFilterHelpScrollIndicator, setShowFilterHelpScrollIndicator] = useState(true);
   
+  // États pour le contenu d'aide
+  const [helpContent, setHelpContent] = useState<{
+    globalHelp: string;
+    filterHelp: string;
+  } | null>(null);
+  
   // États de pagination
   const [currentPage, setCurrentPage] = useState(initialParams.currentPage);
   const ITEMS_PER_PAGE = 20;
@@ -98,6 +120,20 @@ export default function DriversClient({
     if (activeFilters.has('recent')) params.set('recent', 'true');
     if (activeFilters.has('newest-first')) params.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) params.set('oldest-first', 'true');
+    
+    // Nouveaux filtres comportementaux
+    if (activeFilters.has('memory-manipulator')) params.set('memory-manipulator', 'true');
+    if (activeFilters.has('process-killer')) params.set('process-killer', 'true');
+    if (activeFilters.has('debug-bypass')) params.set('debug-bypass', 'true');
+    if (activeFilters.has('registry-manipulator')) params.set('registry-manipulator', 'true');
+    if (activeFilters.has('file-manipulator')) params.set('file-manipulator', 'true');
+    if (activeFilters.has('verified')) params.set('verified', 'true');
+    if (activeFilters.has('unverified')) params.set('unverified', 'true');
+    
+    // Filtre d'architecture
+    if (activeFilters.has('architecture-AMD64')) params.set('architecture', 'AMD64');
+    if (activeFilters.has('architecture-I386')) params.set('architecture', 'I386');
+    if (activeFilters.has('architecture-ARM64')) params.set('architecture', 'ARM64');
     // Supprimer la limite pour récupérer tous les résultats
     
     return `/api/drivers?${params.toString()}`;
@@ -156,6 +192,23 @@ export default function DriversClient({
     }
     setCurrentPage(1);
   }, [searchQuery, activeFilters]);
+
+  // Charger le contenu d'aide depuis les fichiers markdown
+  useEffect(() => {
+    const loadHelpContent = async () => {
+      try {
+        const response = await fetch('/api/help-content');
+        if (response.ok) {
+          const content = await response.json();
+          setHelpContent(content);
+        }
+      } catch (error) {
+        console.error('Failed to load help content:', error);
+      }
+    };
+    
+    loadHelpContent();
+  }, []);
 
   // Initialiser les sections critiques comme déroulées par défaut
   useEffect(() => {
@@ -301,6 +354,30 @@ export default function DriversClient({
         newFilters.delete('trusted-cert');
       }
       
+      // Logique pour les filtres de vérification mutuellement exclusifs
+      if (filterType === 'verified' && newFilters.has('unverified')) {
+        newFilters.delete('unverified');
+      } else if (filterType === 'unverified' && newFilters.has('verified')) {
+        newFilters.delete('verified');
+      }
+      
+      // Logique pour les filtres d'architecture mutuellement exclusifs
+      if (filterType.startsWith('architecture-')) {
+        // Supprimer tous les autres filtres d'architecture
+        ['architecture-AMD64', 'architecture-I386', 'architecture-ARM64'].forEach(arch => {
+          if (arch !== filterType) {
+            newFilters.delete(arch);
+          }
+        });
+      }
+      
+      // Logique pour les filtres de tri mutuellement exclusifs
+      if (filterType === 'newest-first' && newFilters.has('oldest-first')) {
+        newFilters.delete('oldest-first');
+      } else if (filterType === 'oldest-first' && newFilters.has('newest-first')) {
+        newFilters.delete('newest-first');
+      }
+      
       if (newFilters.has(filterType)) {
         newFilters.delete(filterType);
       } else {
@@ -371,9 +448,12 @@ export default function DriversClient({
   // Fonction pour afficher le toast
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setToastMessage(null);
     }, 3000); // Toast disparaît après 3 secondes
+    
+    // Retourner la fonction de nettoyage pour permettre l'annulation si nécessaire
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Fonction pour partager la recherche actuelle
@@ -470,6 +550,20 @@ export default function DriversClient({
     if (activeFilters.has('recent')) url.searchParams.set('recent', 'true');
     if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
+    
+    // Nouveaux filtres comportementaux
+    if (activeFilters.has('memory-manipulator')) url.searchParams.set('memory-manipulator', 'true');
+    if (activeFilters.has('process-killer')) url.searchParams.set('process-killer', 'true');
+    if (activeFilters.has('debug-bypass')) url.searchParams.set('debug-bypass', 'true');
+    if (activeFilters.has('registry-manipulator')) url.searchParams.set('registry-manipulator', 'true');
+    if (activeFilters.has('file-manipulator')) url.searchParams.set('file-manipulator', 'true');
+    if (activeFilters.has('verified')) url.searchParams.set('verified', 'true');
+    if (activeFilters.has('unverified')) url.searchParams.set('unverified', 'true');
+    
+    // Filtres d'architecture
+    if (activeFilters.has('architecture-AMD64')) url.searchParams.set('architecture', 'AMD64');
+    if (activeFilters.has('architecture-I386')) url.searchParams.set('architecture', 'I386');
+    if (activeFilters.has('architecture-ARM64')) url.searchParams.set('architecture', 'ARM64');
     
     // Add current page if not page 1
     if (currentPage > 1) {
@@ -637,25 +731,41 @@ export default function DriversClient({
     if (driver.LoadsDespiteHVCI) {
       const isTrue = driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE';
       tags.push({
-        text: isTrue ? 'HVCI PASSED' : 'HVCI BLOCKED',
+        text: isTrue ? 'HVCI Compatible' : 'HVCI BLOCKED',
         type: isTrue ? 'success' : 'danger',
         icon: isTrue ? 'fas fa-check-circle' : 'fas fa-times-circle'
       });
     }
     
+    // Process killer tag (keep in status tags for now as requested)
     if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
-      const hasKillerFunction = driver.ImportedFunctions.some(func => 
-        func.toLowerCase().includes('zwterminateprocess') ||
-        func.toLowerCase().includes('zwkillprocess') ||
-        func.toLowerCase().includes('ntterminate')
+      const functions = driver.ImportedFunctions.map(f => f.toLowerCase());
+      
+      // Détection process killer
+      const hasProcessKiller = functions.some(func => 
+        func.includes('zwterminateprocess') ||
+        func.includes('zwkillprocess') ||
+        func.includes('ntterminate') ||
+        func.includes('zwsuspendprocess') ||
+        func.includes('psterminatesystemthread')
       );
-      if (hasKillerFunction) {
+      if (hasProcessKiller) {
         tags.push({
-          text: 'KILLER',
-          type: 'danger',
+          text: 'PROCESS KILLER',
+          type: 'process-killer',
           icon: 'fas fa-skull-crossbones'
         });
       }
+    }
+    
+    // Tags basés sur les métadonnées
+    if (driver.Verified) {
+      const isVerified = driver.Verified.toString().toUpperCase() === 'TRUE';
+      tags.push({
+        text: isVerified ? 'VERIFIED' : 'UNVERIFIED',
+        type: isVerified ? 'success' : 'warning',
+        icon: isVerified ? 'fas fa-check-circle' : 'fas fa-question-circle'
+      });
     }
     
     // Gestion des certificats avec priorité
@@ -681,6 +791,115 @@ export default function DriversClient({
     }
     
     return tags;
+  };
+
+  // Generate capacity tags (behavioral analysis)
+  const generateCapacityTags = (driver: Driver) => {
+    const capacities = [];
+    
+    if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
+      const functions = driver.ImportedFunctions.map(f => f.toLowerCase());
+      
+      // Détection process killer
+      const hasProcessKiller = functions.some(func => 
+        func.includes('zwterminateprocess') ||
+        func.includes('zwkillprocess') ||
+        func.includes('ntterminate') ||
+        func.includes('zwsuspendprocess') ||
+        func.includes('psterminatesystemthread')
+      );
+      if (hasProcessKiller) {
+        capacities.push({
+          text: 'Process Killer',
+          type: 'process-killer',
+          icon: 'fas fa-skull-crossbones'
+        });
+      }
+      
+      // Détection memory manipulator
+      const hasMemoryManipulator = functions.some(func => 
+        func.includes('zwmap') || func.includes('zwallocate') ||
+        func.includes('mmmap') || func.includes('mmallocate') ||
+        func.includes('virtualalloc') || func.includes('virtualprotect') ||
+        func.includes('heap') || func.includes('pool')
+      );
+      if (hasMemoryManipulator) {
+        capacities.push({
+          text: 'Memory Manipulator',
+          type: 'memory-manipulator',
+          icon: 'fas fa-memory'
+        });
+      }
+      
+      // Détection debug bypass
+      const hasDebugBypass = functions.some(func => 
+        func.includes('zwsetinformationprocess') || func.includes('zwsetinformationthread') ||
+        func.includes('zwquerysysteminformation') || func.includes('dbgkd') ||
+        func.includes('kddebugger') || func.includes('debugport')
+      );
+      if (hasDebugBypass) {
+        capacities.push({
+          text: 'Debug Bypass',
+          type: 'debug-bypass',
+          icon: 'fas fa-bug'
+        });
+      }
+      
+      // Détection registry manipulator
+      const hasRegistryManipulator = functions.some(func => 
+        func.includes('zwcreatekey') || func.includes('zwopenkey') ||
+        func.includes('zwsetvaluekey') || func.includes('zwdeletekey') ||
+        func.includes('regcreate') || func.includes('regopen') ||
+        func.includes('regset') || func.includes('regdelete')
+      );
+      if (hasRegistryManipulator) {
+        capacities.push({
+          text: 'Registry Manipulator',
+          type: 'registry-manipulator',
+          icon: 'fas fa-edit'
+        });
+      }
+      
+      // Détection file manipulator
+      const hasFileManipulator = functions.some(func => 
+        func.includes('zwcreatefile') || func.includes('zwopenfile') ||
+        func.includes('zwreadfile') || func.includes('zwwritefile') ||
+        func.includes('zwdeletefile') || func.includes('iocreate') ||
+        func.includes('ntread') || func.includes('ntwrite')
+      );
+      if (hasFileManipulator) {
+        capacities.push({
+          text: 'File Manipulator',
+          type: 'file-manipulator',
+          icon: 'fas fa-file-alt'
+        });
+      }
+    }
+    
+    return capacities;
+  };
+
+  // Render capacities section
+  const renderCapacitiesSection = (capacities: Array<{ text: string; type: string; icon?: string }>) => {
+    if (!capacities.length) return null;
+    
+    return (
+      <div className="simple-section">
+        <div className="simple-section-header">
+          <i className="fas fa-cogs"></i>
+          <span className="simple-section-title">Capacities</span>
+        </div>
+        <div className="simple-section-content">
+          <div className="capacity-tags">
+            {capacities.map((capacity, index) => (
+              <span key={index} className={`capacity-tag ${capacity.type}`}>
+                {capacity.icon && <i className={capacity.icon}></i>} {capacity.text}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderStatusTags = (tags: Array<{ text: string; type: string; icon?: string }>) => {
@@ -1321,20 +1540,7 @@ export default function DriversClient({
     );
   };
 
-  // Section Description des commandes (placée après les Hashes)
-  const renderCommandDescription = (commands: Driver['Commands']) => {
-    if (!commands || !commands.Description) return null;
-    
-    return (
-      <div className="simple-section">
-        <div className="simple-section-header">
-          <i className="fas fa-file-text"></i>
-          <span className="simple-section-title">Description</span>
-        </div>
-        <div className="simple-section-content">{commands.Description}</div>
-      </div>
-    );
-  };
+
 
   // Section des commandes
   const renderCommandsSection = (commands: Driver['Commands'], driver: Driver, index: number) => {
@@ -1426,10 +1632,30 @@ export default function DriversClient({
     );
   };
 
+  // Helper function to get the most detailed description
+  const getBestDescription = (driver: Driver): string => {
+    const driverDesc = driver.Description || '';
+    const commandDesc = driver.Commands?.Description || '';
+    
+    // If we don't have both descriptions, return the one we have
+    if (!driverDesc && !commandDesc) return 'No description available';
+    if (!driverDesc) return commandDesc;
+    if (!commandDesc) return driverDesc;
+    
+    // If both exist, choose the longer/more detailed one
+    // Also prioritize command description if it's significantly more detailed
+    if (commandDesc.length > driverDesc.length * 1.2) {
+      return commandDesc;
+    }
+    
+    // Default to driver description if lengths are similar
+    return driverDesc;
+  };
+
   // Fonction pour télécharger un driver
   const downloadDriver = useCallback((driver: Driver) => {
     const hash = driver.MD5;
-    const filename = driver.OriginalFilename || driver.Filename || 'driver';
+    const filename = getDriverName(driver);
     
     if (!hash) {
       showToast('No MD5 hash available for download');
@@ -1452,6 +1678,44 @@ export default function DriversClient({
     showToast(`Downloading ${filename}...`);
   }, [showToast]);
 
+  // Helper function to format architecture display
+  const formatArchitecture = (machineType: string | undefined): string | null => {
+    if (!machineType) return null;
+    
+    switch (machineType.toUpperCase()) {
+      case 'AMD64':
+        return 'x64';
+      case 'I386':
+        return 'x32';
+      case 'ARM64':
+        return 'ARM64';
+      default:
+        return machineType.toLowerCase();
+    }
+  };
+
+  // Helper function to get the best available driver name
+  const getDriverName = (driver: Driver): string => {
+    // First try OriginalFilename, then Filename
+    if (driver.OriginalFilename && driver.OriginalFilename.toLowerCase() !== 'unknown') {
+      return driver.OriginalFilename;
+    }
+    if (driver.Filename && driver.Filename.toLowerCase() !== 'unknown') {
+      return driver.Filename;
+    }
+    
+    // If both are empty or unknown, try to get from Tags array
+    if (driver.Tags && Array.isArray(driver.Tags) && driver.Tags.length > 0) {
+      const firstTag = driver.Tags[0];
+      if (firstTag && firstTag.trim()) {
+        return firstTag;
+      }
+    }
+    
+    // Fallback to Unknown Driver
+    return 'Unknown Driver';
+  };
+
   // Créer une carte driver
   const createDriverCard = (driver: Driver, index: number) => {
     const hashes = {
@@ -1460,13 +1724,18 @@ export default function DriversClient({
       SHA256: driver.SHA256 || (driver.Authentihash && driver.Authentihash.SHA256)
     };
     const statusTags = generateStatusTags(driver);
-    const filename = driver.OriginalFilename || driver.Filename || 'Unknown Driver';
+    const capacityTags = generateCapacityTags(driver);
+    const filename = getDriverName(driver);
+    const formattedArch = formatArchitecture(driver.MachineType as string);
     
     return (
       <div className="driver-card" key={`driver-${index}-${driver.MD5 || driver.SHA256}`}>
         <div className="driver-header">
           <h3 className="driver-title">
             <i className="fas fa-microchip"></i> {filename}
+            {formattedArch && (
+              <span className="driver-architecture">{formattedArch}</span>
+            )}
           </h3>
           <button 
             className="download-btn"
@@ -1481,12 +1750,11 @@ export default function DriversClient({
         {renderStatusTags(statusTags)}
         {renderHashTags(hashes)}
         {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
-        {renderSimpleSection('Description', driver.Description || 'No description available', 'fas fa-info-circle')}
+        {renderSimpleSection('Description', getBestDescription(driver), 'fas fa-info-circle')}
         {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
         {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
         {driver.Created && renderSimpleSection('Created Date', driver.Created, 'fas fa-calendar')}
-        {driver.MitreID && renderSimpleSection('MITRE ID', driver.MitreID, 'fas fa-shield-alt')}
-        {renderCommandDescription(driver.Commands)}
+        {renderCapacitiesSection(capacityTags)}
         {renderCommandsSection(driver.Commands, driver, index)}
         {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
         {renderResourcesSection(driver.Resources, driver, index)}
@@ -1549,18 +1817,18 @@ export default function DriversClient({
             onClick={() => applyDirectFilter('hvci')}
           >
             <span className="stat-label">
-              <i className="fas fa-check"></i> HVCI PASSED
+              <i className="fas fa-check"></i> HVCI Compatible
             </span>
             <span className="stat-value">{statsData?.stats?.hvciCompatible || 0}</span>
           </div>
           <div 
-            className={`stat-item killer clickable ${activeFilters.has('killer') ? 'active' : ''}`}
-            onClick={() => applyDirectFilter('killer')}
+            className={`stat-item clickable process-killer-item ${activeFilters.has('process-killer') ? 'active' : ''}`}
+            onClick={() => applyDirectFilter('process-killer')}
           >
             <span className="stat-label">
-              <i className="fas fa-skull-crossbones"></i> Killer Drivers
+              <i className="fas fa-skull"></i> Process Killer Drivers
             </span>
-            <span className="stat-value">{statsData?.stats?.killerDrivers || 0}</span>
+            <span className="stat-value">{statsData?.stats?.processKillerDrivers || 0}</span>
           </div>
         </div>
         
@@ -1604,13 +1872,7 @@ export default function DriversClient({
               className={`filter-btn hvci-filter ${pendingFilters.has('hvci') ? 'active' : ''}`}
               onClick={() => toggleFilter('hvci')}
             >
-              <i className="fas fa-check"></i> HVCI PASSED
-            </button>
-            <button 
-              className={`filter-btn killer ${pendingFilters.has('killer') ? 'active' : ''}`}
-              onClick={() => toggleFilter('killer')}
-            >
-              <i className="fas fa-skull-crossbones"></i> Killer Drivers
+              <i className="fas fa-check"></i> HVCI Compatible
             </button>
 
             <button 
@@ -1631,7 +1893,7 @@ export default function DriversClient({
               className={`filter-btn ${pendingFilters.has('recent') ? 'active' : ''}`}
               onClick={() => toggleFilter('recent')}
             >
-              <i className="fas fa-clock"></i> Recent Certificates
+              <i className="fas fa-clock"></i> Recent Drivers
             </button>
             <button 
               className={`filter-btn ${pendingFilters.has('newest-first') ? 'active' : ''} ${pendingFilters.has('oldest-first') ? 'disabled' : ''}`}
@@ -1647,10 +1909,83 @@ export default function DriversClient({
             >
               <i className="fas fa-sort-amount-up"></i> Oldest First
             </button>
+          </div>
+          
+          <div className="filter-group advanced-filters">
+            <span className="filter-label"><i className="fas fa-cogs"></i> Behavioral Analysis:</span>
+            <button 
+              className={`filter-btn process-killer-filter ${pendingFilters.has('process-killer') ? 'active' : ''}`}
+              onClick={() => toggleFilter('process-killer')}
+            >
+              <i className="fas fa-skull-crossbones"></i> Process Killer
+            </button>
+            <button 
+              className={`filter-btn behavior-filter ${pendingFilters.has('memory-manipulator') ? 'active' : ''}`}
+              onClick={() => toggleFilter('memory-manipulator')}
+            >
+              <i className="fas fa-memory"></i> Memory Manipulator
+            </button>
+            <button 
+              className={`filter-btn behavior-filter ${pendingFilters.has('debug-bypass') ? 'active' : ''}`}
+              onClick={() => toggleFilter('debug-bypass')}
+            >
+              <i className="fas fa-bug"></i> Debug Bypass
+            </button>
+            <button 
+              className={`filter-btn behavior-filter ${pendingFilters.has('registry-manipulator') ? 'active' : ''}`}
+              onClick={() => toggleFilter('registry-manipulator')}
+            >
+              <i className="fas fa-edit"></i> Registry Manipulator
+            </button>
+            <button 
+              className={`filter-btn behavior-filter ${pendingFilters.has('file-manipulator') ? 'active' : ''}`}
+              onClick={() => toggleFilter('file-manipulator')}
+            >
+              <i className="fas fa-file-alt"></i> File Manipulator
+            </button>
+          </div>
+          
+          <div className="filter-group meta-filters">
+            <span className="filter-label"><i className="fas fa-info-circle"></i> Metadata:</span>
+            <button 
+              className={`filter-btn meta-filter ${pendingFilters.has('verified') ? 'active' : ''} ${pendingFilters.has('unverified') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('verified')}
+              disabled={pendingFilters.has('unverified')}
+            >
+              <i className="fas fa-check-circle"></i> Verified
+            </button>
+            <button 
+              className={`filter-btn meta-filter ${pendingFilters.has('unverified') ? 'active' : ''} ${pendingFilters.has('verified') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('unverified')}
+              disabled={pendingFilters.has('verified')}
+            >
+              <i className="fas fa-question-circle"></i> Unverified
+            </button>
+            <button 
+              className={`filter-btn arch-filter ${pendingFilters.has('architecture-AMD64') ? 'active' : ''}`}
+              onClick={() => toggleFilter('architecture-AMD64')}
+            >
+              <i className="fas fa-microchip"></i> x64
+            </button>
+            <button 
+              className={`filter-btn arch-filter ${pendingFilters.has('architecture-I386') ? 'active' : ''}`}
+              onClick={() => toggleFilter('architecture-I386')}
+            >
+              <i className="fas fa-microchip"></i> x32
+            </button>
+            <button 
+              className={`filter-btn arch-filter ${pendingFilters.has('architecture-ARM64') ? 'active' : ''}`}
+              onClick={() => toggleFilter('architecture-ARM64')}
+            >
+              <i className="fas fa-microchip"></i> arm64
+            </button>
+          </div>
+          
+          <div className="filter-group control-filters">
             <button 
               className="btn btn--primary apply-filters-btn"
               onClick={applyFilters}
-              disabled={pendingFilters.size === 0 && activeFilters.size === 0}
+              disabled={pendingFilters.size === 0 && searchQuery.trim() === ''}
             >
               <i className="fas fa-check"></i> Apply Filters
             </button>
@@ -1915,99 +2250,17 @@ export default function DriversClient({
             </button>
             
             <h3>
-              <i className="fas fa-book"></i> Help - Technical Definitions
+              <i className="fas fa-book"></i> About LOLDrivers Database - Project Vision & Capabilities
             </h3>
             
             <div className="help-intro">
-              <p>
-                <strong>About this project:</strong> The LOLDrivers database is a comprehensive research platform designed to filter, sort, and analyze vulnerable and malicious Windows drivers used in real-world attack campaigns. This tool empowers security researchers, threat hunters, and defenders to efficiently investigate driver-based threats.
-              </p>
-              <p>
-                <strong>Key Features:</strong> Advanced filtering by HVCI compatibility, signature status, and certificate dates. Interactive sorting and search capabilities to quickly identify specific drivers. Comprehensive metadata including hashes, certificates, and known attack usage patterns.
-              </p>
-              <p>
-                Use this database to research BYOVD (Bring Your Own Vulnerable Driver) attacks, track emerging threats, and build defensive signatures against malicious driver campaigns.
-              </p>
-            </div>
-            
-            <div className="help-section">
-              <h4><i className="fas fa-check"></i> HVCI (Hypervisor-protected Code Integrity)</h4>
-              <p>
-                <strong>Definition:</strong> A Windows security feature that uses the hypervisor to protect kernel code integrity against malicious modifications.
-              </p>
-              <p>
-                <strong>Impact:</strong> HVCI-compatible drivers can run on systems with this protection enabled.
-              </p>
-              <p>
-                <strong>Reference:</strong>{" "}
-                <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/bringup/device-guard-and-credential-guard" target="_blank" rel="noopener noreferrer">
-                  Microsoft HVCI Documentation
-                </a>
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-skull-crossbones"></i> Killer Drivers</h4>
-              <p>
-                <strong>Definition:</strong> Legitimate but vulnerable drivers that can be exploited by attackers to perform malicious actions with system privileges.
-              </p>
-              <p>
-                <strong>Usage:</strong> Often used in BYOVD (Bring Your Own Vulnerable Driver) attacks to bypass security protections.
-              </p>
-              <p>
-                <strong>Reference:</strong>{" "}
-                <a href="https://www.loldrivers.io/" target="_blank" rel="noopener noreferrer">
-                  LOLDrivers Project
-                </a>
-              </p>
-            </div>
-
-
-            <div className="help-section">
-              <h4><i className="fas fa-certificate"></i> Trusted Certificate</h4>
-              <p>
-                <strong>Definition:</strong> Drivers signed by well-known Certificate Authorities like Microsoft, GlobalSign, DigiCert, VeriSign, and other trusted issuers.
-              </p>
-              <p>
-                <strong>Trust Level:</strong> These certificates indicate the driver was signed by a recognized authority, though this doesn&apos;t guarantee the driver is safe.
-              </p>
-              <p>
-                <strong>Use Case:</strong> Identify drivers with legitimate code signing certificates from established CAs.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-exclamation-triangle"></i> Unknown Certificate</h4>
-              <p>
-                <strong>Definition:</strong> Drivers with certificates that are expired, self-signed, or issued by unknown/untrusted Certificate Authorities.
-              </p>
-              <p>
-                <strong>Risk Level:</strong> Higher risk of being malicious or compromised due to questionable certificate origin.
-              </p>
-              <p>
-                <strong>Analysis:</strong> Requires additional verification as the certificate chain cannot be trusted through standard means.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-clock"></i> Recent Certificates</h4>
-              <p>
-                <strong>Definition:</strong> Drivers whose signing certificates were issued recently, typically within the last few months.
-              </p>
-              <p>
-                <strong>Interest:</strong> Helps identify new threats or recently discovered drivers in the database.
-              </p>
-              <p>
-                <strong>Usage:</strong> Useful for monitoring threat landscape evolution and new vulnerabilities.
-              </p>
-            </div>
-
-            <div className="help-note">
-              <p>
-                <i className="fas fa-info-circle"></i>{" "}
-                <strong>Important Note:</strong> This database is intended for educational and security research purposes. 
-                Use of this information must comply with applicable laws and ethical best practices.
-              </p>
+              {helpContent ? (
+                <MarkdownRenderer content={helpContent.globalHelp} />
+              ) : (
+                <div className="loading-content">
+                  <p>Loading help content...</p>
+                </div>
+              )}
             </div>
 
             {showScrollIndicator && (
@@ -2068,132 +2321,13 @@ export default function DriversClient({
               <i className="fas fa-filter"></i> Filter Help - How Each Filter Works
             </h3>
             
-            <div className="help-intro">
-              <p>
-                <strong>Information Notice:</strong> This implementation was inspired by the work from loldrivers.com for the HVCI check functionality, but their implementation wasn&apos;t accurate. Unlike the Trail of Bits script that compares against a local version of the driver blocklist, our HVCI check uses Microsoft&apos;s direct link to the vulnerable driver blocklist for more precise comparison and testing.
-              </p>
-              <p>
-                <strong>Reference:</strong> Trail of Bits script: <a href="https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1" target="_blank" rel="noopener noreferrer">check_allowed_drivers.ps1</a>
-              </p>
-              <p>
-                <strong>Microsoft Blocklist:</strong> <a href="https://aka.ms/VulnerableDriverBlockList" target="_blank" rel="noopener noreferrer">https://aka.ms/VulnerableDriverBlockList</a>
-              </p>
-            </div>
-            
-            <div className="help-section">
-              <h4><i className="fas fa-check"></i> HVCI PASSED Filter</h4>
-              <p>
-                <strong>What it does:</strong> Shows only drivers that are compatible with Hypervisor-protected Code Integrity (HVCI) and are NOT present in Microsoft&apos;s vulnerable driver blocklist.
-              </p>
-              <p>
-                <strong>Technical Details:</strong> This filter uses a GitHub Action workflow that automatically fetches Microsoft&apos;s official vulnerable driver blocklist from <code>https://aka.ms/VulnerableDriverBlockList</code> and cross-references it with our driver database. The check runs on a scheduled basis to ensure up-to-date results.
-              </p>
-              <p>
-                <strong>Use Case:</strong> Identify drivers that can safely run on systems with HVCI enabled, which is crucial for Windows 11 and enterprise security configurations.
-              </p>
-              <p>
-                <strong>GitHub Workflow:</strong> The automated process downloads the latest XML blocklist, parses the driver hashes, and marks drivers accordingly. This ensures real-time accuracy compared to static local lists.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-skull-crossbones"></i> Killer Drivers Filter</h4>
-              <p>
-                <strong>What it does:</strong> Displays drivers that are known to be exploitable and have been used in real-world attacks.
-              </p>
-              <p>
-                <strong>Technical Details:</strong> These are legitimate drivers with security vulnerabilities that attackers exploit to gain elevated privileges or perform malicious actions. They&apos;re catalogued based on public threat intelligence and security research.
-              </p>
-              <p>
-                <strong>Attack Vector:</strong> Commonly used in BYOVD (Bring Your Own Vulnerable Driver) attacks where attackers load these legitimate-but-vulnerable drivers to bypass security controls.
-              </p>
-              <p>
-                <strong>Detection:</strong> Security teams can use this filter to identify potentially dangerous drivers in their environment and prioritize them for blocking or monitoring.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-certificate"></i> Trusted Certificate Filter</h4>
-              <p>
-                <strong>What it does:</strong> Shows drivers signed by well-established Certificate Authorities like Microsoft, GlobalSign, DigiCert, VeriSign, and other recognized issuers.
-              </p>
-              <p>
-                <strong>Certificate Validation:</strong> The system analyzes the certificate chain and issuer information to determine if the signing authority is from a trusted root CA.
-              </p>
-              <p>
-                <strong>Business Logic:</strong> Mutually exclusive with &ldquo;Unknown Certificate&rdquo; filter - you can only select one at a time since a certificate cannot be both trusted and untrusted.
-              </p>
-              <p>
-                <strong>Security Note:</strong> While a trusted certificate indicates legitimate signing, it doesn&apos;t guarantee the driver is safe - legitimate certificates can sign vulnerable or malicious drivers.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-exclamation-triangle"></i> Unknown Certificate Filter</h4>
-              <p>
-                <strong>What it does:</strong> Displays drivers with certificates that are expired, self-signed, revoked, or issued by unrecognized Certificate Authorities.
-              </p>
-              <p>
-                <strong>Risk Assessment:</strong> These drivers require additional scrutiny as their certificate chain cannot be validated through standard trust mechanisms.
-              </p>
-              <p>
-                <strong>Common Scenarios:</strong> Self-signed certificates, expired certificates, certificates from compromised CAs, or test certificates that made it into production.
-              </p>
-              <p>
-                <strong>Mutual Exclusivity:</strong> Cannot be used simultaneously with &ldquo;Trusted Certificate&rdquo; filter due to conflicting logic.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-clock"></i> Recent Certificates Filter</h4>
-              <p>
-                <strong>What it does:</strong> Shows drivers whose signing certificates were issued within a recent timeframe (typically last 3-6 months).
-              </p>
-              <p>
-                <strong>Threat Hunting:</strong> Useful for identifying newly signed drivers that might be part of recent attack campaigns or emerging threats.
-              </p>
-              <p>
-                <strong>Date Logic:</strong> Based on the certificate&apos;s &ldquo;Not Before&rdquo; date, not the driver compilation date or when it was added to the database.
-              </p>
-              <p>
-                <strong>Analysis Value:</strong> Recent certificates combined with suspicious behavior patterns can indicate active threat campaigns.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-sort-amount-down"></i> Newest First / <i className="fas fa-sort-amount-up"></i> Oldest First</h4>
-              <p>
-                <strong>What it does:</strong> Sorts the entire result set by the date the driver was added to our database.
-              </p>
-              <p>
-                <strong>Newest First:</strong> Shows recently discovered or updated drivers at the top - useful for tracking emerging threats and latest additions.
-              </p>
-              <p>
-                <strong>Oldest First:</strong> Shows historically known drivers first - useful for studying long-term attack patterns and established threats.
-              </p>
-              <p>
-                <strong>Mutual Exclusivity:</strong> You can only sort in one direction at a time. These filters affect the entire result ordering, not just filtering.
-              </p>
-              <p>
-                <strong>Performance Note:</strong> Sorting is applied after filtering, so combining with other filters will sort only the filtered results.
-              </p>
-            </div>
-
-            <div className="help-section">
-              <h4><i className="fas fa-cogs"></i> How to Use Filters Effectively</h4>
-              <p>
-                <strong>Combination Strategy:</strong> Filters can be combined (except mutually exclusive ones) to create precise queries. For example: &ldquo;HVCI PASSED&rdquo; + &ldquo;Recent Certificates&rdquo; shows newly signed drivers that are HVCI-compatible.
-              </p>
-              <p>
-                <strong>Apply vs Clear:</strong> Changes are staged until you click &ldquo;Apply Filters&rdquo;. Use &ldquo;Clear Filters&rdquo; to reset both search terms and active filters.
-              </p>
-              <p>
-                <strong>URL Integration:</strong> Filter states are preserved in the URL, so you can bookmark specific filter combinations or share them with colleagues.
-              </p>
-              <p>
-                <strong>Performance:</strong> Server-side filtering ensures fast results even with large datasets. Pagination maintains performance with extensive result sets.
-              </p>
-            </div>
+            {helpContent ? (
+              <MarkdownRenderer content={helpContent.filterHelp} />
+            ) : (
+              <div className="loading-content">
+                <p>Loading filter help content...</p>
+              </div>
+            )}
 
             {showFilterHelpScrollIndicator && (
               <div 
