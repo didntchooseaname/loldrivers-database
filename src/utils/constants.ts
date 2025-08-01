@@ -42,12 +42,10 @@ export const FILTER_TYPES = {
 } as const;
 
 // Pre-compiled regex for performance
-export const KILLER_FUNCTIONS_REGEX = /zwterminateprocess|zwkillprocess|ntterminate/i;
+export const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
 
 export const KILLER_FUNCTIONS = [
-  'zwterminateprocess',
-  'zwkillprocess', 
-  'ntterminate'
+  'zwterminateprocess'
 ] as const;
 
 export const NORMALIZATION_OPTIONS = {

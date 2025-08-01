@@ -29,6 +29,10 @@
   --color-green: rgba(34, 197, 94, 1);
   --color-green-dark: rgba(22, 163, 74, 1);
 
+  /* Semantic colors */
+  --color-danger: rgba(192, 21, 47, 1);
+  --color-danger-rgb: 192, 21, 47;
+
   /* Enhanced colors for tags */
   --color-blue-600: rgba(37, 99, 235, 1);
   --color-blue-700: rgba(29, 78, 216, 1);

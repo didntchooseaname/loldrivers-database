@@ -64,7 +64,7 @@ const createSearchKey = (query: string, filters: Record<string, unknown>, page: 
 const normalizeString = (str: string): string => str.toLowerCase().trim();
 
 // Pre-compiled regex for better performance
-const KILLER_FUNCTIONS_REGEX = /zwterminateprocess|zwkillprocess|ntterminate/i;
+const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
 
 class DriversCache {
   private static instance: DriversCache;
@@ -129,9 +129,7 @@ class DriversCache {
       driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) &&
       driver.ImportedFunctions.some(func => {
         const funcLower = func.toLowerCase();
-        return funcLower.includes('zwterminateprocess') || funcLower.includes('zwkillprocess') ||
-               funcLower.includes('ntterminate') || funcLower.includes('zwsuspendprocess') ||
-               funcLower.includes('psterminatesystemthread');
+        return funcLower.includes('zwterminateprocess');
       })
     );
 

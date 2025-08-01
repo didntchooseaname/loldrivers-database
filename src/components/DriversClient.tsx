@@ -7,6 +7,7 @@ import SafeDate from '@/components/SafeDate';
 import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { ChangelogPopup } from '@/components/ChangelogPopup';
+import { TermsPopup } from '@/components/TermsPopup';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = async (url: string) => {
@@ -92,6 +93,7 @@ export default function DriversClient({
   const [showHelpPopup, setShowHelpPopup] = useState(false);
   const [showFilterHelpPopup, setShowFilterHelpPopup] = useState(false);
   const [showChangelogPopup, setShowChangelogPopup] = useState(false);
+  const [showTermsPopup, setShowTermsPopup] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   const [showFilterHelpScrollIndicator, setShowFilterHelpScrollIndicator] = useState(true);
   
@@ -190,6 +192,16 @@ export default function DriversClient({
     setCurrentPage(1);
   }, [searchQuery, activeFilters]);
 
+  // Force revalidation when activeFilters change
+  useEffect(() => {
+    if (isFirstRender.current) {
+      return;
+    }
+    if (mutate) {
+      mutate();
+    }
+  }, [activeFilters, mutate]);
+
   // Load help content from markdown files
   useEffect(() => {
     const loadHelpContent = async () => {
@@ -216,12 +228,7 @@ export default function DriversClient({
         if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
           const hasCriticalFunctions = driver.ImportedFunctions.some(func => {
             const funcLower = func.toLowerCase();
-            return funcLower.includes('zwterminateprocess') || 
-                   funcLower.includes('zwkillprocess') || 
-                   funcLower.includes('ntterminate') ||
-                   funcLower.includes('zwsuspendprocess') ||
-                   funcLower.includes('psterminatesystemthread') ||
-                   (funcLower.includes('zwclose') && funcLower.includes('process'));
+            return funcLower.includes('zwterminateprocess');
           });
           
           if (hasCriticalFunctions) {
@@ -380,11 +387,7 @@ export default function DriversClient({
 
   const applyFilters = useCallback(() => {
     setActiveFilters(new Set(pendingFilters));
-    // Force SWR revalidation for new data
-    if (mutate) {
-      mutate();
-    }
-  }, [pendingFilters, mutate]);
+  }, [pendingFilters]);
 
   // Fonction pour appliquer directement un filtre depuis le header
   const applyDirectFilter = useCallback((filterType: string) => {
@@ -732,11 +735,7 @@ export default function DriversClient({
       
       // Process killer detection
       const hasProcessKiller = functions.some(func => 
-        func.includes('zwterminateprocess') ||
-        func.includes('zwkillprocess') ||
-        func.includes('ntterminate') ||
-        func.includes('zwsuspendprocess') ||
-        func.includes('psterminatesystemthread')
+        func.includes('zwterminateprocess')
       );
       if (hasProcessKiller) {
         tags.push({
@@ -781,11 +780,7 @@ export default function DriversClient({
       
       // Process killer detection
       const hasProcessKiller = functions.some(func => 
-        func.includes('zwterminateprocess') ||
-        func.includes('zwkillprocess') ||
-        func.includes('ntterminate') ||
-        func.includes('zwsuspendprocess') ||
-        func.includes('psterminatesystemthread')
+        func.includes('zwterminateprocess')
       );
       if (hasProcessKiller) {
         capacities.push({
@@ -964,12 +959,7 @@ export default function DriversClient({
       const funcLower = func.toLowerCase();
       
       // Fonctions critiques/dangereuses
-      if (funcLower.includes('zwterminateprocess') || 
-          funcLower.includes('zwkillprocess') || 
-          funcLower.includes('ntterminate') ||
-          funcLower.includes('zwsuspendprocess') ||
-          funcLower.includes('psterminatesystemthread') ||
-          funcLower.includes('zwclose') && funcLower.includes('process')) {
+      if (funcLower.includes('zwterminateprocess')) {
         categorizedFunctions.critical.push(func);
       }
       // Gestion des processus
@@ -2165,14 +2155,17 @@ export default function DriversClient({
                 <i className="fab fa-github"></i> magicsword-io/LOLDrivers
               </a>
             </p>
-            <div className="contributors">
-              <span className="contributors-label">Key Contributors:</span>
-              <div className="contributors-list">
-                <span className="contributor">Michael Haag</span>
-                <span className="contributor">Jose Hernandez</span>
-                <span className="contributor">Nasreddine Bencherchali</span>
-              </div>
-            </div>
+                        <p className="footer-text">
+              This project:{' '}
+              <a 
+                href="https://github.com/didntchooseaname/loldrivers-database" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="footer-link"
+              >
+                <i className="fab fa-github"></i> didntchooseaname/loldrivers-database
+              </a>
+            </p>
           </div>
         </div>
         
@@ -2181,12 +2174,12 @@ export default function DriversClient({
             This is an independent interface for educational and research purposes.
           </p>
           <div className="footer-links">
-            <a 
-              href="/terms" 
+            <button 
+              onClick={() => setShowTermsPopup(true)}
               className="footer-legal-link"
             >
               <i className="fas fa-gavel"></i> Terms of Service
-            </a>
+            </button>
           </div>
         </div>
       </footer>
@@ -2329,6 +2322,12 @@ export default function DriversClient({
       <ChangelogPopup 
         isVisible={showChangelogPopup}
         onClose={() => setShowChangelogPopup(false)}
+      />
+
+      {/* Terms Popup */}
+      <TermsPopup 
+        isVisible={showTermsPopup}
+        onClose={() => setShowTermsPopup(false)}
       />
     </div>
   );

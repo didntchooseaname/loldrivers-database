@@ -53,9 +53,7 @@ const DriverItem = memo(({ driver, style, onClick }: DriverItemProps) => {
             
             {driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) && 
              driver.ImportedFunctions.some(func => 
-               func.toLowerCase().includes('zwterminateprocess') ||
-               func.toLowerCase().includes('zwkillprocess') ||
-               func.toLowerCase().includes('ntterminate')
+               func.toLowerCase().includes('zwterminateprocess')
              ) && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                 Killer Driver

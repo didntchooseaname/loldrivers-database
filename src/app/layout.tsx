@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import './globals.css';
 import ThemeToggle from '@/components/ThemeToggle';
 import ClientScripts from '@/components/ClientScripts';
-import { ClientLayout } from '@/components/ClientLayout';
+import { AppWrapper } from '@/components/AppWrapper';
 
 export const metadata: Metadata = {
   title: 'LOLDrivers Database',
@@ -105,11 +105,9 @@ export default function RootLayout({
       <body className="antialiased">
         <Suspense fallback={<LoadingFallback />}>
           <ThemeToggle />
-          <ClientLayout>
-            <main className="min-h-screen">
-              {children}
-            </main>
-          </ClientLayout>
+          <AppWrapper>
+            {children}
+          </AppWrapper>
           
           <ClientScripts />
         </Suspense>

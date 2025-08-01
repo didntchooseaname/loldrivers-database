@@ -32,6 +32,14 @@ function setCache(key: string, data: unknown) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    
+    // Clear cache if requested
+    if (searchParams.get('clearCache') === 'true') {
+      apiCache.clear();
+      return NextResponse.json({ success: true, message: 'Cache cleared' });
+    }
+    
     const cacheKey = getCacheKey(request.url);
     const cachedResult = getFromCache(cacheKey);
     
@@ -44,9 +52,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = parseInt(searchParams.get('limit') || '1000');
     // Allow unlimited results if limit is set to 0 or -1
     const actualLimit = limit <= 0 ? undefined : Math.min(50000, Math.max(1, limit));
     const query = searchParams.get('q') || '';

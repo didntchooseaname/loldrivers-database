@@ -9,9 +9,7 @@ export const useOptimizedDrivers = (drivers: Driver[]) => {
       // Pre-calculate expensive properties
       isKiller: driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) && 
         driver.ImportedFunctions.some((func: string) => 
-          func.toLowerCase().includes('zwterminateprocess') ||
-          func.toLowerCase().includes('zwkillprocess') ||
-          func.toLowerCase().includes('ntterminate')
+          func.toLowerCase().includes('zwterminateprocess')
         ),
       hvciStatus: driver.LoadsDespiteHVCI ? 
         driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE' : null,

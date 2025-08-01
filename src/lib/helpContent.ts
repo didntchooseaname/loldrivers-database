@@ -6,9 +6,35 @@ export interface HelpContent {
   filterHelp: string;
 }
 
-let cachedContent: HelpContent | null = null;
+export interface TermsResponse {
+  success: boolean;
+  content: string;
+}
 
-export async function getHelpContent(): Promise<HelpContent> {
+let cachedContent: HelpContent | null = null;
+let cachedTerms: string | null = null;
+
+export async function getHelpContent(type?: string): Promise<HelpContent | TermsResponse> {
+  if (type === 'terms') {
+    if (cachedTerms) {
+      return { success: true, content: cachedTerms };
+    }
+
+    try {
+      const contentDir = path.join(process.cwd(), 'src', 'content');
+      const termsPath = path.join(contentDir, 'terms.md');
+      
+      const termsContent = fs.readFileSync(termsPath, 'utf-8');
+      cachedTerms = termsContent;
+      
+      return { success: true, content: termsContent };
+    } catch (error) {
+      console.error('Error loading terms content:', error);
+      return { success: false, content: '# Terms content not available' };
+    }
+  }
+
+  // Default help content logic
   if (cachedContent) {
     return cachedContent;
   }

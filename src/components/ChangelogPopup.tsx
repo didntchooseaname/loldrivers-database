@@ -116,8 +116,9 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
+    if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     
@@ -126,6 +127,24 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
       day: 'numeric',
       year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
     }).format(date);
+  };
+
+  const sanitizeGitHubUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      // Only allow GitHub URLs with HTTPS protocol
+      if (urlObj.hostname === 'github.com' && urlObj.protocol === 'https:') {
+        // Additional check to ensure the path matches expected GitHub commit URL pattern
+        const pathPattern = /^\/[^\/]+\/[^\/]+\/commit\/[a-f0-9]+$/;
+        if (pathPattern.test(urlObj.pathname)) {
+          // Return a new clean URL to prevent any potential XSS
+          return `https://github.com${urlObj.pathname}`;
+        }
+      }
+    } catch {
+      // Invalid URL
+    }
+    return '#';
   };
 
   if (!isVisible) return null;
@@ -182,11 +201,11 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
                       <div className="commit-meta">
                         {commit.author && (
                           <div className="commit-author">
-                            <Image
-                              src={commit.author.avatar_url}
-                              alt={commit.author.login}
-                              width={20}
-                              height={20}
+                            <Image 
+                              src={commit.author.avatar_url} 
+                              alt={`${commit.author.login}'s avatar`}
+                              width={16} 
+                              height={16}
                               className="author-avatar"
                             />
                             <span className="author-name">{commit.author.login}</span>
@@ -195,7 +214,7 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
                         
                         <div className="commit-actions">
                           <a
-                            href={commit.html_url.startsWith('https://github.com/') ? commit.html_url : '#'}
+                            href={sanitizeGitHubUrl(commit.html_url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="commit-link"

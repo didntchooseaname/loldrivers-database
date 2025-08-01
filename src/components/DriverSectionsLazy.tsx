@@ -38,9 +38,7 @@ const DriverSectionsLazy = memo(({
             <div className="collapsible-inner">
               <ul className="functions-list functions-scrollable">
                 {functions.map((func, idx) => {
-                  const isDangerous = func.toLowerCase().includes('zwterminateprocess') ||
-                                    func.toLowerCase().includes('zwkillprocess') ||
-                                    func.toLowerCase().includes('ntterminate');
+                  const isDangerous = func.toLowerCase().includes('zwterminateprocess');
                   
                   return (
                     <li key={idx} className={`function-item ${isDangerous ? 'dangerous' : ''}`}>
