@@ -377,7 +377,7 @@ export default function DriversClient({
   }, []);
 
   // Fonction pour partager la recherche actuelle
-  const shareCurrentSearch = useCallback(() => {
+  const shareCurrentSearch = useCallback(async () => {
     try {
       const url = new URL(window.location.href);
       url.search = ''; // Clear existing params
@@ -406,18 +406,13 @@ export default function DriversClient({
       // Update current URL without page reload
       window.history.replaceState({}, '', shareUrl);
       
-      // Copy to clipboard with graceful degradation
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(shareUrl).then(() => {
-          showToast('Link copied to clipboard!');
-        }).catch((error) => {
-          console.warn('Clipboard API failed:', error);
-          showToast('Failed to copy link - please copy manually');
-        });
-      } else {
-        // For browsers without Clipboard API support
-        console.warn('Clipboard API not available');
-        showToast('Copy not supported - please copy manually from address bar');
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showToast('Link copied to clipboard!');
+      } catch (error) {
+        console.warn('Clipboard API failed:', error);
+        showToast('Failed to copy link - please copy manually');
       }
     } catch (error) {
       console.error('Failed to create share URL:', error);
@@ -721,6 +716,17 @@ export default function DriversClient({
     );
   };
 
+  // Helper function to copy function name to clipboard
+  const copyFunctionToClipboard = async (functionName: string) => {
+    try {
+      await navigator.clipboard.writeText(functionName);
+      showToast(`Function "${functionName}" copied to clipboard!`);
+    } catch (err) {
+      console.error('Failed to copy function:', err);
+      showToast('Failed to copy function to clipboard');
+    }
+  };
+
   // Section des fonctions importées
   const renderImportedFunctionsSection = (functions: string[] | undefined, driver: Driver, index: number) => {
     // Si pas de fonctions ou tableau vide, affichage simple non-collapsible
@@ -877,8 +883,22 @@ export default function DriversClient({
                   {expandedSections.has(`critical-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.critical.map((func, idx) => (
-                        <li key={`critical-${idx}`} className="function-item dangerous">
-                          {func}
+                        <li 
+                          key={`critical-${idx}`} 
+                          className="function-item dangerous clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -903,8 +923,22 @@ export default function DriversClient({
                   {expandedSections.has(`process-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.process.map((func, idx) => (
-                        <li key={`process-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`process-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -929,8 +963,22 @@ export default function DriversClient({
                   {expandedSections.has(`memory-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.memory.map((func, idx) => (
-                        <li key={`memory-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`memory-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -955,8 +1003,22 @@ export default function DriversClient({
                   {expandedSections.has(`file-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.file.map((func, idx) => (
-                        <li key={`file-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`file-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -981,8 +1043,22 @@ export default function DriversClient({
                   {expandedSections.has(`registry-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.registry.map((func, idx) => (
-                        <li key={`registry-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`registry-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -1007,8 +1083,22 @@ export default function DriversClient({
                   {expandedSections.has(`network-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.network.map((func, idx) => (
-                        <li key={`network-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`network-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -1033,8 +1123,22 @@ export default function DriversClient({
                   {expandedSections.has(`security-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.security.map((func, idx) => (
-                        <li key={`security-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`security-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -1059,8 +1163,22 @@ export default function DriversClient({
                   {expandedSections.has(`kernel-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.kernel.map((func, idx) => (
-                        <li key={`kernel-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`kernel-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -1085,8 +1203,22 @@ export default function DriversClient({
                   {expandedSections.has(`other-${index}`) && (
                     <ul className="functions-list category-functions-list">
                       {categorizedFunctions.other.map((func, idx) => (
-                        <li key={`other-${idx}`} className="function-item">
-                          {func}
+                        <li 
+                          key={`other-${idx}`} 
+                          className="function-item clickable-function"
+                          onClick={() => copyFunctionToClipboard(func)}
+                          title={`Click to copy "${func}" to clipboard`}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              copyFunctionToClipboard(func);
+                            }
+                          }}
+                        >
+                          <span className="function-name">{func}</span>
+                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
                         </li>
                       ))}
                     </ul>
@@ -1312,7 +1444,8 @@ export default function DriversClient({
     link.href = downloadUrl;
     link.download = filename;
     link.target = '_blank';
-    document.body.appendChild(link);
+    link.style.display = 'none';
+    document.body.insertAdjacentElement('beforeend', link);
     link.click();
     document.body.removeChild(link);
     
@@ -1334,26 +1467,26 @@ export default function DriversClient({
         <div className="driver-header">
           <h3 className="driver-title">
             <i className="fas fa-microchip"></i> {filename}
-            <button 
-              className="download-btn"
-              onClick={() => downloadDriver(driver)}
-              title={`Download ${filename}`}
-              aria-label={`Download ${filename}`}
-            >
-              <i className="fas fa-download"></i>
-            </button>
           </h3>
-          {renderStatusTags(statusTags)}
-          {renderHashTags(hashes)}
-          {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
-          {renderCommandDescription(driver.Commands)}
+          <button 
+            className="download-btn"
+            onClick={() => downloadDriver(driver)}
+            title={`Download ${filename}`}
+            aria-label={`Download ${filename}`}
+          >
+            <i className="fas fa-download"></i>
+          </button>
         </div>
         
+        {renderStatusTags(statusTags)}
+        {renderHashTags(hashes)}
+        {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
         {renderSimpleSection('Description', driver.Description || 'No description available', 'fas fa-info-circle')}
         {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
         {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
         {driver.Created && renderSimpleSection('Created Date', driver.Created, 'fas fa-calendar')}
         {driver.MitreID && renderSimpleSection('MITRE ID', driver.MitreID, 'fas fa-shield-alt')}
+        {renderCommandDescription(driver.Commands)}
         {renderCommandsSection(driver.Commands, driver, index)}
         {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
         {renderResourcesSection(driver.Resources, driver, index)}
@@ -1937,7 +2070,7 @@ export default function DriversClient({
             
             <div className="help-intro">
               <p>
-                <strong>Information Notice:</strong> This implementation was inspired by the work from loldrivers.com for the HVCI check functionality, but their implementation wasn't accurate. Unlike the Trail of Bits script that compares against a local version of the driver blocklist, our HVCI check uses Microsoft's direct link to the vulnerable driver blocklist for more precise comparison and testing.
+                <strong>Information Notice:</strong> This implementation was inspired by the work from loldrivers.com for the HVCI check functionality, but their implementation wasn&apos;t accurate. Unlike the Trail of Bits script that compares against a local version of the driver blocklist, our HVCI check uses Microsoft&apos;s direct link to the vulnerable driver blocklist for more precise comparison and testing.
               </p>
               <p>
                 <strong>Reference:</strong> Trail of Bits script: <a href="https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1" target="_blank" rel="noopener noreferrer">check_allowed_drivers.ps1</a>
@@ -1950,10 +2083,10 @@ export default function DriversClient({
             <div className="help-section">
               <h4><i className="fas fa-check"></i> HVCI PASSED Filter</h4>
               <p>
-                <strong>What it does:</strong> Shows only drivers that are compatible with Hypervisor-protected Code Integrity (HVCI) and are NOT present in Microsoft's vulnerable driver blocklist.
+                <strong>What it does:</strong> Shows only drivers that are compatible with Hypervisor-protected Code Integrity (HVCI) and are NOT present in Microsoft&apos;s vulnerable driver blocklist.
               </p>
               <p>
-                <strong>Technical Details:</strong> This filter uses a GitHub Action workflow that automatically fetches Microsoft's official vulnerable driver blocklist from <code>https://aka.ms/VulnerableDriverBlockList</code> and cross-references it with our driver database. The check runs on a scheduled basis to ensure up-to-date results.
+                <strong>Technical Details:</strong> This filter uses a GitHub Action workflow that automatically fetches Microsoft&apos;s official vulnerable driver blocklist from <code>https://aka.ms/VulnerableDriverBlockList</code> and cross-references it with our driver database. The check runs on a scheduled basis to ensure up-to-date results.
               </p>
               <p>
                 <strong>Use Case:</strong> Identify drivers that can safely run on systems with HVCI enabled, which is crucial for Windows 11 and enterprise security configurations.
@@ -1969,7 +2102,7 @@ export default function DriversClient({
                 <strong>What it does:</strong> Displays drivers that are known to be exploitable and have been used in real-world attacks.
               </p>
               <p>
-                <strong>Technical Details:</strong> These are legitimate drivers with security vulnerabilities that attackers exploit to gain elevated privileges or perform malicious actions. They're catalogued based on public threat intelligence and security research.
+                <strong>Technical Details:</strong> These are legitimate drivers with security vulnerabilities that attackers exploit to gain elevated privileges or perform malicious actions. They&apos;re catalogued based on public threat intelligence and security research.
               </p>
               <p>
                 <strong>Attack Vector:</strong> Commonly used in BYOVD (Bring Your Own Vulnerable Driver) attacks where attackers load these legitimate-but-vulnerable drivers to bypass security controls.
@@ -1988,10 +2121,10 @@ export default function DriversClient({
                 <strong>Certificate Validation:</strong> The system analyzes the certificate chain and issuer information to determine if the signing authority is from a trusted root CA.
               </p>
               <p>
-                <strong>Business Logic:</strong> Mutually exclusive with "Unknown Certificate" filter - you can only select one at a time since a certificate cannot be both trusted and untrusted.
+                <strong>Business Logic:</strong> Mutually exclusive with &ldquo;Unknown Certificate&rdquo; filter - you can only select one at a time since a certificate cannot be both trusted and untrusted.
               </p>
               <p>
-                <strong>Security Note:</strong> While a trusted certificate indicates legitimate signing, it doesn't guarantee the driver is safe - legitimate certificates can sign vulnerable or malicious drivers.
+                <strong>Security Note:</strong> While a trusted certificate indicates legitimate signing, it doesn&apos;t guarantee the driver is safe - legitimate certificates can sign vulnerable or malicious drivers.
               </p>
             </div>
 
@@ -2007,7 +2140,7 @@ export default function DriversClient({
                 <strong>Common Scenarios:</strong> Self-signed certificates, expired certificates, certificates from compromised CAs, or test certificates that made it into production.
               </p>
               <p>
-                <strong>Mutual Exclusivity:</strong> Cannot be used simultaneously with "Trusted Certificate" filter due to conflicting logic.
+                <strong>Mutual Exclusivity:</strong> Cannot be used simultaneously with &ldquo;Trusted Certificate&rdquo; filter due to conflicting logic.
               </p>
             </div>
 
@@ -2020,7 +2153,7 @@ export default function DriversClient({
                 <strong>Threat Hunting:</strong> Useful for identifying newly signed drivers that might be part of recent attack campaigns or emerging threats.
               </p>
               <p>
-                <strong>Date Logic:</strong> Based on the certificate's "Not Before" date, not the driver compilation date or when it was added to the database.
+                <strong>Date Logic:</strong> Based on the certificate&apos;s &ldquo;Not Before&rdquo; date, not the driver compilation date or when it was added to the database.
               </p>
               <p>
                 <strong>Analysis Value:</strong> Recent certificates combined with suspicious behavior patterns can indicate active threat campaigns.
@@ -2049,10 +2182,10 @@ export default function DriversClient({
             <div className="help-section">
               <h4><i className="fas fa-cogs"></i> How to Use Filters Effectively</h4>
               <p>
-                <strong>Combination Strategy:</strong> Filters can be combined (except mutually exclusive ones) to create precise queries. For example: "HVCI PASSED" + "Recent Certificates" shows newly signed drivers that are HVCI-compatible.
+                <strong>Combination Strategy:</strong> Filters can be combined (except mutually exclusive ones) to create precise queries. For example: &ldquo;HVCI PASSED&rdquo; + &ldquo;Recent Certificates&rdquo; shows newly signed drivers that are HVCI-compatible.
               </p>
               <p>
-                <strong>Apply vs Clear:</strong> Changes are staged until you click "Apply Filters". Use "Clear Filters" to reset both search terms and active filters.
+                <strong>Apply vs Clear:</strong> Changes are staged until you click &ldquo;Apply Filters&rdquo;. Use &ldquo;Clear Filters&rdquo; to reset both search terms and active filters.
               </p>
               <p>
                 <strong>URL Integration:</strong> Filter states are preserved in the URL, so you can bookmark specific filter combinations or share them with colleagues.

@@ -2332,17 +2332,22 @@ select.form-control {
   /* Status tags mobile layout */
   .status-tags {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-6);
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-bottom: var(--space-8);
   }
 
   .status-tag {
-    padding: var(--space-6) var(--space-10);
-    font-size: var(--font-size-sm);
+    padding: var(--space-4) var(--space-8);
+    font-size: var(--font-size-xs);
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    width: fit-content;
+    gap: var(--space-2);
+    width: auto;
+    height: auto;
+    min-height: 28px;
+    border-radius: var(--radius-sm);
   }
 
   /* Headers and typography mobile */
@@ -2364,9 +2369,18 @@ select.form-control {
   .driver-card:hover,
   .driver-card:hover::before,
   .driver-card:hover::after,
-  .driver-card:hover .driver-title {
+  .driver-card:hover .driver-title,
+  .status-tag:hover {
     transform: none;
     box-shadow: none;
+  }
+
+  /* Disable status tag animations on mobile */
+  .status-tag:hover::before,
+  .status-tag:hover::after {
+    left: initial;
+    width: initial;
+    height: initial;
   }
 }
 
@@ -2473,21 +2487,24 @@ select.form-control {
 
 .driver-header {
   margin-bottom: var(--space-12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-8);
 }
 
 .driver-title {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-  margin-bottom: var(--space-6);
+  margin: 0;
   word-break: break-all;
   transition: all var(--duration-normal) var(--ease-standard);
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-8);
   text-align: left;
-  justify-content: flex-start;
+  line-height: var(--line-height-base);
 }
 
 .driver-card:hover .driver-title {
@@ -2500,26 +2517,24 @@ select.form-control {
   background: transparent;
   color: var(--color-primary);
   border: none;
-  border-radius: 0;
-  padding: var(--space-2);
+  padding: var(--space-4);
   cursor: pointer;
   font-size: var(--font-size-lg);
   transition: all var(--duration-fast) var(--ease-standard);
   display: flex;
   align-items: center;
+  justify-content: center;
   min-width: auto;
   flex-shrink: 0;
 }
 
 .download-btn:hover {
-  color: var(--color-primary);
-  transform: none;
-  box-shadow: none;
-  background: transparent;
+  color: var(--color-primary-hover);
+  transform: scale(1.1);
 }
 
 .download-btn:active {
-  transform: none;
+  transform: scale(0.95);
 }
 
 .download-btn i {
@@ -2963,18 +2978,19 @@ select.form-control {
   margin-bottom: var(--space-8);
   color: var(--color-primary);
   font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-base);
 }
 
 .simple-section-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
 }
 
 .simple-section-content {
-  color: var(--color-text);
-  font-size: var(--font-size-lg);
-  line-height: 1.6;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
   word-wrap: break-word;
   overflow-wrap: break-word;
   text-align: left;
@@ -3600,12 +3616,13 @@ select.form-control {
 }
 
 .collapsible-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   transition: all var(--duration-normal) var(--ease-standard);
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  color: var(--color-text);
 }
 
 .collapsible-header:hover .collapsible-title {
@@ -3689,8 +3706,8 @@ select.form-control {
 .function-item {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
-  padding: var(--space-6) var(--space-8); /* Padding légèrement augmenté */
-  background-color: var(--color-bg-8); /* Remettre la couleur de fond */
+  padding: var(--space-6) var(--space-8);
+  background-color: var(--color-bg-8);
   border-radius: var(--radius-sm);
   color: var(--color-text);
   transition: all var(--duration-normal) var(--ease-standard);
@@ -3698,7 +3715,39 @@ select.form-control {
   position: relative;
   overflow: hidden;
   border: 1px solid transparent;
-  margin-bottom: var(--space-2); /* Petit espace entre les éléments */
+  margin-bottom: var(--space-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.function-item.clickable-function:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.function-name {
+  flex: 1;
+  word-break: break-all;
+  font-family: inherit;
+}
+
+.copy-icon {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  flex-shrink: 0;
+}
+
+.function-item:hover .copy-icon {
+  opacity: 1;
+}
+
+.function-item:active {
+  transform: translateY(0);
+  background-color: rgba(var(--color-primary-rgb), 0.1);
 }
 
 .function-item::before {
@@ -3713,11 +3762,15 @@ select.form-control {
 }
 
 .function-item:hover {
-  background-color: rgba(var(--color-accent-rgb), 0.08); /* Remettre la couleur de fond hover */
+  background-color: rgba(var(--color-accent-rgb), 0.08);
   border-color: rgba(var(--color-accent-rgb), 0.2);
-  transform: translateX(4px); /* Mouvement moins prononcé */
-  box-shadow: 0 2px 8px rgba(var(--color-accent-rgb), 0.1); /* Ombre plus douce */
-  color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.function-item:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .function-item:hover::before {
@@ -4755,12 +4808,30 @@ select.form-control {
     min-height: 40px;
   }
   
-  /* Sections with reduced spacing */
+  /* Sections with improved spacing hierarchy */
   .simple-section,
   .collapsible-section,
   .hash-section,
   .status-tags {
+    margin-bottom: var(--space-12);
+  }
+
+  .simple-section {
+    padding: var(--space-12);
+  }
+
+  .collapsible-section {
+    padding: var(--space-12);
+  }
+
+  .simple-section-header {
     margin-bottom: var(--space-8);
+    padding-bottom: var(--space-4);
+  }
+
+  .simple-section-content {
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-normal);
   }
 
   /* Status tags responsive */
