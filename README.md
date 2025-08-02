@@ -4,7 +4,8 @@
 
 **A comprehensive driver security research platform addressing critical gaps in existing driver analysis tools**
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield)
+
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
@@ -200,3 +201,6 @@ This project is provided **"as is"** without any warranty, guarantee, or reliabi
 [⭐ Star this project](https://github.com/didntchooseaname/loldrivers-database) if it helps your security research!
 
 </div>
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_large)
