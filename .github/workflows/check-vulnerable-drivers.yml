@@ -219,7 +219,7 @@ jobs:
         }
         
         Write-Host "Loading drivers from: $localJsonPath"
-        $loldrivers = Get-Content -Path $localJsonPath -Raw | ConvertFrom-Json
+        $loldrivers = Get-Content -Path $localJsonPath -Raw | ConvertFrom-Json -AsHashTable
         
         if (-not $loldrivers) {
             Write-Error "Could not load LOLDrivers data from local file"
