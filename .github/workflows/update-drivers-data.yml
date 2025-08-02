@@ -35,17 +35,23 @@ jobs:
       run: |
         echo "Checking for new commits on LOLDrivers JSON file..."
         
-        # Get the latest commit hash for the JSON file with better error handling
-        echo "API URL: $GITHUB_API_URL"
+        # Construct the API URL directly to avoid environment variable issues
+        API_URL="https://api.github.com/repos/magicsword-io/LOLDrivers/commits?path=loldrivers.io/content/api/drivers.json&per_page=1"
+        echo "API URL: $API_URL"
         
-        # First, get the raw response to debug
-        api_response=$(curl -s -H "Accept: application/vnd.github.v3+json" "$GITHUB_API_URL")
-        echo "API Response (first 500 chars): $(echo "$api_response" | head -c 500)"
+        # Get the latest commit hash for the JSON file with better error handling
+        echo "Making API request..."
+        api_response=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL")
+        
+        # Debug: show response length and first part
+        response_length=$(echo "$api_response" | wc -c)
+        echo "API Response length: $response_length chars"
+        echo "API Response (first 200 chars): $(echo "$api_response" | head -c 200)..."
         
         # Check if response is valid JSON
         if ! echo "$api_response" | jq . > /dev/null 2>&1; then
           echo "Invalid JSON response from GitHub API"
-          echo "Raw response: $api_response"
+          echo "Full response: $api_response"
           exit 1
         fi
         
@@ -136,7 +142,7 @@ jobs:
         echo "Generating update summary..."
         
         # Get commit details for better summary with error handling
-        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
+        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
         
         # Validate JSON response
         if ! echo "$commit_info" | jq . > /dev/null 2>&1; then
@@ -222,7 +228,7 @@ jobs:
         fi
         
         # Get commit info for commit message with error handling
-        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
+        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
         
         # Validate JSON and extract commit message safely
         if echo "$commit_info" | jq . > /dev/null 2>&1; then
