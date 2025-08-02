@@ -4,11 +4,14 @@
 
 **A comprehensive driver security research platform addressing critical gaps in existing driver analysis tools**
 
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield&issueType=license)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield&issueType=security)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-didntchooseaname%2Floldrivers--database-blue.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAyCAYAAAAnWDnqAAAAAXNSR0IArs4c6QAAA05JREFUaEPtmUtyEzEQhtWTQyQLHNak2AB7ZnyXZMEjXMGeK/AIi+QuHrMnbChYY7MIh8g01fJoopFb0uhhEqqcbWTp06/uv1saEDv4O3n3dV60RfP947Mm9/SQc0ICFQgzfc4CYZoTPAswgSJCCUJUnAAoRHOAUOcATwbmVLWdGoH//PB8mnKqScAhsD0kYP3j/Yt5LPQe2KvcXmGvRHcDnpxfL2zOYJ1mFwrryWTz0advv1Ut4CJgf5uhDuDj5eUcAUoahrdY/56ebRWeraTjMt/00Sh3UDtjgHtQNHwcRGOC98BJEAEymycmYcWwOprTgcB6VZ5JK5TAJ+fXGLBm3FDAmn6oPPjR4rKCAoJCal2eAiQp2x0vxTPB3ALO2CRkwmDy5WohzBDwSEFKRwPbknEggCPB/imwrycgxX2NzoMCHhPkDwqYMr9tRcP5qNrMZHkVnOjRMWwLCcr8ohBVb1OMjxLwGCvjTikrsBOiA6fNyCrm8V1rP93iVPpwaE+gO0SsWmPiXB+jikdf6SizrT5qKasx5j8ABbHpFTx+vFXp9EnYQmLx02h1QTTrl6eDqxLnGjporxl3NL3agEvXdT0WmEost648sQOYAeJS9Q7bfUVoMGnjo4AZdUMQku50McDcMWcBPvr0SzbTAFDfvJqwLzgxwATnCgnp4wDl6Aa+Ax283gghmj+vj7feE2KBBRMW3FzOpLOADl0Isb5587h/U4gGvkt5v60Z1VLG8BhYjbzRwyQZemwAd6cCR5/XFWLYZRIMpX39AR0tjaGGiGzLVyhse5C9RKC6ai42ppWPKiBagOvaYk8lO7DajerabOZP46Lby5wKjw1HCRx7p9sVMOWGzb/vA1hwiWc6jm3MvQDTogQkiqIhJV0nBQBTU+3okKCFDy9WwferkHjtxib7t3xIUQtHxnIwtx4mpg26/HfwVNVDb4oI9RHmx5WGelRVlrtiw43zboCLaxv46AZeB3IlTkwouebTr1y2NjSpHz68WNFjHvupy3q8TFn3Hos2IAk4Ju5dCo8B3wP7VPr/FGaKiG+T+v+TQqIrOqMTL1VdWV1DdmcbO8KXBz6esmYWYKPwDL5b5FA1a0hwapHiom0r/cKaoqr+27/XcrS5UwSMbQAAAABJRU5ErkJggg==)](https://deepwiki.com/didntchooseaname/loldrivers-database)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-[🚀 Live Demo](https://loldb.xsec.fr) | [📚 Documentation](#features) | [🤝 Contributing](#contributing)
+[🚀 Live Demo](https://loldb.xsec.fr) | [📚 Documentation](https://deepwiki.com/didntchooseaname/loldrivers-database) | [🤝 Contributing](#contributing)
 
 </div>
 
@@ -30,22 +33,21 @@ This platform goes **beyond simple cataloging** to provide:
 - **Behavioral analysis** through imported function examination
 - **Strict HVCI verification** using Microsoft's official blocklist
 - **Advanced filtering** by capabilities, architecture, and certificates
-- **Professional-grade interface** optimized for security research workflows
 
 ## ✨ Features
 
 ### 🧠 Drivers Behaviors
 Unlike static driver lists, this platform analyzes imported functions to automatically detect capabilities:
 - **Memory manipulation** (allocation, virtual memory, mapping)
-- **Process killing** (termination, suspension)
+- **Process killing** (termination)
 - **Debug bypass** (anti-debugging, information hiding)
 - **Registry manipulation** (key creation, modification, deletion)
 - **File system access** (file creation, modification, I/O operations)
 
 ### 🛡️ Strict HVCI Verification
-- **Direct Microsoft integration** - Queries official vulnerable driver blocklist
+- **Direct Microsoft drivers blocklist integration** - Queries official vulnerable driver blocklist
 - **Automated workflows** - GitHub Actions fetch latest XML blocklist
-- **Up-to-date accuracy** - No reliance on static local lists (Trails of bit script)
+- **Up-to-date** - No reliance on static local lists (Trails of bit local script)
 
 ### 🔍 Search & Filtering
 - **Multi-attribute search** - Hashes, company names, descriptions
@@ -178,7 +180,7 @@ This project is provided **"as is"** without any warranty, guarantee, or reliabi
 - [magicsword-io/LOLDrivers](https://github.com/magicsword-io/LOLDrivers) - Source repository
 - [Microsoft HVCI Blocklist](https://aka.ms/VulnerableDriverBlockList) - Official vulnerability list
 
-## � Contributors & Acknowledgments
+## Contributors & Acknowledgments
 
 **Special thanks** to the original LOLDrivers project and its contributors:
 - **Michael Haag** - Project leadership and development

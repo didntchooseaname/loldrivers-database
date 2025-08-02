@@ -1,14 +1,14 @@
-## Project Vision & Core Mission
+## Project Vision
 
-**Project Vision:** I created this comprehensive driver security research platform to address critical gaps in existing driver analysis tools. This database goes beyond simple cataloging to provide advanced filtering, behavioral analysis, and HVCI compatibility verification for Windows drivers used in real-world attack campaigns.
+**Project Vision:** I created this comprehensive driver security research platform to address  gaps in existing driver analysis tools. This database goes beyond simple cataloging to provide advanced filtering, behavioral analysis, and HVCI compatibility verification for Windows drivers (used in real-world attack campaigns).  
 
-**Core Mission:** Enable security researchers, threat hunters, malware analysts, and system administrators to efficiently identify, analyze, and defend against driver-based attacks through sophisticated search and filtering capabilities that weren&apos;t available in existing solutions.
+Enable security researchers, threat hunters, malware analysts, and system administrators to efficiently identify, analyze, and defend against driver-based attacks through sophisticated search and filtering capabilities that weren&apos;t available in existing solutions.
 
 ## Features
 
 **Advanced Behavioral Analysis:** Unlike static driver lists, this platform analyzes imported functions to automatically detect capabilities like memory manipulation, process killing, debug bypass, registry manipulation, and file system access.
 
-**Real-time HVCI Verification:** Implemented proper HVCI compatibility checking that directly queries Microsoft&apos;s official vulnerable driver blocklist, providing more accurate results than local static lists used by other tools.
+**Periodic HVCI Verification:** Implemented proper HVCI compatibility checking that directly queries Microsoft&apos;s official vulnerable driver blocklist, providing more accurate results than local static lists used by other tools.
 
 **Intelligent Search & Filtering:** Quickly search and filter drivers by attributes including hashes, company names, descriptions, HVCI compatibility, certificate status, architecture, and behavioral patterns.
 
