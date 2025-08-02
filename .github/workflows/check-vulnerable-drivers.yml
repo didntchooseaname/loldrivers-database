@@ -43,23 +43,8 @@ jobs:
         fi
         
         echo "Previous workflow completed successfully"
-        
-        # Check if there were recent commits to data files (indicating the workflow made changes)
-        # We'll check the last few commits to see if any modified the data files
-        curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}/commits?per_page=5" > recent_commits.json
-        
-        # Check if any recent commits modified data/drvj.json or data/drv.json
-        data_updated=$(cat recent_commits.json | jq -r '.[].files[]? | select(.filename == "data/drvj.json" or .filename == "data/drv.json") | .filename' | head -1)
-        
-        if [ -n "$data_updated" ]; then
-          echo "Data file updates detected in recent commits"
-          echo "Updated file: $data_updated"
-          echo "should_run=true" >> $GITHUB_OUTPUT
-        else
-          echo "No data file updates detected in recent commits"
-          echo "should_run=false" >> $GITHUB_OUTPUT
-        fi
+        echo "HVCI workflow will proceed after successful data update"
+        echo "should_run=true" >> $GITHUB_OUTPUT
 
     - name: Summary
       run: |
