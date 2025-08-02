@@ -73,23 +73,45 @@ jobs:
         $blockedVersions = @{}
         $blockedFilenames = @{}
         
-        # Extract blocked hashes from Deny rules
+        # Extract blocked hashes from Deny rules - ONLY Hash attribute values
         if ($fileRules.Deny) {
+            Write-Host "Processing Deny rules..."
+            
+            # Debug: Show first few Deny rules to verify structure
+            $sampleDenyRules = $fileRules.Deny | Select-Object -First 3
+            Write-Host "Sample Deny rules (first 3):"
+            foreach ($rule in $sampleDenyRules) {
+                Write-Host "  ID: $($rule.ID)"
+                Write-Host "  FriendlyName: $($rule.FriendlyName)"
+                Write-Host "  Hash attribute ONLY: $($rule.Hash)"
+                Write-Host "  FileName: $($rule.FileName)"
+                Write-Host "  ---"
+            }
+            
             foreach ($denyRule in $fileRules.Deny) {
-                if ($denyRule.Hash) {
-                    $hashValue = $denyRule.Hash.Trim().ToUpper() -replace '[^A-F0-9]', ''
-                    if ($hashValue.Length -ge 32) {
-                        if ($hashValue.Length -eq 32) {
-                            $blockedHashes[$hashValue] = "MD5"
-                        } elseif ($hashValue.Length -eq 40) {
-                            $blockedHashes[$hashValue] = "SHA1"
-                        } elseif ($hashValue.Length -eq 64) {
-                            $blockedHashes[$hashValue] = "SHA256"
-                        }
+                # Extract ONLY the Hash attribute value, completely ignore FriendlyName
+                if ($denyRule.Hash -and $denyRule.Hash -is [string]) {
+                    $rawHashValue = $denyRule.Hash.Trim()
+                    
+                    # Clean hash: remove any non-hexadecimal characters and convert to uppercase
+                    $cleanHashValue = ($rawHashValue -replace '[^A-F0-9]', '').ToUpper()
+                    
+                    # Validate hash length and store
+                    if ($cleanHashValue.Length -eq 32) {
+                        $blockedHashes[$cleanHashValue] = "MD5"
+                        Write-Host "  Added MD5 hash: $cleanHashValue"
+                    } elseif ($cleanHashValue.Length -eq 40) {
+                        $blockedHashes[$cleanHashValue] = "SHA1" 
+                        Write-Host "  Added SHA1 hash: $cleanHashValue"
+                    } elseif ($cleanHashValue.Length -eq 64) {
+                        $blockedHashes[$cleanHashValue] = "SHA256"
+                        Write-Host "  Added SHA256 hash: $cleanHashValue"
+                    } else {
+                        Write-Host "  Skipped invalid hash length ($($cleanHashValue.Length)): $cleanHashValue"
                     }
                 }
                 
-                # Extract filename restrictions
+                # Extract filename restrictions (separate from hash processing)
                 if ($denyRule.FileName) {
                     $blockedFilenames[$denyRule.FileName] = $denyRule.MaximumFileVersion
                     if ($denyRule.MaximumFileVersion) {
