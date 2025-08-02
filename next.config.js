@@ -11,6 +11,16 @@ const nextConfig = {
     esmExternals: true,
   },
   
+  // Turbopack configuration (now stable)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+  
   // Optimisation des images
   images: {
     unoptimized: true,

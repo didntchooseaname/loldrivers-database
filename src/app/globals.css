@@ -5630,7 +5630,7 @@ select.form-control {
 }
 
 /* =================================================================
-   OPTIMISATIONS DE PERFORMANCE
+   OPTIMISATIONS DE PERFORMANCE AVANCÉES
    ================================================================= */
 
 /* Optimisation des images et favicons */
@@ -5639,6 +5639,15 @@ img[src*="favicons"] {
   will-change: auto;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
+  loading: lazy;
+  decoding: async;
+}
+
+/* Optimisation globale des driver cards */
+.driver-card {
+  contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
 }
 
 /* Animation optimization to reduce repaints */
@@ -5655,6 +5664,102 @@ img[src*="favicons"] {
   .driver-card:not(:hover) {
     will-change: auto;
   }
+  
+  /* Optimiser les transitions */
+  .filter-btn,
+  .search-button,
+  .share-button,
+  .help-button {
+    contain: layout;
+    will-change: transform, background-color;
+  }
+  
+  .filter-btn:not(:hover),
+  .search-button:not(:hover),
+  .share-button:not(:hover),
+  .help-button:not(:hover) {
+    will-change: auto;
+  }
+}
+
+/* Optimisation de la virtualisation */
+.drivers-grid {
+  contain: layout style;
+  isolation: isolate;
+}
+
+/* Optimisation des sections collapsibles */
+.collapsible-section {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 50px;
+}
+
+.collapsible-section.expanded {
+  contain-intrinsic-size: auto 300px;
+}
+
+/* Optimisation du loading */
+.loading-bar-progress {
+  will-change: transform;
+  contain: layout style paint;
+}
+
+/* Optimisation des popups */
+.popup-container,
+.help-popup {
+  contain: layout style paint;
+  isolation: isolate;
+}
+
+/* Optimisation des listes de fonctions */
+.functions-list {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* Skeletons pour le chargement */
+.skeleton-line {
+  background: linear-gradient(90deg, 
+    var(--color-border) 25%, 
+    transparent 50%, 
+    var(--color-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  height: 1rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-2);
+}
+
+.skeleton-line.short {
+  width: 60%;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Intersection Observer optimization */
+.driver-card[data-visible="false"] {
+  content-visibility: hidden;
+  contain-intrinsic-size: auto 200px;
+}
+
+/* Critical rendering path optimization */
+.above-fold {
+  content-visibility: visible;
+}
+
+.below-fold {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
 }
 
 /* Optimization for low-performance devices */
