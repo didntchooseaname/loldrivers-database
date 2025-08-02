@@ -1738,22 +1738,22 @@ select.form-control {
 
 .process-killer-item.active {
   border-color: var(--color-red-600);
-  background: linear-gradient(135deg, rgba(var(--color-red-600-rgb), 0.08), rgba(var(--color-red-600-rgb), 0.05));
+  background: var(--color-red-600) !important;
   box-shadow: 0 4px 20px rgba(var(--color-red-600-rgb), 0.25);
 }
 
 .process-killer-item.active .stat-label {
-  color: var(--color-text-primary);
-  text-shadow: 0 1px 2px rgba(var(--color-red-600-rgb), 0.2);
+  color: var(--color-white) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .process-killer-item.active .stat-label i {
-  color: var(--color-red-600);
+  color: var(--color-white) !important;
 }
 
 .process-killer-item.active .stat-value {
-  color: var(--color-red-600);
-  text-shadow: 0 1px 2px rgba(var(--color-red-600-rgb), 0.2);
+  color: var(--color-white) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* HVCI styles for dark mode */
@@ -1796,22 +1796,22 @@ select.form-control {
   }
 
   .process-killer-item.active .stat-label {
-    color: var(--color-text-primary);
-    text-shadow: 0 1px 3px rgba(var(--color-red-700-rgb), 0.3);
+    color: var(--color-white) !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
 
   .process-killer-item.active .stat-label i {
-    color: var(--color-red-400);
+    color: var(--color-white) !important;
   }
 
   .process-killer-item.active .stat-value {
-    color: var(--color-red-400);
-    text-shadow: 0 1px 3px rgba(var(--color-red-700-rgb), 0.3);
+    color: var(--color-white) !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
 
   .process-killer-item.active {
     border-color: var(--color-red-400);
-    background: linear-gradient(135deg, rgba(var(--color-red-400-rgb), 0.08), rgba(var(--color-red-400-rgb), 0.05));
+    background: var(--color-red-400) !important;
     box-shadow: 0 4px 20px rgba(var(--color-red-400-rgb), 0.25);
   }
 }
