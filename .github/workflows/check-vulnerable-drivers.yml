@@ -14,25 +14,13 @@ permissions:
   actions: read
 
 jobs:
-  run_powershell:
-    runs-on: windows-latest
-    # Only run if manual trigger OR if previous workflow was successful
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+  check_prerequisites:
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check_commits.outputs.should_run }}
     steps:
-    - name: Workflow Status Info
-      run: |
-        Write-Host "=========================================="
-        Write-Host "       HVCI TAG UPDATE WORKFLOW"
-        Write-Host "=========================================="
-        Write-Host "Trigger Event: ${{ github.event_name }}"
-        if ("${{ github.event_name }}" -eq "workflow_run") {
-          Write-Host "Previous Workflow: ${{ github.event.workflow_run.name }}"
-          Write-Host "Previous Status: ${{ github.event.workflow_run.conclusion }}"
-          Write-Host "Reason: Triggered after successful data update"
-        } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          Write-Host "Reason: Manual trigger"
-        }
-        Write-Host "=========================================="
+    - name: Check Prerequisites
+      id: check_commits
       run: |
         echo "Checking prerequisites for HVCI Tag Update..."
         echo "Event name: ${{ github.event_name }}"
@@ -69,13 +57,13 @@ jobs:
           echo "Updated file: $data_updated"
           echo "should_run=true" >> $GITHUB_OUTPUT
         else
-          echo "ℹNo data file updates detected in recent commits"
+          echo "No data file updates detected in recent commits"
           echo "should_run=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Summary
       run: |
-        echo "## 🔍 HVCI Workflow Prerequisites Check" >> $GITHUB_STEP_SUMMARY
+        echo "## HVCI Workflow Prerequisites Check" >> $GITHUB_STEP_SUMMARY
         echo "**Event Type:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
         if [ "${{ github.event_name }}" = "workflow_run" ]; then
           echo "**Previous Workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
@@ -251,7 +239,7 @@ jobs:
         }
         
         function Test-BlockedFilename($driver) {
-            # Vérifie si un des Tags correspond à un FileName bloqué et si la version est dans la plage bloquée
+            # Check if any Tags match a blocked FileName and if version is in blocked range
             if (-not $driver.Tags -or -not ($driver.Tags -is [array])) {
                 return @{ IsBlocked = $false }
             }
@@ -259,7 +247,7 @@ jobs:
             $fileVersion = $driver.FileVersion
             foreach ($tag in $driver.Tags) {
                 if ($tag -and $blockedFilenames.ContainsKey($tag)) {
-                    # Recherche la règle Deny correspondante pour extraire les bornes de version
+                    # Find corresponding Deny rule to extract version bounds
                     $denyRule = $fileRules.Deny | Where-Object { $_.FileName -eq $tag } | Select-Object -First 1
                     $minVersion = $null
                     $maxVersion = $null
@@ -269,7 +257,7 @@ jobs:
                         if ($denyRule.MaximumFileVersion) { $maxVersion = $denyRule.MaximumFileVersion }
                     }
                     
-                    # Si pas de restriction de version dans la règle, utiliser la valeur stockée
+                    # If no version restriction in rule, use stored value
                     if (-not $maxVersion -and $blockedVersions.ContainsKey($tag)) {
                         $maxVersion = $blockedVersions[$tag]
                     }
@@ -279,13 +267,13 @@ jobs:
                     
                     if ($fileVersion -and ($minVersion -or $maxVersion)) {
                         try {
-                            # Nettoyer et parser la version
+                            # Clean and parse version
                             $ver = ($fileVersion -replace ',\s*', '.').Split(' ')[0]
                             $verObj = [version]$ver
                             $minOk = $true
                             $maxOk = $true
                             
-                            # Vérifier les bornes de version
+                            # Check version bounds
                             if ($minVersion) { $minOk = ($verObj -ge [version]$minVersion) }
                             if ($maxVersion) { $maxOk = ($verObj -le [version]$maxVersion) }
                             
@@ -303,7 +291,7 @@ jobs:
                             Write-Host "  Warning: Failed to parse version '$fileVersion' for tag '$tag'"
                         }
                     } elseif ($fileVersion -and ($fileVersion -eq $minVersion -or $fileVersion -eq $maxVersion)) {
-                        # Correspondance exacte de version
+                        # Exact version match
                         return @{
                             IsBlocked = $true
                             MatchedFilename = $tag
@@ -821,9 +809,9 @@ jobs:
                         }
                         
                         // HVCI LoadsDespiteHVCI logic:
-                        // - If driver has Allowed status → "LoadsDespiteHVCI": "TRUE"
-                        // - If driver has Blocked status → "LoadsDespiteHVCI": "FALSE"
-                        // - If driver is not in CSV → leave as is or set to null
+                        // - If driver has Allowed status -> "LoadsDespiteHVCI": "TRUE"
+                        // - If driver has Blocked status -> "LoadsDespiteHVCI": "FALSE"
+                        // - If driver is not in CSV -> leave as is or set to null
                         
                         const currentLoadsDespiteHVCI = sample.LoadsDespiteHVCI;
                         let newLoadsDespiteHVCI = null;
@@ -939,9 +927,9 @@ jobs:
             summaryContent += '4. Compares LOLDrivers database against the blocklist\n';
             summaryContent += '5. Determines blocked/allowed status based on hash matches\n\n';
             summaryContent += '**LoadsDespiteHVCI Logic:**\n';
-            summaryContent += '- Drivers **NOT** in Microsoft blocklist → **LoadsDespiteHVCI = "TRUE"**\n';
-            summaryContent += '- Drivers **IN** Microsoft blocklist → **LoadsDespiteHVCI = "FALSE"**\n';
-            summaryContent += '- Drivers with insufficient hash data → **LoadsDespiteHVCI = unchanged**\n\n';
+            summaryContent += '- Drivers **NOT** in Microsoft blocklist -> **LoadsDespiteHVCI = "TRUE"**\n';
+            summaryContent += '- Drivers **IN** Microsoft blocklist -> **LoadsDespiteHVCI = "FALSE"**\n';
+            summaryContent += '- Drivers with insufficient hash data -> **LoadsDespiteHVCI = unchanged**\n\n';
             
             if (changes.newlyBlocked.length > 0) {
                 summaryContent += '## Newly Blocked Drivers (LoadsDespiteHVCI = FALSE)\n\n';
@@ -951,7 +939,7 @@ jobs:
                     summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
                     summaryContent += `   - ${item.hashType}: \`${item.hash}\`\n`;
                     summaryContent += `   - Company: ${item.company}\n`;
-                    summaryContent += `   - Previous: ${item.previousValue} → New: ${item.newValue}\n\n`;
+                    summaryContent += `   - Previous: ${item.previousValue} -> New: ${item.newValue}\n\n`;
                 });
             }
             
@@ -963,7 +951,7 @@ jobs:
                     summaryContent += `   - Driver ID: \`${item.driverId}\`\n`;
                     summaryContent += `   - ${item.hashType}: \`${item.hash}\`\n`;
                     summaryContent += `   - Company: ${item.company}\n`;
-                    summaryContent += `   - Previous: ${item.previousValue} → New: ${item.newValue}\n\n`;
+                    summaryContent += `   - Previous: ${item.previousValue} -> New: ${item.newValue}\n\n`;
                 });
             }
             
