@@ -14,7 +14,7 @@ permissions:
 env:
   REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
   GITHUB_API_URL: https://api.github.com/repos/magicsword-io/LOLDrivers/commits?path=loldrivers.io/content/api/drivers.json&per_page=1
-  LOCAL_FILE: data/drvj.json
+  LOCAL_FILE: data/drv.json
   BACKUP_FILE: data/drv.bak
   COMMIT_HASH_FILE: data/.last_commit_hash
 
@@ -103,32 +103,32 @@ jobs:
       id: download
       run: |
         echo "Downloading remote drivers.json..."
-        curl -s -L "$REMOTE_URL" -o temp_drvj.json
+        curl -s -L "$REMOTE_URL" -o temp_drivers.json
         
-        if [ ! -f temp_drvj.json ]; then
+        if [ ! -f temp_drivers.json ]; then
           echo "Failed to download remote file"
           exit 1
         fi
         
         echo "Remote file downloaded successfully"
-        echo "Remote file size: $(stat -c%s temp_drvj.json) bytes"
+        echo "Remote file size: $(stat -c%s temp_drivers.json) bytes"
         
         # Create data directory if it doesn't exist
         mkdir -p data
         
-        # Backup existing file if it exists
+        # Backup existing drv.json if it exists (overwrite any existing backup)
         if [ -f "$LOCAL_FILE" ]; then
-          echo "Backing up existing file to $BACKUP_FILE..."
+          echo "Backing up existing drv.json to drv.bak (overwriting if exists)..."
           cp "$LOCAL_FILE" "$BACKUP_FILE"
           echo "Backup created successfully"
           echo "backup_created=true" >> $GITHUB_OUTPUT
         else
-          echo "No existing file to backup"
+          echo "No existing drv.json to backup"
           echo "backup_created=false" >> $GITHUB_OUTPUT
         fi
         
-        # Move new file to final location
-        mv temp_drvj.json "$LOCAL_FILE"
+        # Move new file to final location as drv.json
+        mv temp_drivers.json "$LOCAL_FILE"
         echo "New file saved as $LOCAL_FILE"
         
         # Store the new commit hash
@@ -170,7 +170,7 @@ jobs:
         summary+="- **Message:** $commit_message\n\n"
         
         summary+="### File Changes\n"
-        summary+="- **New file:** \`data/drvj.json\`\n"
+        summary+="- **New file:** \`data/drv.json\`\n"
         if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
           summary+="- **Backup created:** \`data/drv.bak\`\n"
         fi
@@ -200,7 +200,7 @@ jobs:
         fi
         
         summary+="### Links\n"
-        summary+="- [View Updated File](./data/drvj.json)\n"
+        summary+="- [View Updated File](./data/drv.json)\n"
         if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
           summary+="- [View Backup File](./data/drv.bak)\n"
         fi
@@ -248,12 +248,12 @@ jobs:
         
         if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
           commit_msg+="\n\nFiles updated:"
-          commit_msg+="\n- data/drvj.json (new data)"
+          commit_msg+="\n- data/drv.json (new data)"
           commit_msg+="\n- data/drv.bak (backup of previous)"
           commit_msg+="\n- data/.last_commit_hash (tracking)"
         else
           commit_msg+="\n\nFiles created:"
-          commit_msg+="\n- data/drvj.json (initial data)"
+          commit_msg+="\n- data/drv.json (initial data)"
           commit_msg+="\n- data/.last_commit_hash (tracking)"
         fi
         
@@ -269,7 +269,7 @@ jobs:
       if: always()
       run: |
         echo "Cleaning up temporary files..."
-        rm -f temp_drvj.json update_summary.md
+        rm -f temp_drivers.json update_summary.md
         echo "Cleanup completed"
         
     - name: Job Summary
@@ -296,7 +296,7 @@ jobs:
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Files" >> $GITHUB_STEP_SUMMARY
-        echo "- **Main Data:** \`data/drvj.json\`" >> $GITHUB_STEP_SUMMARY
+        echo "- **Main Data:** \`data/drv.json\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Backup:** \`data/drv.bak\`" >> $GITHUB_STEP_SUMMARY
         echo "- **Commit Tracking:** \`data/.last_commit_hash\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

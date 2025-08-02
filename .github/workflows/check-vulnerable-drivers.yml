@@ -3,7 +3,7 @@ name: "HVCI Tag Update"
 on:
   workflow_dispatch: # Allow manual trigger
   workflow_run:
-    workflows: ["Update LOLDrivers Data"]  # Name of the data update workflow
+    workflows: ["Update LOLDrivers Data"]
     types:
       - completed
     branches:
@@ -14,15 +14,25 @@ permissions:
   actions: read
 
 jobs:
-  # Check if previous workflow actually committed changes
-  check_prerequisites:
-    runs-on: ubuntu-latest
-    # Always run this job to provide outputs for dependent jobs
-    outputs:
-      should_run: ${{ steps.check_commits.outputs.should_run || 'true' }}
+  run_powershell:
+    runs-on: windows-latest
+    # Only run if manual trigger OR if previous workflow was successful
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
-    - name: Check if Update LOLDrivers Data workflow was successful and committed changes
-      id: check_commits
+    - name: Workflow Status Info
+      run: |
+        Write-Host "=========================================="
+        Write-Host "       HVCI TAG UPDATE WORKFLOW"
+        Write-Host "=========================================="
+        Write-Host "Trigger Event: ${{ github.event_name }}"
+        if ("${{ github.event_name }}" -eq "workflow_run") {
+          Write-Host "Previous Workflow: ${{ github.event.workflow_run.name }}"
+          Write-Host "Previous Status: ${{ github.event.workflow_run.conclusion }}"
+          Write-Host "Reason: Triggered after successful data update"
+        } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          Write-Host "Reason: Manual trigger"
+        }
+        Write-Host "=========================================="
       run: |
         echo "Checking prerequisites for HVCI Tag Update..."
         echo "Event name: ${{ github.event_name }}"
