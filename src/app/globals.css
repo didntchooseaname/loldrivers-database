@@ -77,7 +77,7 @@
   --color-green-rgb: 34, 197, 94;
   --color-green-dark-rgb: 22, 163, 74;
 
-  /* RGB versions des nouvelles couleurs */
+  /* RGB versions of new colors */
   --color-blue-600-rgb: 37, 99, 235;
   --color-blue-700-rgb: 29, 78, 216;
   --color-yellow-600-rgb: 217, 119, 6;
@@ -814,13 +814,8 @@ select.form-control {
   border: 1px solid var(--color-border-secondary);
 }
 
-@font-face {
-  font-family: 'FKGroteskNeue';
-  src: url('https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2')
-    format('woff2');
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
-/* END PERPLEXITY DESIGN SYSTEM */
 /* Header styling */
 .header {
   text-align: center;
@@ -2372,7 +2367,7 @@ select.form-control {
   pointer-events: none;
 }
 
-/* Barre de chargement */
+/* Loading bar */
 .loading-bar-container {
   margin: var(--space-16) 0;
   text-align: center;
@@ -2539,7 +2534,7 @@ select.form-control {
   margin-bottom: var(--space-80);
   padding-bottom: var(--space-32);
   
-  /* Optimisations de performance */
+  /* Performance optimizations */
   contain: layout style paint;
   transform: translateZ(0);
 }
@@ -2895,11 +2890,11 @@ select.form-control {
   position: relative;
   overflow: hidden;
   
-  /* Optimisations de performance */
+  /* Performance optimizations */
   contain: layout style paint;
   will-change: auto;
   
-  /* Animation d'apparition plus simple et stable */
+  /* Simple and stable fade-in animation */
   opacity: 0;
   animation: fadeInStable var(--duration-slow) var(--ease-standard) forwards;
 }
@@ -5630,10 +5625,10 @@ select.form-control {
 }
 
 /* =================================================================
-   OPTIMISATIONS DE PERFORMANCE AVANCÉES
+   ADVANCED PERFORMANCE OPTIMIZATIONS
    ================================================================= */
 
-/* Optimisation des images et favicons */
+/* Optimization of images and favicons */
 img[src*="favicons"] {
   contain: layout style paint;
   will-change: auto;
@@ -5643,7 +5638,7 @@ img[src*="favicons"] {
   decoding: async;
 }
 
-/* Optimisation globale des driver cards */
+/* Global optimization of driver cards */
 .driver-card {
   contain: layout style paint;
   content-visibility: auto;
@@ -5682,13 +5677,13 @@ img[src*="favicons"] {
   }
 }
 
-/* Optimisation de la virtualisation */
+/* Virtualization optimization */
 .drivers-grid {
   contain: layout style;
   isolation: isolate;
 }
 
-/* Optimisation des sections collapsibles */
+/* Collapsible sections optimization */
 .collapsible-section {
   contain: layout style;
   content-visibility: auto;
@@ -5699,27 +5694,27 @@ img[src*="favicons"] {
   contain-intrinsic-size: auto 300px;
 }
 
-/* Optimisation du loading */
+/* Loading optimization */
 .loading-bar-progress {
   will-change: transform;
   contain: layout style paint;
 }
 
-/* Optimisation des popups */
+/* Popups optimization */
 .popup-container,
 .help-popup {
   contain: layout style paint;
   isolation: isolate;
 }
 
-/* Optimisation des listes de fonctions */
+/* Function lists optimization */
 .functions-list {
   contain: layout style;
   content-visibility: auto;
   contain-intrinsic-size: auto 200px;
 }
 
-/* Skeletons pour le chargement */
+/* Loading skeletons */
 .skeleton-line {
   background: linear-gradient(90deg, 
     var(--color-border) 25%, 
@@ -5777,7 +5772,7 @@ img[src*="favicons"] {
   }
 }
 
-/* Optimisation du scroll */
+/* Scroll optimization */
 .drivers-grid,
 .help-popup,
 .collapsible-content {
@@ -5786,7 +5781,7 @@ img[src*="favicons"] {
   overscroll-behavior: contain;
 }
 
-/* Optimisation des listes longues */
+/* Long lists optimization */
 .functions-list,
 .resources-list {
   contain: layout style;
