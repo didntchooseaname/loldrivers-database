@@ -3,7 +3,7 @@ name: Update LOLDrivers Data
 # Trigger on new commits to the LOLDrivers JSON file
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Check every 30 minutes for new commits
+    - cron: '0 1 * * 1'  # Check weekly on Mondays at 01:00 UTC
   workflow_dispatch:  # Allows manual execution
 
 permissions:

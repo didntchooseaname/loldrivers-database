@@ -1,9 +1,6 @@
 name: "HVCI Tag Update"
 
 on:
-  schedule:
-    # Runs weekly on Mondays at 02:00 UTC
-    - cron: '0 2 * * 1'
   workflow_dispatch: # Allow manual trigger
   workflow_run:
     workflows: ["Update LOLDrivers Data"]  # Name of the data update workflow
@@ -17,9 +14,93 @@ permissions:
   actions: read
 
 jobs:
+  # Check if previous workflow actually committed changes
+  check_prerequisites:
+    runs-on: ubuntu-latest
+    # Always run this job to provide outputs for dependent jobs
+    outputs:
+      should_run: ${{ steps.check_commits.outputs.should_run || 'true' }}
+    steps:
+    - name: Check if Update LOLDrivers Data workflow was successful and committed changes
+      id: check_commits
+      run: |
+        echo "Checking prerequisites for HVCI Tag Update..."
+        echo "Event name: ${{ github.event_name }}"
+        
+        # For manual or scheduled triggers, always allow the workflow to run
+        if [ "${{ github.event_name }}" != "workflow_run" ]; then
+          echo "Manual or scheduled trigger - workflow should run"
+          echo "should_run=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+        echo "Workflow run event: ${{ github.event.workflow_run.event }}"
+        
+        # Check if the workflow_run was successful
+        if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+          echo "Previous workflow did not complete successfully"
+          echo "should_run=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        echo "Previous workflow completed successfully"
+        
+        # Check if there were recent commits to data files (indicating the workflow made changes)
+        # We'll check the last few commits to see if any modified the data files
+        curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/commits?per_page=5" > recent_commits.json
+        
+        # Check if any recent commits modified data/drvj.json or data/drv.json
+        data_updated=$(cat recent_commits.json | jq -r '.[].files[]? | select(.filename == "data/drvj.json" or .filename == "data/drv.json") | .filename' | head -1)
+        
+        if [ -n "$data_updated" ]; then
+          echo "Data file updates detected in recent commits"
+          echo "Updated file: $data_updated"
+          echo "should_run=true" >> $GITHUB_OUTPUT
+        else
+          echo "ℹNo data file updates detected in recent commits"
+          echo "should_run=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Summary
+      run: |
+        echo "## 🔍 HVCI Workflow Prerequisites Check" >> $GITHUB_STEP_SUMMARY
+        echo "**Event Type:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          echo "**Previous Workflow:** ${{ github.event.workflow_run.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Workflow Status:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "**Decision:** ${{ steps.check_commits.outputs.should_run }}" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.check_commits.outputs.should_run }}" = "true" ]; then
+          echo "**Result:** HVCI workflow will proceed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "**Result:** HVCI workflow will be skipped" >> $GITHUB_STEP_SUMMARY
+        fi
+
   run_powershell:
     runs-on: windows-latest
+    needs: [check_prerequisites]
+    # Run based on the prerequisite check result
+    if: needs.check_prerequisites.outputs.should_run == 'true'
     steps:
+    - name: Workflow Status Info
+      run: |
+        Write-Host "=========================================="
+        Write-Host "       HVCI TAG UPDATE WORKFLOW"
+        Write-Host "=========================================="
+        Write-Host "Trigger Event: ${{ github.event_name }}"
+        if ("${{ github.event_name }}" -eq "workflow_run") {
+          Write-Host "Previous Workflow: ${{ github.event.workflow_run.name }}"
+          Write-Host "Previous Status: ${{ github.event.workflow_run.conclusion }}"
+          Write-Host "Reason: Data file changes detected in recent commits"
+        } elseif ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          Write-Host "Reason: Manual trigger"
+        } elseif ("${{ github.event_name }}" -eq "schedule") {
+          Write-Host "Reason: Scheduled run (weekly)"
+        }
+        Write-Host "=========================================="
+        
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -159,6 +240,80 @@ jobs:
             return @{ IsBlocked = $false }
         }
         
+        function Test-BlockedFilename($driver) {
+            # Vérifie si un des Tags correspond à un FileName bloqué et si la version est dans la plage bloquée
+            if (-not $driver.Tags -or -not ($driver.Tags -is [array])) {
+                return @{ IsBlocked = $false }
+            }
+            
+            $fileVersion = $driver.FileVersion
+            foreach ($tag in $driver.Tags) {
+                if ($tag -and $blockedFilenames.ContainsKey($tag)) {
+                    # Recherche la règle Deny correspondante pour extraire les bornes de version
+                    $denyRule = $fileRules.Deny | Where-Object { $_.FileName -eq $tag } | Select-Object -First 1
+                    $minVersion = $null
+                    $maxVersion = $null
+                    
+                    if ($denyRule) {
+                        if ($denyRule.MinimumFileVersion) { $minVersion = $denyRule.MinimumFileVersion }
+                        if ($denyRule.MaximumFileVersion) { $maxVersion = $denyRule.MaximumFileVersion }
+                    }
+                    
+                    # Si pas de restriction de version dans la règle, utiliser la valeur stockée
+                    if (-not $maxVersion -and $blockedVersions.ContainsKey($tag)) {
+                        $maxVersion = $blockedVersions[$tag]
+                    }
+                    if (-not $maxVersion -and $blockedFilenames[$tag]) {
+                        $maxVersion = $blockedFilenames[$tag]
+                    }
+                    
+                    if ($fileVersion -and ($minVersion -or $maxVersion)) {
+                        try {
+                            # Nettoyer et parser la version
+                            $ver = ($fileVersion -replace ',\s*', '.').Split(' ')[0]
+                            $verObj = [version]$ver
+                            $minOk = $true
+                            $maxOk = $true
+                            
+                            # Vérifier les bornes de version
+                            if ($minVersion) { $minOk = ($verObj -ge [version]$minVersion) }
+                            if ($maxVersion) { $maxOk = ($verObj -le [version]$maxVersion) }
+                            
+                            if ($minOk -and $maxOk) {
+                                return @{
+                                    IsBlocked = $true
+                                    MatchedFilename = $tag
+                                    DriverVersion = $ver
+                                    MinVersion = $minVersion
+                                    MaxVersion = $maxVersion
+                                    Reason = "Filename and version blocked"
+                                }
+                            }
+                        } catch {
+                            Write-Host "  Warning: Failed to parse version '$fileVersion' for tag '$tag'"
+                        }
+                    } elseif ($fileVersion -and ($fileVersion -eq $minVersion -or $fileVersion -eq $maxVersion)) {
+                        # Correspondance exacte de version
+                        return @{
+                            IsBlocked = $true
+                            MatchedFilename = $tag
+                            DriverVersion = $fileVersion
+                            ExactMatch = $true
+                            Reason = "Filename and version blocked (exact match)"
+                        }
+                    } elseif (-not $minVersion -and -not $maxVersion) {
+                        # Pas de restriction de version, le filename seul suffit
+                        return @{
+                            IsBlocked = $true
+                            MatchedFilename = $tag
+                            Reason = "Filename blocked (no version restriction)"
+                        }
+                    }
+                }
+            }
+            return @{ IsBlocked = $false }
+        }
+        
         function Test-BlockedSigner($driver) {
             if (-not $driver.Signatures -or -not $driver.Signatures.Certificates) {
                 return @{ IsBlocked = $false }
@@ -264,6 +419,7 @@ jobs:
                     
                     # Test all HVCI blocking conditions following Trail of Bits logic
                     $hashResult = Test-BlockedHash $sample
+                    $filenameResult = Test-BlockedFilename $sample
                     $signerResult = Test-BlockedSigner $sample  
                     $versionResult = Test-BlockedVersion $sample
                     
@@ -272,12 +428,27 @@ jobs:
                     $matchedDetail = "N/A"
                     $matchedType = "N/A"
                     
-                    # Check blocking conditions in order (following original script logic)
+                    # Check blocking conditions in priority order (hash > filename+version > version > signer)
                     if ($hashResult.IsBlocked) {
                         $isBlocked = $true
                         $blockReason = $hashResult.Reason
                         $matchedDetail = $hashResult.MatchedHash
                         $matchedType = $hashResult.HashType
+                    }
+                    elseif ($filenameResult.IsBlocked) {
+                        $isBlocked = $true
+                        $blockReason = $filenameResult.Reason
+                        if ($filenameResult.ExactMatch) {
+                            $matchedDetail = "Tag: '$($filenameResult.MatchedFilename)' Version: $($filenameResult.DriverVersion) (exact match)"
+                        } elseif ($filenameResult.MinVersion -or $filenameResult.MaxVersion) {
+                            $versionRange = ""
+                            if ($filenameResult.MinVersion) { $versionRange += "Min: $($filenameResult.MinVersion) " }
+                            if ($filenameResult.MaxVersion) { $versionRange += "Max: $($filenameResult.MaxVersion)" }
+                            $matchedDetail = "Tag: '$($filenameResult.MatchedFilename)' Version: $($filenameResult.DriverVersion) ($versionRange)"
+                        } else {
+                            $matchedDetail = "Tag: '$($filenameResult.MatchedFilename)' (no version restriction)"
+                        }
+                        $matchedType = "Filename"
                     }
                     elseif ($versionResult.IsBlocked) {
                         $isBlocked = $true
@@ -354,6 +525,7 @@ jobs:
         
         # Create detailed analysis summary with breakdown by blocking reason
         $hashBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -like "*Hash*" }).Count
+        $filenameBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -eq "Filename" }).Count
         $certBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -eq "Certificate" }).Count
         $versionBlocked = ($blockedDrivers | Where-Object { $_.MatchedType -eq "Version" }).Count
         
@@ -376,21 +548,22 @@ jobs:
         
         ## Blocking Reasons Breakdown
         - **Hash-based blocks**: $hashBlocked drivers
+        - **Filename/Tag-based blocks**: $filenameBlocked drivers
         - **Certificate-based blocks**: $certBlocked drivers  
         - **Version-based blocks**: $versionBlocked drivers
         
         ## HVCI Policy Components Analyzed
         - **Blocked Hashes**: $($blockedHashes.Count) (MD5, SHA1, SHA256, Authentihash)
+        - **Blocked Filenames**: $($blockedFilenames.Count) (FileName rules with version checks)
         - **Blocked Signers**: $($blockedSigners.Count) (Certificate TBS hashes)
         - **Version Restrictions**: $($blockedVersions.Count) (MaximumFileVersion rules)
-        - **Filename Restrictions**: $($blockedFilenames.Count) (FileName rules)
         
         ## Analysis Methodology
         This comprehensive analysis follows the Trail of Bits HVCI methodology which checks:
         1. **Hash Matching**: Compares driver hashes (MD5, SHA1, SHA256, Authentihash) against blocked hash lists
-        2. **Certificate Validation**: Checks driver certificates against blocked signer TBS hashes
-        3. **Version Checking**: Validates driver versions against maximum allowed versions
-        4. **Filename Rules**: Applies filename-specific blocking rules
+        2. **Filename/Tag Matching**: Case-sensitive comparison of driver Tags array against XML FileName entries with version validation
+        3. **Certificate Validation**: Checks driver certificates against blocked signer TBS hashes
+        4. **Version Checking**: Validates driver versions against maximum allowed versions
         
         The analysis uses the official Microsoft Vulnerable Driver Blocklist XML policy file which contains FileRule entries with Deny rules for various driver attributes.
         
@@ -431,10 +604,10 @@ jobs:
           hvci_analysis_summary.txt
 
   run_node:
-    needs: run_powershell
+    needs: [run_powershell]
     runs-on: ubuntu-latest
-    # Only run if previous workflow succeeded, or if triggered manually/by cron
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    # Only run if PowerShell job succeeded (which already includes prerequisite checks)
+    if: success()
     
     steps:
     - name: Checkout code
