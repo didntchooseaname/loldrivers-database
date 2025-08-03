@@ -238,8 +238,17 @@ jobs:
                     
                     # Certificate validation (simplified)
                     cert_status = "Unknown"
-                    if sample.get('Signatures', {}).get('Certificates'):
-                        cert_status = "Valid"  # Simplified - would need detailed validation
+                    signatures = sample.get('Signatures')
+                    if signatures:
+                        # Handle both dict and list formats
+                        if isinstance(signatures, dict) and signatures.get('Certificates'):
+                            cert_status = "Valid"
+                        elif isinstance(signatures, list) and len(signatures) > 0:
+                            # Check if any signature has certificates
+                            for sig in signatures:
+                                if isinstance(sig, dict) and sig.get('Certificates'):
+                                    cert_status = "Valid"
+                                    break
                     
                     results.append({
                         'MD5': sample.get('MD5', 'N/A'),
