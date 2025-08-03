@@ -379,12 +379,20 @@ jobs:
                 drivers = json.load(f)
             
             updated_count = 0
+            cleaned_count = 0
             
             for driver in drivers:
                 if not driver.get('KnownVulnerableSamples'):
                     continue
                     
                 for sample in driver['KnownVulnerableSamples']:
+                    # Clean up obsolete fields
+                    obsolete_fields = ['HVCIStatus', 'CertificateValid', 'CertificateExpired', 'CertificateRevoked', 'CertificateSuspicious']
+                    for field in obsolete_fields:
+                        if field in sample:
+                            del sample[field]
+                            cleaned_count += 1
+                    
                     # Find matching analysis result
                     result = None
                     for hash_field in ['MD5', 'SHA1', 'SHA256']:
@@ -394,19 +402,14 @@ jobs:
                             break
                     
                     if result:
-                        # Add certificate attributes
+                        # Add certificate status only
                         sample['CertificateStatus'] = result['status']
-                        sample['HVCIStatus'] = result['hvci_status']
                         
-                        # Add individual certificate flags for filtering
-                        if result['status'] == 'Valid':
-                            sample['CertificateValid'] = True
-                        elif result['status'] == 'Expired':
-                            sample['CertificateExpired'] = True
-                        elif result['status'] == 'Revoked':
-                            sample['CertificateRevoked'] = True
+                        # Update existing LoadsDespiteHVCI field based on HVCI status
+                        if result['hvci_status'] == 'Blocked':
+                            sample['LoadsDespiteHVCI'] = 'FALSE'
                         else:
-                            sample['CertificateSuspicious'] = True
+                            sample['LoadsDespiteHVCI'] = 'TRUE'
                             
                         updated_count += 1
             
@@ -415,6 +418,7 @@ jobs:
                 json.dump(drivers, f, indent=2)
                 
             print(f"Updated {updated_count} driver samples with certificate attributes")
+            print(f"Cleaned {cleaned_count} obsolete HVCIStatus fields")
             return updated_count
         
         def main():
