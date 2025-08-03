@@ -100,25 +100,39 @@
 
 **Display:** Architecture is also shown directly in driver cards next to the driver title for quick identification.
 
-## Trusted Certificate Filter
+## Certificate Validation Filters
 
-**What it does:** Shows drivers signed by well-established Certificate Authorities like `Microsoft`, `GlobalSign`, `DigiCert`, `VeriSign`, and other recognized issuers.
+The certificate validation system provides comprehensive analysis of driver signing certificates through automated workflows that validate certificate status, expiration, and trust chains.
 
-**Certificate Validation:** The system analyzes the certificate chain and issuer information to determine if the signing authority is from a trusted root `CA`.
+### Expired Certificates Filter
 
-**Business Logic:** Mutually exclusive with "Unknown Certificate" filter - you can only select one at a time since a certificate cannot be both trusted and untrusted.
+**What it does:** Displays drivers with certificates that have passed their validity period.
 
-**Security Note:** While a trusted certificate indicates legitimate signing, it doesn't guarantee the driver is safe - legitimate certificates can sign vulnerable or malicious drivers.
+**Risk Assessment:** Expired certificates can indicate outdated drivers or potentially suspicious signing practices.
 
-## Unknown Certificate Filter
+**Validation Logic:** Checks the `ValidTo` field against current date/time to determine expiration status.
 
-**What it does:** Displays drivers with certificates that are expired, self-signed, revoked, or issued by unrecognized Certificate Authorities.
+**Security Note:** While not immediately malicious, expired certificates require additional scrutiny.
 
-**Risk Assessment:** These drivers require additional scrutiny as their certificate chain cannot be validated through standard trust mechanisms.
+### Valid Certificates Filter
 
-**Common Scenarios:** Self-signed certificates, expired certificates, certificates from compromised `CAs`, or test certificates that made it into production.
+**What it does:** Shows drivers with properly validated certificates from trusted Certificate Authorities.
 
-**Mutual Exclusivity:** Cannot be used simultaneously with "Trusted Certificate" filter due to conflicting logic.
+**Validation Criteria:** Current (not expired), not revoked, issued by recognized CA, and follows standard certificate practices.
+
+**Trust Level:** Highest confidence level for certificate authenticity, though doesn't guarantee driver safety.
+
+**Mutual Exclusivity:** Cannot be combined with expired or missing certificate filters due to logical conflicts.
+
+### No Certificate Filter
+
+**What it does:** Displays drivers that lack digital signatures or certificate information entirely.
+
+**Security Assessment:** Unsigned drivers are automatically blocked by modern Windows security mechanisms and cannot load on systems with proper security configurations.
+
+**Modern Windows:** Current Windows versions (Windows 10/11 with Secure Boot, HVCI, or Driver Signature Enforcement) will reject unsigned drivers, making them ineffective on secured systems.
+
+**Historical Context:** These drivers may represent legacy threats from older Windows versions or systems with disabled security features.
 
 ## Recent Drivers Filter
 
@@ -146,16 +160,42 @@
 
 **Combination Strategy:** Filters can be combined (except mutually exclusive ones) to create precise queries. Examples:
 
+- **HVCI Compatible + Valid Certificates + Process Killer:** HVCI-compatible and legitimately signed killer driver
 - **HVCI Compatible + Recent Drivers:** Newly discovered drivers that are HVCI-compatible
 - **Memory Manipulator + Process Killer:** Highly dangerous drivers with multiple attack capabilities
-- **Debug Bypass + Unknown Certificate:** Potential evasion tools with questionable authenticity
+- **Debug Bypass + No Certificate:** Potential evasion tools without proper signing
+- **Revoked Certificates + Process Killer:** Extremely high-risk drivers with compromised signing
+- **Valid Certificates + File Manipulator:** Legitimately signed but potentially dangerous drivers
 
-**Behavioral Analysis:** Use the behavioral filters (Memory Manipulator, Debug Bypass, Registry Manipulator, File Manipulator) to understand driver capabilities and potential attack vectors.
+**Certificate Classification Logic:** The system uses automated workflows to analyze and classify driver certificates through comprehensive validation:
 
-**Architecture Targeting:** Filter by architecture (AMD64, I386, ARM64) when analyzing threats specific to certain system types or compatibility requirements.
+**Technical Analysis Process:**
+- **Certificate Chain Validation:** Verifies the complete certificate chain from root CA to signing certificate
+- **Temporal Validation:** Checks ValidFrom/ValidTo dates against current timestamp for expiration status
+- **Revocation Checking:** Cross-references certificate serial numbers and thumbprints against known revocation databases
+- **Authority Assessment:** Evaluates issuer against database of known legitimate and compromised Certificate Authorities
+
+**Classification Categories:**
+- **Valid:** Passes all validation checks - current validity period, trusted CA, not revoked, production certificate
+- **Revoked:** Certificate found in revocation lists or known compromised certificate databases
+- **Expired:** ValidTo date is earlier than current timestamp
+- **Suspicious:** Self-signed, unusual patterns, or issued by questionable authorities
+- **Missing:** No digital signature or certificate data present in driver binary
+
+**Workflow Integration:** Certificate validation runs as part of the automated "Driver Tagging" GitHub workflow, processing the entire database and applying appropriate tags based on validation results.
+
+**Behavioral Analysis Strategy:** Use behavioral filters to understand driver capabilities and potential attack vectors:
+
+- **Memory Manipulator:** Drivers with memory allocation, mapping, or protection modification capabilities
+- **Debug Bypass:** Drivers that can manipulate debugging features or hide processes from analysis tools  
+- **Registry Manipulator:** Drivers capable of creating, modifying, or deleting Windows registry entries
+- **File Manipulator:** Drivers with file system manipulation capabilities for reading, writing, or deleting files
+- **Process Killer:** Drivers specifically capable of terminating processes, often used in security bypass attacks
+
+**Architecture Targeting:** Filter by target processor architecture when analyzing platform-specific threats:
+
+- **AMD64 (x64):** Most common on modern Windows systems, highest priority for current threat analysis
+- **I386 (x32):** Legacy 32-bit systems, important for compatibility and historical threat research
+- **ARM64:** Windows on ARM devices, growing importance with ARM-based Windows systems
 
 **Apply vs Clear:** Changes are staged until you click &quot;Apply Filters&quot;. Use &quot;Clear Filters&quot; to reset both search terms and active filters.
-
-**URL Integration:** Filter states are preserved in the URL, so you can bookmark specific filter combinations or share them with colleagues.
-
-**Performance:** Server-side filtering ensures fast results even with large datasets. Pagination maintains performance with extensive result sets.

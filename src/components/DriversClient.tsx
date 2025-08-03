@@ -53,6 +53,11 @@ const getInitialUrlParams = () => {
   if (params.get('newest-first') === 'true') activeFilters.add('newest-first');
   if (params.get('oldest-first') === 'true') activeFilters.add('oldest-first');
   
+  // Certificate validation filters
+  if (params.get('cert-expired') === 'true') activeFilters.add('cert-expired');
+  if (params.get('cert-valid') === 'true') activeFilters.add('cert-valid');
+  if (params.get('cert-missing') === 'true') activeFilters.add('cert-missing');
+  
   // Behavioral filters
   if (params.get('memory-manipulator') === 'true') activeFilters.add('memory-manipulator');
   if (params.get('process-killer') === 'true') activeFilters.add('process-killer');
@@ -122,6 +127,11 @@ export default function DriversClient({
     if (activeFilters.has('recent')) params.set('recent', 'true');
     if (activeFilters.has('newest-first')) params.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) params.set('oldest-first', 'true');
+    
+    // Certificate validation filters
+    if (activeFilters.has('cert-expired')) params.set('cert-expired', 'true');
+    if (activeFilters.has('cert-valid')) params.set('cert-valid', 'true');
+    if (activeFilters.has('cert-missing')) params.set('cert-missing', 'true');
     
     // Behavioral filters
     if (activeFilters.has('memory-manipulator')) params.set('memory-manipulator', 'true');
@@ -356,6 +366,38 @@ export default function DriversClient({
         newFilters.delete('untrusted-cert');
       } else if (filterType === 'untrusted-cert' && newFilters.has('trusted-cert')) {
         newFilters.delete('trusted-cert');
+      }
+      
+      // Logique d'exclusivité intelligente pour les filtres de certificat
+      if (filterType.startsWith('cert-')) {
+        // Groupe d'exclusivité: Valid vs Missing (mutuellement exclusif)
+        if (filterType === 'cert-valid' && newFilters.has('cert-missing')) {
+          newFilters.delete('cert-missing');
+        } else if (filterType === 'cert-missing' && newFilters.has('cert-valid')) {
+          newFilters.delete('cert-valid');
+        }
+        
+        // Si on active cert-missing, désactiver tous les autres filtres de problèmes
+        // (pas de certificat = pas de problèmes de certificat)
+        if (filterType === 'cert-missing') {
+          ['cert-expired', 'cert-valid'].forEach(filter => {
+            newFilters.delete(filter);
+          });
+        }
+        
+        // Si on active cert-valid, désactiver les filtres de problèmes incompatibles
+        // (un certificat valide ne peut pas être expiré)
+        if (filterType === 'cert-valid') {
+          ['cert-expired', 'cert-missing'].forEach(filter => {
+            newFilters.delete(filter);
+          });
+        }
+        
+        // Si on active un problème majeur (expired), désactiver cert-valid
+        if (['cert-expired'].includes(filterType)) {
+          newFilters.delete('cert-valid');
+          newFilters.delete('cert-missing');
+        }
       }
       
       // Logic for mutually exclusive verification filters
@@ -863,6 +905,73 @@ export default function DriversClient({
     }
     
     return capacities;
+  };
+
+  // Generate certificate tags based on KnownVulnerableSamples attributes
+  const generateCertificateTags = (driver: Driver) => {
+    const certTags = [];
+    
+    if (driver.KnownVulnerableSamples && Array.isArray(driver.KnownVulnerableSamples)) {
+      // Check for certificate attributes across all samples
+      let hasRevoked = false;
+      let hasExpired = false;
+      let hasSuspicious = false;
+      let hasValid = false;
+      let hasMissing = false;
+      
+      for (const sample of driver.KnownVulnerableSamples) {
+        if (sample && typeof sample === 'object') {
+          if (sample.CertificateRevoked === true) hasRevoked = true;
+          if (sample.CertificateExpired === true) hasExpired = true;
+          if (sample.CertificateSuspicious === true) hasSuspicious = true;
+          if (sample.CertificateValid === true) hasValid = true;
+          if (sample.CertificateStatus === 'Missing') hasMissing = true;
+        }
+      }
+      
+      // Add tags based on certificate status (prioritize most critical first)
+      if (hasRevoked) {
+        certTags.push({
+          text: 'REVOKED CERTIFICATE',
+          type: 'danger',
+          icon: 'fas fa-ban'
+        });
+      }
+      
+      if (hasExpired) {
+        certTags.push({
+          text: 'EXPIRED CERTIFICATE',
+          type: 'warning',
+          icon: 'fas fa-clock'
+        });
+      }
+      
+      if (hasSuspicious) {
+        certTags.push({
+          text: 'SUSPICIOUS CERTIFICATE',
+          type: 'warning',
+          icon: 'fas fa-exclamation-triangle'
+        });
+      }
+      
+      if (hasValid && !hasRevoked && !hasExpired && !hasSuspicious) {
+        certTags.push({
+          text: 'VALID CERTIFICATE',
+          type: 'success',
+          icon: 'fas fa-check-circle'
+        });
+      }
+      
+      if (hasMissing && !hasValid && !hasRevoked && !hasExpired && !hasSuspicious) {
+        certTags.push({
+          text: 'NO CERTIFICATE',
+          type: 'secondary',
+          icon: 'fas fa-question-circle'
+        });
+      }
+    }
+    
+    return certTags;
   };
 
   // Render capacities section
@@ -1706,6 +1815,7 @@ export default function DriversClient({
     };
     const statusTags = generateStatusTags(driver);
     const capacityTags = generateCapacityTags(driver);
+    const certificateTags = generateCertificateTags(driver);
     const filename = getDriverName(driver);
     const formattedArch = formatArchitecture(driver.MachineType as string);
     
@@ -1729,6 +1839,11 @@ export default function DriversClient({
         </div>
         
         {renderStatusTags(statusTags)}
+        {certificateTags.length > 0 && (
+          <div className="certificate-tags-section">
+            {renderStatusTags(certificateTags)}
+          </div>
+        )}
         {renderHashTags(hashes)}
         {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
         {renderSimpleSection('Description', getBestDescription(driver), 'fas fa-info-circle')}
@@ -1931,6 +2046,31 @@ export default function DriversClient({
               onClick={() => toggleFilter('file-manipulator')}
             >
               <i className="fas fa-file-alt"></i> File Manipulator
+            </button>
+          </div>
+          
+          <div className="filter-group certificate-filters">
+            <span className="filter-label"><i className="fas fa-certificate"></i> Certificates:</span>
+            <button 
+              className={`filter-btn cert-filter cert-expired-filter ${pendingFilters.has('cert-expired') ? 'active' : ''} ${pendingFilters.has('cert-missing') ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('cert-expired')}
+              disabled={pendingFilters.has('cert-missing')}
+            >
+              <i className="fas fa-clock"></i> Expired
+            </button>
+            <button 
+              className={`filter-btn cert-filter cert-valid-filter ${pendingFilters.has('cert-valid') ? 'active' : ''} ${(pendingFilters.has('cert-missing') || pendingFilters.has('cert-expired')) ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('cert-valid')}
+              disabled={pendingFilters.has('cert-missing') || pendingFilters.has('cert-expired')}
+            >
+              <i className="fas fa-check-circle"></i> Valid
+            </button>
+            <button 
+              className={`filter-btn cert-filter cert-missing-filter ${pendingFilters.has('cert-missing') ? 'active' : ''} ${(pendingFilters.has('cert-valid') || pendingFilters.has('cert-expired')) ? 'disabled' : ''}`}
+              onClick={() => toggleFilter('cert-missing')}
+              disabled={pendingFilters.has('cert-valid') || pendingFilters.has('cert-expired')}
+            >
+              <i className="fas fa-question-circle"></i> No Cert
             </button>
           </div>
           

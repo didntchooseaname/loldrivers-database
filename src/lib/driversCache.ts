@@ -428,6 +428,16 @@ class DriversCache {
         return this.hasTrustedCertificate(driver);
       case 'untrustedCert':
         return this.hasUntrustedCertificate(driver);
+      case 'certRevoked':
+        return this.hasCertificateAttribute(driver, 'CertificateRevoked');
+      case 'certExpired':
+        return this.hasCertificateAttribute(driver, 'CertificateExpired');
+      case 'certSuspicious':
+        return this.hasCertificateAttribute(driver, 'CertificateSuspicious');
+      case 'certValid':
+        return this.hasCertificateAttribute(driver, 'CertificateValid');
+      case 'certMissing':
+        return this.hasCertificateAttributeStatus(driver, 'Missing');
       default:
         return true;
     }
@@ -586,6 +596,35 @@ class DriversCache {
     }
 
     return false;
+  }
+
+  private hasCertificateTag(driver: ProcessedDriver, tag: string): boolean {
+    if (!driver.Tags || !Array.isArray(driver.Tags)) {
+      return false;
+    }
+    return driver.Tags.includes(tag);
+  }
+
+  private hasCertificateAttribute(driver: ProcessedDriver, attributeName: string): boolean {
+    if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
+      return false;
+    }
+
+    // Check if any sample has the certificate attribute set to true
+    return driver.KnownVulnerableSamples.some(sample => 
+      sample && typeof sample === 'object' && sample[attributeName] === true
+    );
+  }
+
+  private hasCertificateAttributeStatus(driver: ProcessedDriver, status: string): boolean {
+    if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
+      return false;
+    }
+
+    // Check if any sample has the CertificateStatus matching the given status
+    return driver.KnownVulnerableSamples.some(sample => 
+      sample && typeof sample === 'object' && sample.CertificateStatus === status
+    );
   }
 
   clearCache() {

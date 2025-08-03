@@ -73,6 +73,13 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('registry-manipulator') === 'true') filters.registryManipulator = true;
     if (searchParams.get('file-manipulator') === 'true') filters.fileManipulator = true;
     
+    // Certificate validation filters
+    if (searchParams.get('cert-revoked') === 'true') filters.certRevoked = true;
+    if (searchParams.get('cert-expired') === 'true') filters.certExpired = true;
+    if (searchParams.get('cert-suspicious') === 'true') filters.certSuspicious = true;
+    if (searchParams.get('cert-valid') === 'true') filters.certValid = true;
+    if (searchParams.get('cert-missing') === 'true') filters.certMissing = true;
+    
     // Filtres par architecture
     const architecture = searchParams.get('architecture');
     if (architecture && ['AMD64', 'I386', 'ARM64'].includes(architecture)) {

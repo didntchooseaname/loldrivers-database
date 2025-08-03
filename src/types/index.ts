@@ -13,6 +13,7 @@ export interface Driver {
     SHA1?: string;
     SHA256?: string;
   };
+  KnownVulnerableSamples?: KnownVulnerableSample[];
   Signatures?: Signature[];
   Commands?: {
     Command?: string;
@@ -31,6 +32,20 @@ export interface Driver {
   Tags?: string[];
   CVE?: string[];
   Verified?: string;
+  [key: string]: unknown;
+}
+
+export interface KnownVulnerableSample {
+  MD5?: string;
+  SHA1?: string;
+  SHA256?: string;
+  Filename?: string;
+  Imphash?: string;
+  CertificateRevoked?: boolean;
+  CertificateExpired?: boolean;
+  CertificateSuspicious?: boolean;
+  CertificateValid?: boolean;
+  CertificateStatus?: string;
   [key: string]: unknown;
 }
 
