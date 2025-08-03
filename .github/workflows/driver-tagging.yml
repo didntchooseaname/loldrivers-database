@@ -60,27 +60,36 @@ jobs:
         echo "Current hash: $current_hash"
         
         # Check previous hash
-        if [ -f "data/blocklist-hash.txt" ] && grep -q "^[A-Fa-f0-9]" data/blocklist-hash.txt; then
-          previous_hash=$(grep "^[A-Fa-f0-9]" data/blocklist-hash.txt | head -1)
-          echo "Previous hash: $previous_hash"
-          
-          if [ "$current_hash" = "$previous_hash" ]; then
-            echo "Hash unchanged - skipping analysis"
-            echo "hash_changed=false" >> $GITHUB_OUTPUT
-            exit 0
+        if [ -f "data/blocklist-hash.txt" ]; then
+          # Look for a valid hash (64 hex characters)
+          if grep -q "^[A-Fa-f0-9]\{64\}$" data/blocklist-hash.txt; then
+            previous_hash=$(grep "^[A-Fa-f0-9]\{64\}$" data/blocklist-hash.txt | head -1)
+            echo "Previous hash: $previous_hash"
+            
+            if [ "$current_hash" = "$previous_hash" ]; then
+              echo "Hash unchanged - skipping analysis"
+              echo "hash_changed=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          else
+            echo "No valid hash found in blocklist-hash.txt - proceeding with first run"
           fi
+        else
+          echo "No hash file found - proceeding with first run"
         fi
         
         echo "Hash changed or first run - proceeding"
         echo "$current_hash" > data/blocklist-hash.txt
         echo "hash_changed=true" >> $GITHUB_OUTPUT
         
-    - name: Upload blocklist
+    - name: Upload blocklist and hash
       if: steps.download.outputs.hash_changed == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: blocklist
-        path: VulnerableDriverBlockList.zip
+        path: |
+          VulnerableDriverBlockList.zip
+          data/blocklist-hash.txt
 
   analyze_hvci:
     runs-on: ubuntu-latest
@@ -422,6 +431,12 @@ jobs:
         EOF
         
         python update_certificates.py
+        
+    - name: Upload updated driver data
+      uses: actions/upload-artifact@v4
+      with:
+        name: updated-drv-json
+        path: data/drv.json
 
   commit_changes:
     runs-on: ubuntu-latest
@@ -433,15 +448,26 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Download updated hash
+    - name: Download blocklist and hash
+      uses: actions/download-artifact@v4
+      with:
+        name: blocklist
+        
+    - name: Download updated driver data
+      uses: actions/download-artifact@v4
+      with:
+        name: updated-drv-json
+        path: data/
+        
+    - name: Restore hash file
       run: |
-        # The hash file was updated in download_blocklist job
-        # We need to recreate it here for commit
+        # The hash file comes from the blocklist artifact
         if [ -f "data/blocklist-hash.txt" ]; then
-          echo "Hash file already exists"
+          echo "Hash file found in artifact"
+          cat data/blocklist-hash.txt
         else
-          echo "Creating placeholder hash file"
-          echo "# Hash will be updated by workflow" > data/blocklist-hash.txt
+          echo "ERROR: Hash file not found in artifact"
+          exit 1
         fi
         
     - name: Commit and push changes
