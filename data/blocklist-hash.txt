@@ -1,0 +1,4 @@
+# Microsoft HVCI Blocklist Hash
+# This file stores the SHA256 hash of the downloaded Microsoft Vulnerable Driver Blocklist
+# to enable change detection and avoid unnecessary processing when the blocklist hasn't changed.
+# Initial run - no hash stored yet

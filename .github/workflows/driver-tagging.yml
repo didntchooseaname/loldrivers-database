@@ -68,6 +68,7 @@ jobs:
     if: needs.check_prerequisites.outputs.should_run == 'true'
     steps:
     - name: Workflow Status Info
+      shell: pwsh
       run: |
         Write-Host "=========================================="
         Write-Host "       HVCI TAG UPDATE WORKFLOW"
@@ -90,10 +91,39 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
     - name: Run PowerShell script
+      shell: pwsh
       run: |
+        # Check if we have a cached hash to compare against
+        $cacheFile = "data/blocklist-hash.txt"
+        $previousHash = ""
+        
+        if (Test-Path $cacheFile) {
+            $previousHash = Get-Content $cacheFile -Raw
+            $previousHash = $previousHash.Trim()
+            Write-Host "Previous hash found: $previousHash"
+        } else {
+            Write-Host "No previous hash found - first run or cache cleared"
+        }
+        
         # Download Microsoft's official HVCI blocklist
         Write-Host "Downloading Microsoft HVCI Vulnerable Driver Blocklist..."
         Invoke-WebRequest -Uri "https://aka.ms/VulnerableDriverBlockList" -OutFile "VulnerableDriverBlockList.zip"
+        
+        # Calculate hash of the downloaded file
+        $currentHash = (Get-FileHash -Path "VulnerableDriverBlockList.zip" -Algorithm SHA256).Hash
+        Write-Host "Current hash: $currentHash"
+        
+        # Compare hashes to determine if we need to process
+        if ($previousHash -eq $currentHash) {
+            Write-Host "Hash unchanged - no processing needed. Skipping analysis."
+            # Store the hash for future comparisons
+            $currentHash | Out-File -FilePath $cacheFile -Encoding UTF8
+            exit 0
+        } else {
+            Write-Host "Hash changed or first run - proceeding with analysis..."
+            # Store the new hash
+            $currentHash | Out-File -FilePath $cacheFile -Encoding UTF8
+        }
         
         # Extract the zip file
         Write-Host "Extracting blocklist ZIP file..."
@@ -1030,6 +1060,7 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add data/drv.json
+        git add data/blocklist-hash.txt
         
         if git diff --staged --quiet; then
           echo "No certificate attribute changes to commit"
@@ -1533,6 +1564,9 @@ jobs:
           echo "No JSON file found to commit"
           exit 1
         fi
+        
+        # Add the hash file for tracking
+        git add data/blocklist-hash.txt
         
         # Create detailed commit message
         COMMIT_MSG="Update LoadsDespiteHVCI using Microsoft Official Blocklist"
