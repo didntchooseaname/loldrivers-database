@@ -555,7 +555,36 @@ jobs:
             exit 1
         }
         
-        $driversData = Get-Content $drvPath | ConvertFrom-Json
+        # Load JSON with duplicate key handling
+        $jsonContent = Get-Content $drvPath -Raw
+        try {
+            $driversData = $jsonContent | ConvertFrom-Json
+        } catch {
+            # Handle duplicate keys by using case-insensitive approach
+            Write-Host "JSON parsing failed due to duplicate keys, attempting cleanup..." -ForegroundColor Yellow
+            
+            # Simple approach: remove duplicate case variants (keep first occurrence)
+            $lines = $jsonContent -split "`n"
+            $cleanedLines = @()
+            $seenKeys = @{}
+            
+            foreach ($line in $lines) {
+                if ($line -match '^\s*"([^"]+)"\s*:') {
+                    $key = $matches[1].ToLower()
+                    if (-not $seenKeys.ContainsKey($key)) {
+                        $seenKeys[$key] = $true
+                        $cleanedLines += $line
+                    } else {
+                        Write-Host "Skipping duplicate key: $($matches[1])" -ForegroundColor Yellow
+                    }
+                } else {
+                    $cleanedLines += $line
+                }
+            }
+            
+            $cleanedJson = $cleanedLines -join "`n"
+            $driversData = $cleanedJson | ConvertFrom-Json
+        }
         $validationResults = @{}
         $downloadStats = @{
             attempted = 0
@@ -687,172 +716,171 @@ jobs:
         
     - name: Update certificate attributes
       run: |
-        cat > update_certificates.py << 'EOF'
-        #!/usr/bin/env python3
-        import json
-        import csv
-        from pathlib import Path
-        
-        def load_analysis_results():
-            """Load HVCI analysis results and certificate validation"""
-            results = {}
-            
-            # Load HVCI results
-            with open('hvci_results.csv', 'r') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    # Map by hash
-                    for hash_field in ['MD5', 'SHA1', 'SHA256']:
-                        hash_value = row.get(hash_field)
-                        if hash_value and hash_value != 'N/A':
-                            results[hash_value.upper()] = {
-                                'status': row['CertificateStatus'],
-                                'hvci_status': row['Status']
-                            }
-            
-            # Load PowerShell certificate validation results
-            try:
-                with open('certificate_validation_results.json', 'r') as f:
-                    cert_data = json.load(f)
-                    cert_results = cert_data.get('validation_results', {})
-                    download_stats = cert_data.get('download_statistics', {})
-                    
-                    print(f"PowerShell validation summary:")
-                    print(f"  - Download attempts: {download_stats.get('attempted', 0)}")
-                    print(f"  - Successful downloads: {download_stats.get('successful', 0)}")
-                    print(f"  - Failed downloads: {download_stats.get('failed', 0)}")
-                    print(f"  - Skipped (no MD5): {download_stats.get('skipped', 0)}")
-                    
-                    # Update results with PowerShell validation
-                    for hash_value, cert_info in cert_results.items():
-                        if hash_value in results:
-                            # Use PowerShell validation result if available
-                            results[hash_value]['status'] = cert_info['status']
-                            results[hash_value]['reason'] = cert_info.get('reason', '')
-                            results[hash_value]['details'] = cert_info.get('details', '')
-                        else:
-                            # Add new entry from PowerShell validation
-                            results[hash_value] = {
-                                'status': cert_info['status'],
-                                'hvci_status': 'Unknown',
-                                'reason': cert_info.get('reason', ''),
-                                'details': cert_info.get('details', '')
-                            }
-                    
-                    print(f"Loaded {len(cert_results)} certificate validation results from PowerShell")
-                    
-            except FileNotFoundError:
-                print("PowerShell certificate validation results not found, using HVCI results only")
-            except Exception as e:
-                print(f"Error loading PowerShell results: {e}")
-            
-            return results
-        
-        def update_driver_data(analysis_results):
-            """Update driver data with certificate attributes"""
-            
-            # Load driver data
-            drv_path = Path('data/drv.json')
-            if not drv_path.exists():
-                drv_path = Path('data/drvj.json')
-                
-            with open(drv_path, 'r') as f:
-                drivers = json.load(f)
-            
-            updated_count = 0
-            cleaned_count = 0
-            
-            for driver in drivers:
-                if not driver.get('KnownVulnerableSamples'):
-                    continue
-                    
-                for sample in driver['KnownVulnerableSamples']:
-                    # Clean up obsolete fields
-                    obsolete_fields = ['HVCIStatus', 'CertificateValid', 'CertificateExpired', 'CertificateRevoked', 'CertificateSuspicious']
-                    for field in obsolete_fields:
-                        if field in sample:
-                            del sample[field]
-                            cleaned_count += 1
-                    
-                    # Find matching analysis result
-                    result = None
-                    for hash_field in ['MD5', 'SHA1', 'SHA256']:
-                        hash_value = sample.get(hash_field)
-                        if hash_value and hash_value.upper() in analysis_results:
-                            result = analysis_results[hash_value.upper()]
-                            break
-                    
-                    if result:
-                        # Add certificate status from PowerShell validation or HVCI analysis
-                        cert_status = result['status']
-                        
-                        # Apply additional validation logic
-                        if cert_status == "Unknown" and sample.get('Signatures'):
-                            # If PowerShell couldn't determine but we have signature data
-                            cert_status = "Valid"
-                        
-                        sample['CertificateStatus'] = cert_status
-                        
-                        # Update existing LoadsDespiteHVCI field based on HVCI status
-                        hvci_status = result.get('hvci_status', 'Unknown')
-                        if hvci_status == 'Blocked':
-                            sample['LoadsDespiteHVCI'] = 'FALSE'
-                        elif hvci_status == 'Allowed':
-                            sample['LoadsDespiteHVCI'] = 'TRUE'
-                        # If hvci_status is Unknown, preserve existing LoadsDespiteHVCI value
-                            
-                        updated_count += 1
-                    else:
-                        # No validation result found, try to infer from existing data
-                        if sample.get('Signatures') and len(sample['Signatures']) > 0:
-                            # Has signature data but no validation result
-                            sample['CertificateStatus'] = 'Unknown'
-                        elif not sample.get('CertificateStatus'):
-                            # No signature data and no existing status
-                            sample['CertificateStatus'] = 'Unknown'
-            
-            # Save updated data
-            with open(drv_path, 'w') as f:
-                json.dump(drivers, f, indent=2)
-                
-            print(f"Updated {updated_count} driver samples with certificate attributes")
-            print(f"Cleaned {cleaned_count} obsolete fields")
-            
-            # Generate certificate statistics
-            cert_stats = {}
-            for driver in drivers:
-                if not driver.get('KnownVulnerableSamples'):
-                    continue
-                for sample in driver['KnownVulnerableSamples']:
-                    status = sample.get('CertificateStatus', 'Unknown')
-                    cert_stats[status] = cert_stats.get(status, 0) + 1
-            
-            print(f"Certificate Status Distribution:")
-            for status, count in sorted(cert_stats.items()):
-                print(f"  {status}: {count}")
-            
-            return updated_count, cert_stats
-        
-        def main():
-            print("Loading analysis results...")
-            analysis_results = load_analysis_results()
-            
-            print("Updating driver database...")
-            updated_count, cert_stats = update_driver_data(analysis_results)
-            
-            print(f"Certificate update complete: {updated_count} samples updated")
-            
-            # Save certificate statistics for summary
-            with open('certificate_stats.json', 'w') as f:
-                json.dump({
-                    'updated_count': updated_count,
-                    'certificate_distribution': cert_stats,
-                    'total_analysis_results': len(analysis_results)
-                }, f, indent=2)
-        
-        if __name__ == '__main__':
-            main()
-        EOF
+        # Create Python script using echo commands (Windows compatible)
+        echo '#!/usr/bin/env python3' > update_certificates.py
+        echo 'import json' >> update_certificates.py
+        echo 'import csv' >> update_certificates.py
+        echo 'from pathlib import Path' >> update_certificates.py
+        echo '' >> update_certificates.py
+        echo 'def load_analysis_results():' >> update_certificates.py
+        echo '    """Load HVCI analysis results and certificate validation"""' >> update_certificates.py
+        echo '    results = {}' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    # Load HVCI results' >> update_certificates.py
+        echo '    with open("hvci_results.csv", "r") as f:' >> update_certificates.py
+        echo '        reader = csv.DictReader(f)' >> update_certificates.py
+        echo '        for row in reader:' >> update_certificates.py
+        echo '            # Map by hash' >> update_certificates.py
+        echo '            for hash_field in ["MD5", "SHA1", "SHA256"]:' >> update_certificates.py
+        echo '                hash_value = row.get(hash_field)' >> update_certificates.py
+        echo '                if hash_value and hash_value != "N/A":' >> update_certificates.py
+        echo '                    results[hash_value.upper()] = {' >> update_certificates.py
+        echo '                        "status": row["CertificateStatus"],' >> update_certificates.py
+        echo '                        "hvci_status": row["Status"]' >> update_certificates.py
+        echo '                    }' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    # Load PowerShell certificate validation results' >> update_certificates.py
+        echo '    try:' >> update_certificates.py
+        echo '        with open("certificate_validation_results.json", "r") as f:' >> update_certificates.py
+        echo '            cert_data = json.load(f)' >> update_certificates.py
+        echo '            cert_results = cert_data.get("validation_results", {})' >> update_certificates.py
+        echo '            download_stats = cert_data.get("download_statistics", {})' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '            print(f"PowerShell validation summary:")' >> update_certificates.py
+        echo '            print(f"  - Download attempts: {download_stats.get(\"attempted\", 0)}")' >> update_certificates.py
+        echo '            print(f"  - Successful downloads: {download_stats.get(\"successful\", 0)}")' >> update_certificates.py
+        echo '            print(f"  - Failed downloads: {download_stats.get(\"failed\", 0)}")' >> update_certificates.py
+        echo '            print(f"  - Skipped (no MD5): {download_stats.get(\"skipped\", 0)}")' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '            # Update results with PowerShell validation' >> update_certificates.py
+        echo '            for hash_value, cert_info in cert_results.items():' >> update_certificates.py
+        echo '                if hash_value in results:' >> update_certificates.py
+        echo '                    # Use PowerShell validation result if available' >> update_certificates.py
+        echo '                    results[hash_value]["status"] = cert_info["status"]' >> update_certificates.py
+        echo '                    results[hash_value]["reason"] = cert_info.get("reason", "")' >> update_certificates.py
+        echo '                    results[hash_value]["details"] = cert_info.get("details", "")' >> update_certificates.py
+        echo '                else:' >> update_certificates.py
+        echo '                    # Add new entry from PowerShell validation' >> update_certificates.py
+        echo '                    results[hash_value] = {' >> update_certificates.py
+        echo '                        "status": cert_info["status"],' >> update_certificates.py
+        echo '                        "hvci_status": "Unknown",' >> update_certificates.py
+        echo '                        "reason": cert_info.get("reason", ""),' >> update_certificates.py
+        echo '                        "details": cert_info.get("details", "")' >> update_certificates.py
+        echo '                    }' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '            print(f"Loaded {len(cert_results)} certificate validation results from PowerShell")' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '    except FileNotFoundError:' >> update_certificates.py
+        echo '        print("PowerShell certificate validation results not found, using HVCI results only")' >> update_certificates.py
+        echo '    except Exception as e:' >> update_certificates.py
+        echo '        print(f"Error loading PowerShell results: {e}")' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    return results' >> update_certificates.py
+        echo '' >> update_certificates.py
+        echo 'def update_driver_data(analysis_results):' >> update_certificates.py
+        echo '    """Update driver data with certificate attributes"""' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    # Load driver data' >> update_certificates.py
+        echo '    drv_path = Path("data/drv.json")' >> update_certificates.py
+        echo '    if not drv_path.exists():' >> update_certificates.py
+        echo '        drv_path = Path("data/drvj.json")' >> update_certificates.py
+        echo '        ' >> update_certificates.py
+        echo '    with open(drv_path, "r") as f:' >> update_certificates.py
+        echo '        drivers = json.load(f)' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    updated_count = 0' >> update_certificates.py
+        echo '    cleaned_count = 0' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    for driver in drivers:' >> update_certificates.py
+        echo '        if not driver.get("KnownVulnerableSamples"):' >> update_certificates.py
+        echo '            continue' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '        for sample in driver["KnownVulnerableSamples"]:' >> update_certificates.py
+        echo '            # Clean up obsolete fields' >> update_certificates.py
+        echo '            obsolete_fields = ["HVCIStatus", "CertificateValid", "CertificateExpired", "CertificateRevoked", "CertificateSuspicious"]' >> update_certificates.py
+        echo '            for field in obsolete_fields:' >> update_certificates.py
+        echo '                if field in sample:' >> update_certificates.py
+        echo '                    del sample[field]' >> update_certificates.py
+        echo '                    cleaned_count += 1' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '            # Find matching analysis result' >> update_certificates.py
+        echo '            result = None' >> update_certificates.py
+        echo '            for hash_field in ["MD5", "SHA1", "SHA256"]:' >> update_certificates.py
+        echo '                hash_value = sample.get(hash_field)' >> update_certificates.py
+        echo '                if hash_value and hash_value.upper() in analysis_results:' >> update_certificates.py
+        echo '                    result = analysis_results[hash_value.upper()]' >> update_certificates.py
+        echo '                    break' >> update_certificates.py
+        echo '            ' >> update_certificates.py
+        echo '            if result:' >> update_certificates.py
+        echo '                # Add certificate status from PowerShell validation or HVCI analysis' >> update_certificates.py
+        echo '                cert_status = result["status"]' >> update_certificates.py
+        echo '                ' >> update_certificates.py
+        echo '                # Apply additional validation logic' >> update_certificates.py
+        echo '                if cert_status == "Unknown" and sample.get("Signatures"):' >> update_certificates.py
+        echo '                    # If PowerShell couldn\'t determine but we have signature data' >> update_certificates.py
+        echo '                    cert_status = "Valid"' >> update_certificates.py
+        echo '                ' >> update_certificates.py
+        echo '                sample["CertificateStatus"] = cert_status' >> update_certificates.py
+        echo '                ' >> update_certificates.py
+        echo '                # Update existing LoadsDespiteHVCI field based on HVCI status' >> update_certificates.py
+        echo '                hvci_status = result.get("hvci_status", "Unknown")' >> update_certificates.py
+        echo '                if hvci_status == "Blocked":' >> update_certificates.py
+        echo '                    sample["LoadsDespiteHVCI"] = "FALSE"' >> update_certificates.py
+        echo '                elif hvci_status == "Allowed":' >> update_certificates.py
+        echo '                    sample["LoadsDespiteHVCI"] = "TRUE"' >> update_certificates.py
+        echo '                # If hvci_status is Unknown, preserve existing LoadsDespiteHVCI value' >> update_certificates.py
+        echo '                    ' >> update_certificates.py
+        echo '                updated_count += 1' >> update_certificates.py
+        echo '            else:' >> update_certificates.py
+        echo '                # No validation result found, try to infer from existing data' >> update_certificates.py
+        echo '                if sample.get("Signatures") and len(sample["Signatures"]) > 0:' >> update_certificates.py
+        echo '                    # Has signature data but no validation result' >> update_certificates.py
+        echo '                    sample["CertificateStatus"] = "Unknown"' >> update_certificates.py
+        echo '                elif not sample.get("CertificateStatus"):' >> update_certificates.py
+        echo '                    # No signature data and no existing status' >> update_certificates.py
+        echo '                    sample["CertificateStatus"] = "Unknown"' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    # Save updated data' >> update_certificates.py
+        echo '    with open(drv_path, "w") as f:' >> update_certificates.py
+        echo '        json.dump(drivers, f, indent=2)' >> update_certificates.py
+        echo '        ' >> update_certificates.py
+        echo '    print(f"Updated {updated_count} driver samples with certificate attributes")' >> update_certificates.py
+        echo '    print(f"Cleaned {cleaned_count} obsolete fields")' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    # Generate certificate statistics' >> update_certificates.py
+        echo '    cert_stats = {}' >> update_certificates.py
+        echo '    for driver in drivers:' >> update_certificates.py
+        echo '        if not driver.get("KnownVulnerableSamples"):' >> update_certificates.py
+        echo '            continue' >> update_certificates.py
+        echo '        for sample in driver["KnownVulnerableSamples"]:' >> update_certificates.py
+        echo '            status = sample.get("CertificateStatus", "Unknown")' >> update_certificates.py
+        echo '            cert_stats[status] = cert_stats.get(status, 0) + 1' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    print(f"Certificate Status Distribution:")' >> update_certificates.py
+        echo '    for status, count in sorted(cert_stats.items()):' >> update_certificates.py
+        echo '        print(f"  {status}: {count}")' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    return updated_count, cert_stats' >> update_certificates.py
+        echo '' >> update_certificates.py
+        echo 'def main():' >> update_certificates.py
+        echo '    print("Loading analysis results...")' >> update_certificates.py
+        echo '    analysis_results = load_analysis_results()' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    print("Updating driver database...")' >> update_certificates.py
+        echo '    updated_count, cert_stats = update_driver_data(analysis_results)' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    print(f"Certificate update complete: {updated_count} samples updated")' >> update_certificates.py
+        echo '    ' >> update_certificates.py
+        echo '    # Save certificate statistics for summary' >> update_certificates.py
+        echo '    with open("certificate_stats.json", "w") as f:' >> update_certificates.py
+        echo '        json.dump({' >> update_certificates.py
+        echo '            "updated_count": updated_count,' >> update_certificates.py
+        echo '            "certificate_distribution": cert_stats,' >> update_certificates.py
+        echo '            "total_analysis_results": len(analysis_results)' >> update_certificates.py
+        echo '        }, f, indent=2)' >> update_certificates.py
+        echo '' >> update_certificates.py
+        echo 'if __name__ == "__main__":' >> update_certificates.py
+        echo '    main()' >> update_certificates.py
         
         python update_certificates.py
         
