@@ -325,7 +325,7 @@ jobs:
           hvci_summary.json
 
   update_certificates:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: analyze_hvci
     steps:
     - name: Checkout
@@ -343,6 +343,344 @@ jobs:
       with:
         name: hvci-analysis
         
+    - name: Create drivers directory
+      run: |
+        mkdir -p data/drivers
+        
+    - name: Download and validate certificates with PowerShell
+      shell: powershell
+      run: |
+        # PowerShell script to download and validate driver certificates
+        $ErrorActionPreference = "Continue"
+        
+        Write-Host "Starting driver download and certificate validation process..."
+        
+        # Create drivers directory if it doesn't exist
+        $driversDir = "data/drivers"
+        if (-not (Test-Path $driversDir)) {
+            New-Item -ItemType Directory -Path $driversDir -Force | Out-Null
+        }
+        
+        # Function to download a driver file
+        function Get-DriverFile {
+            param(
+                [string]$MD5Hash,
+                [string]$TargetDir,
+                [int]$MaxRetries = 3
+            )
+            
+            $fileName = "$MD5Hash.bin"
+            $filePath = Join-Path $TargetDir $fileName
+            $downloadUrl = "https://github.com/magicsword-io/LOLDrivers/raw/main/drivers/$fileName"
+            
+            # Check if file already exists
+            if (Test-Path $filePath) {
+                Write-Host "Driver already exists: $fileName" -ForegroundColor Green
+                return $filePath
+            }
+            
+            # Download the driver file
+            $retryCount = 0
+            while ($retryCount -lt $MaxRetries) {
+                try {
+                    Write-Host "Downloading: $fileName (attempt $($retryCount + 1))" -ForegroundColor Yellow
+                    Invoke-WebRequest -Uri $downloadUrl -OutFile $filePath -TimeoutSec 30 -ErrorAction Stop
+                    
+                    # Verify file was downloaded and has content
+                    if ((Test-Path $filePath) -and ((Get-Item $filePath).Length -gt 0)) {
+                        Write-Host "Successfully downloaded: $fileName" -ForegroundColor Green
+                        return $filePath
+                    } else {
+                        Remove-Item $filePath -Force -ErrorAction SilentlyContinue
+                        throw "Downloaded file is empty or invalid"
+                    }
+                }
+                catch {
+                    $retryCount++
+                    Write-Host "Download failed for $fileName (attempt $retryCount): $($_.Exception.Message)" -ForegroundColor Red
+                    
+                    if ($retryCount -lt $MaxRetries) {
+                        Start-Sleep -Seconds 2
+                    }
+                }
+            }
+            
+            Write-Host "Failed to download after $MaxRetries attempts: $fileName" -ForegroundColor Red
+            return $null
+        }
+        
+        # Function to validate a single certificate
+        function Test-DriverCertificate {
+            param(
+                [string]$FilePath,
+                [int]$TimeoutSeconds = 10
+            )
+            
+            try {
+                if (-not (Test-Path $FilePath)) {
+                    return @{
+                        Status = "Unknown"
+                        Reason = "File not found"
+                        Details = ""
+                    }
+                }
+                
+                # Get the certificate
+                $signature = Get-AuthenticodeSignature $FilePath -ErrorAction SilentlyContinue
+                
+                if ($null -eq $signature) {
+                    return @{
+                        Status = "Unknown"
+                        Reason = "Failed to get signature"
+                        Details = ""
+                    }
+                }
+                
+                # Check signature status first
+                if ($signature.Status -eq "NotSigned") {
+                    return @{
+                        Status = "Unknown"
+                        Reason = "File is not signed"
+                        Details = ""
+                    }
+                }
+                
+                if ($signature.Status -eq "HashMismatch") {
+                    return @{
+                        Status = "Invalid"
+                        Reason = "Hash mismatch - file may be corrupted"
+                        Details = ""
+                    }
+                }
+                
+                $cert = $signature.SignerCertificate
+                
+                if ($null -eq $cert) {
+                    return @{
+                        Status = "Unknown"
+                        Reason = "No certificate found in signature"
+                        Details = ""
+                    }
+                }
+                
+                # Check if certificate is expired
+                $now = Get-Date
+                if ($cert.NotAfter -lt $now) {
+                    return @{
+                        Status = "Expired"
+                        Reason = "Certificate has expired"
+                        Details = "Expired on: $($cert.NotAfter.ToString('yyyy-MM-dd'))"
+                    }
+                }
+                
+                if ($cert.NotBefore -gt $now) {
+                    return @{
+                        Status = "Invalid"
+                        Reason = "Certificate not yet valid"
+                        Details = "Valid from: $($cert.NotBefore.ToString('yyyy-MM-dd'))"
+                    }
+                }
+                
+                # Check revocation status
+                try {
+                    $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+                    $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::Online
+                    $chain.ChainPolicy.RevocationFlag = [System.Security.Cryptography.X509Certificates.X509RevocationFlag]::EntireChain
+                    $chain.ChainPolicy.VerificationFlags = [System.Security.Cryptography.X509Certificates.X509VerificationFlags]::NoFlag
+                    $chain.ChainPolicy.UrlRetrievalTimeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+                    
+                    $valid = $chain.Build($cert)
+                    
+                    if ($valid) {
+                        return @{
+                            Status = "Valid"
+                            Reason = "Certificate is valid and not revoked"
+                            Details = "Subject: $($cert.Subject)"
+                        }
+                    } else {
+                        $statusDetails = @()
+                        foreach ($status in $chain.ChainStatus) {
+                            $statusDetails += "$($status.Status): $($status.StatusInformation.Trim())"
+                            
+                            # Check for specific revocation status
+                            if ($status.Status -eq "Revoked") {
+                                return @{
+                                    Status = "Revoked"
+                                    Reason = "Certificate has been revoked"
+                                    Details = $status.StatusInformation.Trim()
+                                }
+                            }
+                        }
+                        
+                        return @{
+                            Status = "Invalid"
+                            Reason = "Certificate validation failed"
+                            Details = ($statusDetails -join "; ")
+                        }
+                    }
+                } catch {
+                    # If online revocation check fails, fall back to basic validation
+                    if ($signature.Status -eq "Valid") {
+                        return @{
+                            Status = "Valid"
+                            Reason = "Certificate appears valid (revocation check failed)"
+                            Details = "Subject: $($cert.Subject)"
+                        }
+                    } else {
+                        return @{
+                            Status = "Unknown"
+                            Reason = "Certificate validation error"
+                            Details = $_.Exception.Message
+                        }
+                    }
+                }
+            }
+            catch {
+                return @{
+                    Status = "Unknown"
+                    Reason = "Error during validation"
+                    Details = $_.Exception.Message
+                }
+            }
+        }
+        
+        # Load the driver data to get file paths
+        $drvPath = "data/drv.json"
+        if (-not (Test-Path $drvPath)) {
+            $drvPath = "data/drvj.json"
+        }
+        
+        if (-not (Test-Path $drvPath)) {
+            Write-Host "Driver data file not found"
+            exit 1
+        }
+        
+        $driversData = Get-Content $drvPath | ConvertFrom-Json
+        $validationResults = @{}
+        $downloadStats = @{
+            attempted = 0
+            successful = 0
+            failed = 0
+            skipped = 0
+        }
+        
+        Write-Host "Processing $($driversData.Count) drivers..."
+        
+        $processedCount = 0
+        $totalSamples = 0
+        
+        # First pass: count total samples
+        foreach ($driver in $driversData) {
+            if ($driver.KnownVulnerableSamples) {
+                $totalSamples += $driver.KnownVulnerableSamples.Count
+            }
+        }
+        
+        Write-Host "Total samples to process: $totalSamples"
+        
+        foreach ($driver in $driversData) {
+            if (-not $driver.KnownVulnerableSamples) {
+                continue
+            }
+            
+            foreach ($sample in $driver.KnownVulnerableSamples) {
+                $processedCount++
+                
+                # Get MD5 hash for download
+                $md5Hash = $sample.MD5
+                if (-not $md5Hash) {
+                    Write-Host "No MD5 hash found for sample $processedCount, skipping..." -ForegroundColor Yellow
+                    $downloadStats.skipped++
+                    continue
+                }
+                
+                # Use SHA256 as primary identifier for results, fall back to MD5
+                $sampleId = if ($sample.SHA256) { $sample.SHA256.ToUpper() } else { $md5Hash.ToUpper() }
+                
+                # Download the driver file
+                $downloadStats.attempted++
+                $driverPath = Get-DriverFile -MD5Hash $md5Hash -TargetDir $driversDir
+                
+                if ($null -ne $driverPath) {
+                    $downloadStats.successful++
+                    
+                    # Validate certificate
+                    Write-Host "Validating certificate for: $md5Hash.bin" -ForegroundColor Cyan
+                    $validationResult = Test-DriverCertificate -FilePath $driverPath -TimeoutSeconds 15
+                    
+                    $validationResults[$sampleId] = @{
+                        status = $validationResult.Status
+                        reason = $validationResult.Reason
+                        details = $validationResult.Details
+                        file_path = $driverPath
+                        md5_hash = $md5Hash
+                    }
+                    
+                    Write-Host "Certificate status for $($md5Hash): $($validationResult.Status)" -ForegroundColor $(
+                        switch ($validationResult.Status) {
+                            "Valid" { "Green" }
+                            "Expired" { "Yellow" }
+                            "Revoked" { "Red" }
+                            "Invalid" { "Red" }
+                            default { "Gray" }
+                        }
+                    )
+                } else {
+                    $downloadStats.failed++
+                    
+                    # Still record the sample but mark as unknown
+                    $validationResults[$sampleId] = @{
+                        status = "Unknown"
+                        reason = "Failed to download driver file"
+                        details = "Download failed after multiple attempts"
+                        file_path = $null
+                        md5_hash = $md5Hash
+                    }
+                }
+                
+                # Progress reporting
+                if ($processedCount % 50 -eq 0 -or $processedCount -eq $totalSamples) {
+                    $percentage = [math]::Round(($processedCount / $totalSamples) * 100, 1)
+                    Write-Host "Progress: $processedCount/$totalSamples ($percentage%) - Downloaded: $($downloadStats.successful), Failed: $($downloadStats.failed)" -ForegroundColor Blue
+                }
+            }
+        }
+        
+        Write-Host ""
+        Write-Host "=== Certificate Validation Summary ===" -ForegroundColor Green
+        Write-Host "Total samples processed: $processedCount" -ForegroundColor Cyan
+        Write-Host "Download attempts: $($downloadStats.attempted)" -ForegroundColor Cyan
+        Write-Host "Successful downloads: $($downloadStats.successful)" -ForegroundColor Green
+        Write-Host "Failed downloads: $($downloadStats.failed)" -ForegroundColor Red
+        Write-Host "Skipped (no MD5): $($downloadStats.skipped)" -ForegroundColor Yellow
+        
+        # Certificate status distribution
+        $statusCounts = @{}
+        foreach ($result in $validationResults.Values) {
+            $status = $result.status
+            $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1
+        }
+        
+        Write-Host ""
+        Write-Host "Certificate Status Distribution:" -ForegroundColor Yellow
+        foreach ($status in $statusCounts.Keys | Sort-Object) {
+            $count = $statusCounts[$status]
+            Write-Host "  $status : $count" -ForegroundColor White
+        }
+        
+        # Save validation results as JSON for Python script
+        $resultsJson = @{
+            validation_results = $validationResults
+            download_statistics = $downloadStats
+            timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            processed_count = $processedCount
+            certificate_distribution = $statusCounts
+        }
+        
+        $resultsJson | ConvertTo-Json -Depth 10 | Out-File -FilePath "certificate_validation_results.json" -Encoding UTF8
+        Write-Host ""
+        Write-Host "Validation results saved to certificate_validation_results.json" -ForegroundColor Green
+        
     - name: Update certificate attributes
       run: |
         cat > update_certificates.py << 'EOF'
@@ -352,8 +690,10 @@ jobs:
         from pathlib import Path
         
         def load_analysis_results():
-            """Load HVCI analysis results"""
+            """Load HVCI analysis results and certificate validation"""
             results = {}
+            
+            # Load HVCI results
             with open('hvci_results.csv', 'r') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
@@ -365,6 +705,43 @@ jobs:
                                 'status': row['CertificateStatus'],
                                 'hvci_status': row['Status']
                             }
+            
+            # Load PowerShell certificate validation results
+            try:
+                with open('certificate_validation_results.json', 'r') as f:
+                    cert_data = json.load(f)
+                    cert_results = cert_data.get('validation_results', {})
+                    download_stats = cert_data.get('download_statistics', {})
+                    
+                    print(f"PowerShell validation summary:")
+                    print(f"  - Download attempts: {download_stats.get('attempted', 0)}")
+                    print(f"  - Successful downloads: {download_stats.get('successful', 0)}")
+                    print(f"  - Failed downloads: {download_stats.get('failed', 0)}")
+                    print(f"  - Skipped (no MD5): {download_stats.get('skipped', 0)}")
+                    
+                    # Update results with PowerShell validation
+                    for hash_value, cert_info in cert_results.items():
+                        if hash_value in results:
+                            # Use PowerShell validation result if available
+                            results[hash_value]['status'] = cert_info['status']
+                            results[hash_value]['reason'] = cert_info.get('reason', '')
+                            results[hash_value]['details'] = cert_info.get('details', '')
+                        else:
+                            # Add new entry from PowerShell validation
+                            results[hash_value] = {
+                                'status': cert_info['status'],
+                                'hvci_status': 'Unknown',
+                                'reason': cert_info.get('reason', ''),
+                                'details': cert_info.get('details', '')
+                            }
+                    
+                    print(f"Loaded {len(cert_results)} certificate validation results from PowerShell")
+                    
+            except FileNotFoundError:
+                print("PowerShell certificate validation results not found, using HVCI results only")
+            except Exception as e:
+                print(f"Error loading PowerShell results: {e}")
+            
             return results
         
         def update_driver_data(analysis_results):
@@ -402,33 +779,72 @@ jobs:
                             break
                     
                     if result:
-                        # Add certificate status only
-                        sample['CertificateStatus'] = result['status']
+                        # Add certificate status from PowerShell validation or HVCI analysis
+                        cert_status = result['status']
+                        
+                        # Apply additional validation logic
+                        if cert_status == "Unknown" and sample.get('Signatures'):
+                            # If PowerShell couldn't determine but we have signature data
+                            cert_status = "Valid"
+                        
+                        sample['CertificateStatus'] = cert_status
                         
                         # Update existing LoadsDespiteHVCI field based on HVCI status
-                        if result['hvci_status'] == 'Blocked':
+                        hvci_status = result.get('hvci_status', 'Unknown')
+                        if hvci_status == 'Blocked':
                             sample['LoadsDespiteHVCI'] = 'FALSE'
-                        else:
+                        elif hvci_status == 'Allowed':
                             sample['LoadsDespiteHVCI'] = 'TRUE'
+                        # If hvci_status is Unknown, preserve existing LoadsDespiteHVCI value
                             
                         updated_count += 1
+                    else:
+                        # No validation result found, try to infer from existing data
+                        if sample.get('Signatures') and len(sample['Signatures']) > 0:
+                            # Has signature data but no validation result
+                            sample['CertificateStatus'] = 'Unknown'
+                        elif not sample.get('CertificateStatus'):
+                            # No signature data and no existing status
+                            sample['CertificateStatus'] = 'Unknown'
             
             # Save updated data
             with open(drv_path, 'w') as f:
                 json.dump(drivers, f, indent=2)
                 
             print(f"Updated {updated_count} driver samples with certificate attributes")
-            print(f"Cleaned {cleaned_count} obsolete HVCIStatus fields")
-            return updated_count
+            print(f"Cleaned {cleaned_count} obsolete fields")
+            
+            # Generate certificate statistics
+            cert_stats = {}
+            for driver in drivers:
+                if not driver.get('KnownVulnerableSamples'):
+                    continue
+                for sample in driver['KnownVulnerableSamples']:
+                    status = sample.get('CertificateStatus', 'Unknown')
+                    cert_stats[status] = cert_stats.get(status, 0) + 1
+            
+            print(f"Certificate Status Distribution:")
+            for status, count in sorted(cert_stats.items()):
+                print(f"  {status}: {count}")
+            
+            return updated_count, cert_stats
         
         def main():
             print("Loading analysis results...")
             analysis_results = load_analysis_results()
             
             print("Updating driver database...")
-            updated_count = update_driver_data(analysis_results)
+            updated_count, cert_stats = update_driver_data(analysis_results)
             
             print(f"Certificate update complete: {updated_count} samples updated")
+            
+            # Save certificate statistics for summary
+            with open('certificate_stats.json', 'w') as f:
+                json.dump({
+                    'updated_count': updated_count,
+                    'certificate_distribution': cert_stats,
+                    'total_analysis_results': len(analysis_results)
+                }, f, indent=2)
         
         if __name__ == '__main__':
             main()
@@ -436,11 +852,26 @@ jobs:
         
         python update_certificates.py
         
-    - name: Upload updated driver data
+    - name: Cleanup downloaded drivers (optional space saving)
+      shell: powershell
+      run: |
+        $driversDir = "data/drivers"
+        if (Test-Path $driversDir) {
+          $fileCount = (Get-ChildItem $driversDir -File).Count
+          $totalSize = [math]::Round((Get-ChildItem $driversDir -File | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+          Write-Host "Cleaning up $fileCount driver files ($totalSize MB)..." -ForegroundColor Yellow
+          Remove-Item $driversDir -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Cleanup completed." -ForegroundColor Green
+        }
+        
+    - name: Upload updated driver data and validation results
       uses: actions/upload-artifact@v4
       with:
         name: updated-drv-json
-        path: data/drv.json
+        path: |
+          data/drv.json
+          certificate_validation_results.json
+          certificate_stats.json
 
   commit_changes:
     runs-on: ubuntu-latest
@@ -473,6 +904,37 @@ jobs:
           echo "ERROR: Hash file not found in artifact"
           exit 1
         fi
+        
+    - name: Display Certificate Statistics
+      shell: pwsh
+      run: |
+        if (Test-Path "certificate_stats.json") {
+          $stats = Get-Content "certificate_stats.json" | ConvertFrom-Json
+          Write-Host "=== Certificate Analysis Summary ===" -ForegroundColor Green
+          Write-Host "Total Analysis Results: $($stats.total_analysis_results)" -ForegroundColor Cyan
+          Write-Host "Updated Samples: $($stats.updated_count)" -ForegroundColor Cyan
+          Write-Host ""
+          Write-Host "Certificate Distribution:" -ForegroundColor Yellow
+          $stats.certificate_distribution.PSObject.Properties | ForEach-Object {
+            Write-Host "  $($_.Name): $($_.Value)" -ForegroundColor White
+          }
+        }
+        
+        if (Test-Path "certificate_validation_results.json") {
+          $validation = Get-Content "certificate_validation_results.json" | ConvertFrom-Json
+          $downloadStats = $validation.download_statistics
+          Write-Host ""
+          Write-Host "=== Download Statistics ===" -ForegroundColor Green
+          Write-Host "Download Attempts: $($downloadStats.attempted)" -ForegroundColor Cyan
+          Write-Host "Successful Downloads: $($downloadStats.successful)" -ForegroundColor Green
+          Write-Host "Failed Downloads: $($downloadStats.failed)" -ForegroundColor Red
+          Write-Host "Skipped (No MD5): $($downloadStats.skipped)" -ForegroundColor Yellow
+          
+          if ($downloadStats.attempted -gt 0) {
+            $successRate = [math]::Round(($downloadStats.successful / $downloadStats.attempted) * 100, 1)
+            Write-Host "Success Rate: $successRate%" -ForegroundColor Cyan
+          }
+        }
         
     - name: Commit and push changes
       run: |

@@ -429,15 +429,15 @@ class DriversCache {
       case 'untrustedCert':
         return this.hasUntrustedCertificate(driver);
       case 'certRevoked':
-        return this.hasCertificateAttribute(driver, 'CertificateRevoked');
+        return this.hasCertificateAttributeStatus(driver, 'Revoked');
       case 'certExpired':
-        return this.hasCertificateAttribute(driver, 'CertificateExpired');
+        return this.hasCertificateAttributeStatus(driver, 'Expired');
       case 'certSuspicious':
-        return this.hasCertificateAttribute(driver, 'CertificateSuspicious');
+        return this.hasCertificateAttributeStatus(driver, 'Invalid');
       case 'certValid':
-        return this.hasCertificateAttribute(driver, 'CertificateValid');
+        return this.hasCertificateAttributeStatus(driver, 'Valid');
       case 'certMissing':
-        return this.hasCertificateAttributeStatus(driver, 'Missing');
+        return this.hasCertificateAttributeStatus(driver, 'Unknown');
       default:
         return true;
     }
@@ -462,73 +462,24 @@ class DriversCache {
   }
 
   private hasTrustedCertificate(driver: ProcessedDriver): boolean {
-    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
-      return false;
-    }
-
-    const trustedIssuers = [
-      'Microsoft Corporation',
-      'GlobalSign',
-      'DigiCert',
-      'VeriSign',
-      'Symantec',
-      'Thawte',
-      'GeoTrust',
-      'Comodo',
-      'Sectigo',
-      'Entrust',
-      'IdenTrust',
-      'Go Daddy',
-      'Network Solutions',
-      'Starfield Technologies'
-    ];
-
-    const now = Date.now();
-
-    for (const signature of driver.Signatures) {
-      if (signature.Certificates && Array.isArray(signature.Certificates)) {
-        for (const cert of signature.Certificates) {
-          if (cert.Subject && cert.ValidTo) {
-            try {
-              const validTo = new Date(cert.ValidTo).getTime();
-              if (validTo > now) {
-                const isTrusted = trustedIssuers.some(issuer => 
-                  typeof cert.Subject === 'string' && cert.Subject.includes(issuer)
-                );
-                if (isTrusted) {
-                  return true;
-                }
-              }
-            } catch {
-              continue;
-            }
-          }
-        }
-      }
-    }
-    return false;
+    // Use the new CertificateStatus field for more accurate filtering
+    return this.hasCertificateAttributeStatus(driver, 'Valid');
   }
 
   private hasUntrustedCertificate(driver: ProcessedDriver): boolean {
-    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+    // Use the new CertificateStatus field - consider anything non-Valid as untrusted
+    if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
       return false;
     }
 
-    let hasAnyCertificate = false;
-
-    for (const signature of driver.Signatures) {
-      if (signature.Certificates && Array.isArray(signature.Certificates)) {
-        for (const cert of signature.Certificates) {
-          if (cert.Subject) {
-            hasAnyCertificate = true;
-            break;
-          }
-        }
+    return driver.KnownVulnerableSamples.some(sample => {
+      if (sample && typeof sample === 'object' && sample.CertificateStatus) {
+        const status = sample.CertificateStatus;
+        // Consider these statuses as "untrusted"
+        return status === 'Expired' || status === 'Revoked' || status === 'Invalid' || status === 'Unknown';
       }
-    }
-
-    // Retourner true si le driver a des certificats mais aucun n'est de confiance
-    return hasAnyCertificate && !this.hasTrustedCertificate(driver);
+      return false;
+    });
   }
 
   private searchInDriverOptimized(driver: ProcessedDriver, searchTerm: string): boolean {

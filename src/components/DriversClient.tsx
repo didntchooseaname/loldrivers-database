@@ -54,7 +54,9 @@ const getInitialUrlParams = () => {
   if (params.get('oldest-first') === 'true') activeFilters.add('oldest-first');
   
   // Certificate validation filters
+  if (params.get('cert-revoked') === 'true') activeFilters.add('cert-revoked');
   if (params.get('cert-expired') === 'true') activeFilters.add('cert-expired');
+  if (params.get('cert-suspicious') === 'true') activeFilters.add('cert-suspicious');
   if (params.get('cert-valid') === 'true') activeFilters.add('cert-valid');
   if (params.get('cert-missing') === 'true') activeFilters.add('cert-missing');
   
@@ -129,7 +131,9 @@ export default function DriversClient({
     if (activeFilters.has('oldest-first')) params.set('oldest-first', 'true');
     
     // Certificate validation filters
+    if (activeFilters.has('cert-revoked')) params.set('cert-revoked', 'true');
     if (activeFilters.has('cert-expired')) params.set('cert-expired', 'true');
+    if (activeFilters.has('cert-suspicious')) params.set('cert-suspicious', 'true');
     if (activeFilters.has('cert-valid')) params.set('cert-valid', 'true');
     if (activeFilters.has('cert-missing')) params.set('cert-missing', 'true');
     
@@ -251,109 +255,50 @@ export default function DriversClient({
     });
   }, [paginatedDrivers, currentPage, ITEMS_PER_PAGE]);
 
-  // Check active certificate
+  // Check active certificate using CertificateStatus
   const hasActiveCertificate = (driver: Driver): boolean => {
-    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+    if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
       return false;
     }
 
-    for (const signature of driver.Signatures) {
-      if (signature.Certificates && Array.isArray(signature.Certificates)) {
-        for (const cert of signature.Certificates) {
-          if (cert.ValidTo) {
-            try {
-              const validTo = new Date(cert.ValidTo);
-              const now = new Date();
-              if (validTo > now) {
-                return true;
-              }
-            } catch {
-              continue;
-            }
-          }
-        }
+    return driver.KnownVulnerableSamples.some(sample => {
+      if (sample && typeof sample === 'object' && sample.CertificateStatus) {
+        const status = sample.CertificateStatus;
+        // Consider Valid certificates as "active" (not expired or revoked)
+        return status === 'Valid';
       }
-    }
-    return false;
+      return false;
+    });
   };
 
-  // Check if driver has valid trusted certificate
+  // Check if driver has valid trusted certificate using CertificateStatus
   const hasTrustedCertificate = (driver: Driver): boolean => {
-    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+    if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
       return false;
     }
 
-    const trustedIssuers = [
-      'Microsoft Corporation',
-      'GlobalSign',
-      'DigiCert',
-      'VeriSign',
-      'Symantec',
-      'Thawte',
-      'GeoTrust',
-      'Comodo',
-      'Sectigo',
-      'Entrust',
-      'IdenTrust',
-      'Go Daddy',
-      'Network Solutions',
-      'Starfield Technologies'
-    ];
-
-    const now = new Date();
-
-    for (const signature of driver.Signatures) {
-      if (signature.Certificates && Array.isArray(signature.Certificates)) {
-        // Chercher un certificat de confiance valide
-        for (const cert of signature.Certificates) {
-          if (cert.Subject && cert.ValidTo) {
-            try {
-              const validTo = new Date(cert.ValidTo);
-              if (validTo > now) {
-                // Check if signed by trusted authority
-                const isTrusted = trustedIssuers.some(issuer => 
-                  typeof cert.Subject === 'string' && cert.Subject.includes(issuer)
-                );
-                if (isTrusted) {
-                  return true;
-                }
-              }
-            } catch {
-              continue;
-            }
-          }
-        }
+    return driver.KnownVulnerableSamples.some(sample => {
+      if (sample && typeof sample === 'object' && sample.CertificateStatus) {
+        return sample.CertificateStatus === 'Valid';
       }
-    }
-    return false;
+      return false;
+    });
   };
 
   // Check if driver has suspicious certificate (expired, self-signed, etc.)
   const hasUntrustedCertificate = (driver: Driver): boolean => {
-    if (!driver.Signatures || !Array.isArray(driver.Signatures)) {
+    if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
       return false;
     }
 
-    let hasAnyCertificate = false;
-    let hasTrustedCert = false;
-
-    for (const signature of driver.Signatures) {
-      if (signature.Certificates && Array.isArray(signature.Certificates)) {
-        for (const cert of signature.Certificates) {
-          if (cert.Subject) {
-            hasAnyCertificate = true;
-            
-            // Check if it's a trusted certificate
-            if (hasTrustedCertificate(driver)) {
-              hasTrustedCert = true;
-            }
-          }
-        }
+    return driver.KnownVulnerableSamples.some(sample => {
+      if (sample && typeof sample === 'object' && sample.CertificateStatus) {
+        const status = sample.CertificateStatus;
+        // Consider these statuses as "untrusted"
+        return status === 'Expired' || status === 'Revoked' || status === 'Invalid' || status === 'Unknown';
       }
-    }
-
-    // Retourner true si le driver a des certificats mais aucun n'est de confiance
-    return hasAnyCertificate && !hasTrustedCert;
+      return false;
+    });
   };
 
   // Gestion des filtres
@@ -512,6 +457,13 @@ export default function DriversClient({
       if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
       if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
       
+      // Certificate validation filters
+      if (activeFilters.has('cert-revoked')) url.searchParams.set('cert-revoked', 'true');
+      if (activeFilters.has('cert-expired')) url.searchParams.set('cert-expired', 'true');
+      if (activeFilters.has('cert-suspicious')) url.searchParams.set('cert-suspicious', 'true');
+      if (activeFilters.has('cert-valid')) url.searchParams.set('cert-valid', 'true');
+      if (activeFilters.has('cert-missing')) url.searchParams.set('cert-missing', 'true');
+      
       // Behavioral filters
       if (activeFilters.has('memory-manipulator')) url.searchParams.set('memory-manipulator', 'true');
       if (activeFilters.has('process-killer')) url.searchParams.set('process-killer', 'true');
@@ -598,6 +550,13 @@ export default function DriversClient({
     if (activeFilters.has('recent')) url.searchParams.set('recent', 'true');
     if (activeFilters.has('newest-first')) url.searchParams.set('newest-first', 'true');
     if (activeFilters.has('oldest-first')) url.searchParams.set('oldest-first', 'true');
+    
+    // Certificate validation filters
+    if (activeFilters.has('cert-revoked')) url.searchParams.set('cert-revoked', 'true');
+    if (activeFilters.has('cert-expired')) url.searchParams.set('cert-expired', 'true');
+    if (activeFilters.has('cert-suspicious')) url.searchParams.set('cert-suspicious', 'true');
+    if (activeFilters.has('cert-valid')) url.searchParams.set('cert-valid', 'true');
+    if (activeFilters.has('cert-missing')) url.searchParams.set('cert-missing', 'true');
     
     // Behavioral filters
     if (activeFilters.has('memory-manipulator')) url.searchParams.set('memory-manipulator', 'true');
@@ -907,25 +866,26 @@ export default function DriversClient({
     return capacities;
   };
 
-  // Generate certificate tags based on KnownVulnerableSamples attributes
+  // Generate certificate tags based on KnownVulnerableSamples CertificateStatus
   const generateCertificateTags = (driver: Driver) => {
     const certTags = [];
     
     if (driver.KnownVulnerableSamples && Array.isArray(driver.KnownVulnerableSamples)) {
-      // Check for certificate attributes across all samples
+      // Check for certificate status across all samples
       let hasRevoked = false;
       let hasExpired = false;
-      let hasSuspicious = false;
+      let hasInvalid = false;
       let hasValid = false;
-      let hasMissing = false;
+      let hasUnknown = false;
       
       for (const sample of driver.KnownVulnerableSamples) {
-        if (sample && typeof sample === 'object') {
-          if (sample.CertificateRevoked === true) hasRevoked = true;
-          if (sample.CertificateExpired === true) hasExpired = true;
-          if (sample.CertificateSuspicious === true) hasSuspicious = true;
-          if (sample.CertificateValid === true) hasValid = true;
-          if (sample.CertificateStatus === 'Missing') hasMissing = true;
+        if (sample && typeof sample === 'object' && sample.CertificateStatus) {
+          const status = sample.CertificateStatus;
+          if (status === 'Revoked') hasRevoked = true;
+          if (status === 'Expired') hasExpired = true;
+          if (status === 'Invalid') hasInvalid = true;
+          if (status === 'Valid') hasValid = true;
+          if (status === 'Unknown') hasUnknown = true;
         }
       }
       
@@ -946,15 +906,15 @@ export default function DriversClient({
         });
       }
       
-      if (hasSuspicious) {
+      if (hasInvalid) {
         certTags.push({
-          text: 'SUSPICIOUS CERTIFICATE',
+          text: 'INVALID CERTIFICATE',
           type: 'warning',
           icon: 'fas fa-exclamation-triangle'
         });
       }
       
-      if (hasValid && !hasRevoked && !hasExpired && !hasSuspicious) {
+      if (hasValid && !hasRevoked && !hasExpired && !hasInvalid) {
         certTags.push({
           text: 'VALID CERTIFICATE',
           type: 'success',
@@ -962,9 +922,9 @@ export default function DriversClient({
         });
       }
       
-      if (hasMissing && !hasValid && !hasRevoked && !hasExpired && !hasSuspicious) {
+      if (hasUnknown && !hasValid && !hasRevoked && !hasExpired && !hasInvalid) {
         certTags.push({
-          text: 'NO CERTIFICATE',
+          text: 'CERTIFICATE STATUS UNKNOWN',
           type: 'secondary',
           icon: 'fas fa-question-circle'
         });
