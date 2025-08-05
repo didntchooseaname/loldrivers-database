@@ -1,0 +1,309 @@
+name: HVCI Drivers Check
+
+on:
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  check-hvci-drivers:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Download Microsoft Vulnerable Driver Blocklist
+      id: download-blocklist
+      shell: powershell
+      run: |
+        # Download the vulnerable driver blocklist ZIP
+        $blocklistUrl = "https://aka.ms/VulnerableDriverBlockList"
+        $zipPath = "VulnerableDriverBlockList.zip"
+        $extractPath = "blocklist_temp"
+        
+        try {
+          Invoke-WebRequest -Uri $blocklistUrl -OutFile $zipPath -UserAgent "Mozilla/5.0"
+          Write-Host "Downloaded blocklist ZIP successfully"
+          
+          # Calculate hash of downloaded ZIP
+          $downloadHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash
+          Write-Host "Downloaded ZIP hash: $downloadHash"
+          
+          # Check if hash file exists and compare
+          if (Test-Path "data/blocklist-hash.txt") {
+            $storedHash = Get-Content "data/blocklist-hash.txt" -Raw
+            $storedHash = $storedHash.Trim()
+            
+            if ($downloadHash -eq $storedHash) {
+              Write-Host "Hash matches stored hash. Skipping processing."
+              Write-Output "skip_processing=true" >> $env:GITHUB_ENV
+              exit 0
+            } else {
+              Write-Host "Hash differs from stored hash. Continuing processing."
+              Write-Output "skip_processing=false" >> $env:GITHUB_ENV
+            }
+          } else {
+            Write-Host "No stored hash found. Continuing processing."
+            Write-Output "skip_processing=false" >> $env:GITHUB_ENV
+          }
+          
+          # Extract ZIP
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          
+          # Verify SiPolicy_Enforced.xml exists
+          $xmlPath = Join-Path $extractPath "SiPolicy_Enforced.xml"
+          if (Test-Path $xmlPath) {
+            Write-Host "Found SiPolicy_Enforced.xml"
+            Write-Output "xml_path=$xmlPath" >> $env:GITHUB_ENV
+          } else {
+            Write-Error "SiPolicy_Enforced.xml not found in extracted files"
+            exit 1
+          }
+          
+          # Store the new hash
+          $downloadHash | Out-File -FilePath "data/blocklist-hash.txt" -Encoding utf8 -NoNewline
+          
+        } catch {
+          Write-Error "Failed to download or process blocklist: $_"
+          exit 1
+        }
+    
+    - name: Process HVCI Driver Check
+      if: env.skip_processing == 'false'
+      shell: powershell
+      run: |
+        # Load the drivers JSON data
+        if (-not (Test-Path "data/drv.json")) {
+          Write-Error "data/drv.json not found"
+          exit 1
+        }
+        
+        $driversData = Get-Content "data/drv.json" -Raw | ConvertFrom-Json
+        Write-Host "Loaded $($driversData.Count) drivers from data/drv.json"
+        
+        # Load the XML policy
+        $xmlPath = $env:xml_path
+        if (-not (Test-Path $xmlPath)) {
+          Write-Error "XML policy file not found: $xmlPath"
+          exit 1
+        }
+        
+        [xml]$policy = Get-Content $xmlPath
+        Write-Host "Loaded HVCI policy XML"
+        
+        # Extract policy components
+        $fileRules = $policy.SiPolicy.FileRules
+        $signers = $policy.SiPolicy.Signers.Signer
+        
+        Write-Host "Found $($fileRules.Deny.Count) deny rules and $($signers.Count) signers"
+        
+        # Initialize result collections
+        $allowed = New-Object System.Collections.ArrayList
+        $blocked = New-Object System.Collections.ArrayList
+        
+        # Helper function to check if driver hash is blocked
+        function Test-BlockedHash($driver) {
+          foreach ($hash in $fileRules.Deny.Hash) {
+            if ($hash -and (
+              ($hash -eq $driver.Authentihash.SHA256) -or
+              ($hash -eq $driver.Authentihash.SHA1) -or 
+              ($hash -eq $driver.Authentihash.MD5) -or 
+              ($hash -eq $driver.SHA256) -or
+              ($hash -eq $driver.SHA1) -or 
+              ($hash -eq $driver.MD5)
+            )) {
+              return $true
+            }
+          }
+          return $false
+        }
+        
+        # Helper function to check if driver signer is blocked
+        function Test-BlockedSigner($driver) {
+          $fileAttrib = $fileRules.FileAttrib | Where-Object { $_.FileName -eq $driver.OriginalFilename }
+          
+          foreach ($signer in $signers) {
+            if ($signer.CertRoot -and $signer.CertRoot.Value) {
+              $tbs = $signer.CertRoot.Value.ToLower()
+              
+              if ($driver.Signatures -and $driver.Signatures.Count -gt 0) {
+                foreach ($signature in $driver.Signatures) {
+                  if ($signature.Certificates -and $signature.Certificates.Count -gt 0) {
+                    foreach ($cert in $signature.Certificates) {
+                      if ($cert.TBS -and (
+                        ($cert.TBS.MD5 -and $cert.TBS.MD5.ToLower() -eq $tbs) -or
+                        ($cert.TBS.SHA1 -and $cert.TBS.SHA1.ToLower() -eq $tbs) -or 
+                        ($cert.TBS.SHA256 -and $cert.TBS.SHA256.ToLower() -eq $tbs) -or 
+                        ($cert.TBS.SHA384 -and $cert.TBS.SHA384.ToLower() -eq $tbs)
+                      )) {
+                        $blockedFiles = $signer.FileAttribRef
+                        if (-not $blockedFiles -or ($fileAttrib -and $blockedFiles.RuleID -contains $fileAttrib.ID)) {
+                          return $true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          return $false
+        }
+        
+        # Process each driver
+        $modifiedDrivers = 0
+        foreach ($driver in $driversData) {
+          if ($driver.KnownVulnerableSamples -and $driver.KnownVulnerableSamples.Count -gt 0) {
+            foreach ($sample in $driver.KnownVulnerableSamples) {
+              $isBlocked = $false
+              
+              # Check if hash is blocked
+              if (Test-BlockedHash $sample) {
+                $isBlocked = $true
+              }
+              
+              # Check file version rules
+              if (-not $isBlocked) {
+                $fileMaxVersion = ($fileRules.Deny | Where-Object { $_.FileName -eq $sample.OriginalFilename }).MaximumFileVersion
+                if ($fileMaxVersion -and $sample.FileVersion) {
+                  $version = ($sample.FileVersion -replace ',\s*', '.').Split()[0]
+                  if ($version -and [version]$version -le [version]$fileMaxVersion) {
+                    $isBlocked = $true
+                  }
+                }
+              }
+              
+              # Check signer rules
+              if (-not $isBlocked) {
+                if (Test-BlockedSigner $sample) {
+                  $isBlocked = $true
+                }
+              }
+              
+              # Update LoadsDespiteHVCI field
+              $newValue = if ($isBlocked) { "FALSE" } else { "TRUE" }
+              if ($sample.LoadsDespiteHVCI -ne $newValue) {
+                $sample.LoadsDespiteHVCI = $newValue
+                $modifiedDrivers++
+              }
+              
+              # Add to result collections for CSV
+              $driverInfo = [PSCustomObject]@{
+                MD5 = $sample.MD5
+                SHA1 = $sample.SHA1
+                SHA256 = $sample.SHA256
+                Status = if ($isBlocked) { "Blocked" } else { "Allowed" }
+              }
+              
+              if ($isBlocked) {
+                [void]$blocked.Add($driverInfo)
+              } else {
+                [void]$allowed.Add($driverInfo)
+              }
+            }
+          }
+        }
+        
+        # Generate CSV
+        $allDrivers = $allowed + $blocked
+        $csvPath = "data/hvci_drivers.csv"
+        
+        # Ensure data directory exists
+        if (-not (Test-Path "data")) {
+          New-Item -ItemType Directory -Path "data" -Force
+        }
+        
+        $allDrivers | Export-Csv -Path $csvPath -NoTypeInformation
+        Write-Host "CSV file created at $csvPath with $($allDrivers.Count) entries"
+        
+        # Save updated JSON
+        $driversData | ConvertTo-Json -Depth 10 | Out-File -FilePath "data/drv.json" -Encoding utf8
+        Write-Host "Updated drv.json with $modifiedDrivers modified driver entries"
+        
+        # Set environment variables for summary
+        Write-Output "total_drivers=$($allDrivers.Count)" >> $env:GITHUB_ENV
+        Write-Output "allowed_drivers=$($allowed.Count)" >> $env:GITHUB_ENV
+        Write-Output "blocked_drivers=$($blocked.Count)" >> $env:GITHUB_ENV
+        Write-Output "modified_drivers=$modifiedDrivers" >> $env:GITHUB_ENV
+    
+    - name: Generate Summary
+      if: env.skip_processing == 'false'
+      shell: powershell
+      run: |
+        $summary = @"
+        # HVCI Driver Check Results
+        
+        ## Summary
+        - **Total Drivers Processed**: $env:total_drivers
+        - **Allowed Drivers**: $env:allowed_drivers
+        - **Blocked Drivers**: $env:blocked_drivers
+        - **Modified Driver Entries**: $env:modified_drivers
+        
+        ## Details
+        - Drivers marked as **Allowed** can potentially load despite HVCI restrictions
+        - Drivers marked as **Blocked** are prevented from loading by the HVCI policy
+        - The LoadsDespiteHVCI field has been updated for modified entries
+        - Updated CSV file saved to data/hvci_drivers.csv
+        - Updated JSON file saved to data/drv.json
+        
+        ## Files Updated
+        - data/hvci_drivers.csv
+        - data/drv.json
+        - data/blocklist-hash.txt
+        "@
+        
+        Write-Host $summary
+        $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+    
+    - name: Check for changes
+      if: env.skip_processing == 'false'
+      id: changes
+      shell: powershell
+      run: |
+        $gitStatus = git status --porcelain
+        if ($gitStatus) {
+          Write-Host "Changes detected:"
+          Write-Host $gitStatus
+          Write-Output "has_changes=true" >> $env:GITHUB_ENV
+        } else {
+          Write-Host "No changes detected"
+          Write-Output "has_changes=false" >> $env:GITHUB_ENV
+        }
+    
+    - name: Commit and push changes
+      if: env.skip_processing == 'false' && env.has_changes == 'true'
+      shell: powershell
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        git add data/hvci_drivers.csv
+        git add data/drv.json
+        git add data/blocklist-hash.txt
+        
+        $commitMessage = "Update HVCI driver check results - $env:modified_drivers drivers modified"
+        git commit -m $commitMessage
+        git push
+        
+        Write-Host "Changes committed and pushed successfully"
+    
+    - name: Cleanup
+      if: always()
+      shell: powershell
+      run: |
+        # Clean up temporary files
+        if (Test-Path "VulnerableDriverBlockList.zip") {
+          Remove-Item "VulnerableDriverBlockList.zip" -Force
+        }
+        if (Test-Path "blocklist_temp") {
+          Remove-Item "blocklist_temp" -Recurse -Force
+        }
+        Write-Host "Cleanup completed"
