@@ -10,9 +10,9 @@ Enable security researchers, threat hunters, malware analysts, and system admini
 
 **Periodic HVCI Verification:** Implemented proper HVCI compatibility checking that directly queries Microsoft&apos;s official vulnerable driver blocklist, providing more accurate results than local static lists used by other tools.
 
-**Intelligent Search & Filtering:** Quickly search and filter drivers by attributes including hashes, company names, descriptions, HVCI compatibility, certificate status, architecture, and behavioral patterns.
+**Intelligent Search & Filtering:** Quickly search and filter drivers by attributes including hashes, company names, descriptions, HVCI compatibility, architecture, and behavioral patterns.
 
-**Certificate Analysis:** Comprehensive certificate validation system that categorizes drivers by trusted vs. unknown certificate authorities, helping assess legitimacy and risk levels.
+**Certificate Information Display:** Comprehensive certificate validation system that shows certificate status information in driver details for security assessment purposes.
 
 **Architecture-Aware Filtering:** Filter by specific processor architectures (x64, x32, arm64) with clear visual indicators in driver cards for quick identification.
 

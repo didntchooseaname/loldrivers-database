@@ -102,37 +102,17 @@
 
 ## Certificate Validation Filters
 
+*Note: Certificate filtering is currently disabled in the UI while the certificate validation system is being updated. Certificate status information is still displayed in driver details for informational purposes.*
+
 The certificate validation system provides comprehensive analysis of driver signing certificates through automated workflows that validate certificate status, expiration, and trust chains.
 
-### Expired Certificates Filter
+### Certificate Information (Display Only)
 
-**What it does:** Displays drivers with certificates that have passed their validity period.
+**What it shows:** Driver cards display certificate status information including expired, valid, missing, revoked, or suspicious certificates for security assessment purposes.
 
-**Risk Assessment:** Expired certificates can indicate outdated drivers or potentially suspicious signing practices.
+**Risk Assessment:** Certificate information helps assess driver legitimacy - expired certificates can indicate outdated drivers or potentially suspicious signing practices.
 
-**Validation Logic:** Checks the `ValidTo` field against current date/time to determine expiration status.
-
-**Security Note:** While not immediately malicious, expired certificates require additional scrutiny.
-
-### Valid Certificates Filter
-
-**What it does:** Shows drivers with properly validated certificates from trusted Certificate Authorities.
-
-**Validation Criteria:** Current (not expired), not revoked, issued by recognized CA, and follows standard certificate practices.
-
-**Trust Level:** Highest confidence level for certificate authenticity, though doesn't guarantee driver safety.
-
-**Mutual Exclusivity:** Cannot be combined with expired or missing certificate filters due to logical conflicts.
-
-### No Certificate Filter
-
-**What it does:** Displays drivers that lack digital signatures or certificate information entirely.
-
-**Security Assessment:** Unsigned drivers are automatically blocked by modern Windows security mechanisms and cannot load on systems with proper security configurations.
-
-**Modern Windows:** Current Windows versions (Windows 10/11 with Secure Boot, HVCI, or Driver Signature Enforcement) will reject unsigned drivers, making them ineffective on secured systems.
-
-**Historical Context:** These drivers may represent legacy threats from older Windows versions or systems with disabled security features.
+**Security Note:** While certificate status is shown for informational purposes, all certificate-based filtering has been temporarily disabled.
 
 ## Recent Drivers Filter
 
@@ -160,29 +140,27 @@ The certificate validation system provides comprehensive analysis of driver sign
 
 **Combination Strategy:** Filters can be combined (except mutually exclusive ones) to create precise queries. Examples:
 
-- **HVCI Compatible + Valid Certificates + Process Killer:** HVCI-compatible and legitimately signed killer driver
+- **HVCI Compatible + Process Killer:** HVCI-compatible drivers with process termination capabilities
 - **HVCI Compatible + Recent Drivers:** Newly discovered drivers that are HVCI-compatible
 - **Memory Manipulator + Process Killer:** Highly dangerous drivers with multiple attack capabilities
-- **Debug Bypass + No Certificate:** Potential evasion tools without proper signing
-- **Revoked Certificates + Process Killer:** Extremely high-risk drivers with compromised signing
-- **Valid Certificates + File Manipulator:** Legitimately signed but potentially dangerous drivers
+- **Debug Bypass + Memory Manipulator:** Advanced evasion tools with memory manipulation
+- **Registry Manipulator + File Manipulator:** Drivers with comprehensive system manipulation capabilities
 
-**Certificate Classification Logic:** The system uses automated workflows to analyze and classify driver certificates through comprehensive validation:
+**Certificate Information:** While certificate filtering is currently disabled, certificate status information is still displayed in driver cards for security assessment purposes.
 
 **Technical Analysis Process:**
-- **Certificate Chain Validation:** Verifies the complete certificate chain from root CA to signing certificate
-- **Temporal Validation:** Checks ValidFrom/ValidTo dates against current timestamp for expiration status
-- **Revocation Checking:** Cross-references certificate serial numbers and thumbprints against known revocation databases
-- **Authority Assessment:** Evaluates issuer against database of known legitimate and compromised Certificate Authorities
+- **Certificate Status Display:** Shows certificate validation status (valid, expired, revoked, suspicious, missing) in driver information
+- **Trust Assessment:** Visual indicators help evaluate driver legitimacy based on certificate information
+- **Security Context:** Certificate data provides additional context for threat assessment
 
-**Classification Categories:**
-- **Valid:** Passes all validation checks - current validity period, trusted CA, not revoked, production certificate
+**Classification Categories (Display Only):**
+- **Valid:** Current validity period, trusted CA, not revoked, production certificate
 - **Revoked:** Certificate found in revocation lists or known compromised certificate databases
 - **Expired:** ValidTo date is earlier than current timestamp
 - **Suspicious:** Self-signed, unusual patterns, or issued by questionable authorities
 - **Missing:** No digital signature or certificate data present in driver binary
 
-**Workflow Integration:** Certificate validation runs as part of the automated "Driver Tagging" GitHub workflow, processing the entire database and applying appropriate tags based on validation results.
+**Information Display:** Certificate status information is shown in driver cards for security assessment, but active filtering by certificate status is currently disabled.
 
 **Behavioral Analysis Strategy:** Use behavioral filters to understand driver capabilities and potential attack vectors:
 

@@ -32,7 +32,7 @@ Traditional driver analysis tools can have limitations:
 This platform goes **beyond simple cataloging** to provide:
 - **Behavioral analysis** through imported function examination
 - **Strict HVCI verification** using Microsoft's official blocklist
-- **Advanced filtering** by capabilities, architecture, and certificates
+- **Advanced filtering** by capabilities, architecture, and HVCI compatibility
 
 ## ✨ Features
 
@@ -55,15 +55,15 @@ Unlike static driver lists, this platform analyzes imported functions to automat
 ### 🔍 Search & Filtering
 - **Multi-attribute search** - Hashes, company names, descriptions
 - **Behavioral filters** - Search by detected capabilities
-- **Certificate analysis** - Trusted vs. unknown authorities
+- **HVCI compatibility** - Filter by HVCI-compatible vs. blocked drivers
 - **Architecture-aware** - Filter by x64, x32, ARM64 with visual indicators
 - **URL state management** - Bookmark and share search queries
 
 ### 📊 Certificate Analysis System
-- **Comprehensive validation** - Analyzes complete certificate chains
-- **Trust categorization** - Trusted CAs vs. unknown/expired certificates
-- **Risk assessment** - Identifies self-signed, revoked, or compromised certificates
-- **Visual indicators** - Clear trust status in driver cards
+- **Certificate information display** - Shows certificate status in driver details
+- **Trust indicators** - Visual indicators for certificate validation status
+- **Risk assessment** - Identifies self-signed, revoked, expired, or compromised certificates
+- **Security context** - Provides certificate information for threat assessment
 
 ## 🏗️ Technical Implementation
 
