@@ -59,7 +59,7 @@ jobs:
           Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
           
           # Verify SiPolicy_Enforced.xml exists
-          $xmlPath = Join-Path $extractPath "SiPolicy_Enforced.xml"
+          $xmlPath = Join-Path $extractPath "VulnerableDriverBlockList\SiPolicy_Enforced.xml"
           if (Test-Path $xmlPath) {
             Write-Host "Found SiPolicy_Enforced.xml"
             Write-Output "xml_path=$xmlPath" >> $env:GITHUB_ENV
