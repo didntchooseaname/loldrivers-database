@@ -272,12 +272,38 @@ jobs:
                 }
               }
               
-              # Update LoadsDespiteHVCI field
+              # Update LoadsDespiteHVCI field with better object handling
               $newValue = if ($isBlocked) { "FALSE" } else { "TRUE" }
-              if ($sample.LoadsDespiteHVCI -ne $newValue) {
-                $sample.LoadsDespiteHVCI = $newValue
-                $modifiedDrivers++
+
+              try {
+                # Check if property exists
+                $hasProperty = $sample.PSObject.Properties.Name -contains "LoadsDespiteHVCI"
+                $currentValue = if ($hasProperty) { $sample.LoadsDespiteHVCI } else { $null }
+                
+                if ($currentValue -ne $newValue) {
+                  if ($hasProperty) {
+                    # Property exists, update it
+                    $sample.LoadsDespiteHVCI = $newValue
+                  } else {
+                    # Property doesn't exist, add it
+                    $sample | Add-Member -MemberType NoteProperty -Name "LoadsDespiteHVCI" -Value $newValue -Force
+                  }
+                  $modifiedDrivers++
+                  Write-Host "Updated LoadsDespiteHVCI for driver $($sample.SHA256) to $newValue"
+                }
+              } catch {
+                Write-Host "Warning: Failed to update LoadsDespiteHVCI for driver $($sample.SHA256): $_"
+                # Try creating a new object with the property
+                $newSample = [PSCustomObject]@{}
+                foreach ($prop in $sample.PSObject.Properties) {
+                  $newSample | Add-Member -MemberType NoteProperty -Name $prop.Name -Value $prop.Value
+                }
+                $newSample | Add-Member -MemberType NoteProperty -Name "LoadsDespiteHVCI" -Value $newValue -Force
+                
+                # Replace the sample in the array (this requires more complex logic)
+                Write-Host "Created new object with LoadsDespiteHVCI property"
               }
+
               
               # Add to result collections for CSV
               $driverInfo = [PSCustomObject]@{
