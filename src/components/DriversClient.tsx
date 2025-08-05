@@ -2009,6 +2009,7 @@ export default function DriversClient({
             </button>
           </div>
           
+          {/* Certificate filters temporarily disabled
           <div className="filter-group certificate-filters">
             <span className="filter-label"><i className="fas fa-certificate"></i> Certificates:</span>
             <button 
@@ -2033,6 +2034,7 @@ export default function DriversClient({
               <i className="fas fa-question-circle"></i> No Cert
             </button>
           </div>
+          */}
           
           <div className="filter-group meta-filters">
             <span className="filter-label"><i className="fas fa-microchip"></i> Architecture:</span>

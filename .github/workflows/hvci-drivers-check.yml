@@ -243,7 +243,6 @@ jobs:
         }
         
         # Process each driver
-        $modifiedDrivers = 0
         foreach ($driver in $driversData) {
           if ($driver.KnownVulnerableSamples -and $driver.KnownVulnerableSamples.Count -gt 0) {
             foreach ($sample in $driver.KnownVulnerableSamples) {
@@ -272,38 +271,8 @@ jobs:
                 }
               }
               
-              # Update LoadsDespiteHVCI field with better object handling
+              # Determine status for CSV only (no JSON modification)
               $newValue = if ($isBlocked) { "FALSE" } else { "TRUE" }
-
-              try {
-                # Check if property exists
-                $hasProperty = $sample.PSObject.Properties.Name -contains "LoadsDespiteHVCI"
-                $currentValue = if ($hasProperty) { $sample.LoadsDespiteHVCI } else { $null }
-                
-                if ($currentValue -ne $newValue) {
-                  if ($hasProperty) {
-                    # Property exists, update it
-                    $sample.LoadsDespiteHVCI = $newValue
-                  } else {
-                    # Property doesn't exist, add it
-                    $sample | Add-Member -MemberType NoteProperty -Name "LoadsDespiteHVCI" -Value $newValue -Force
-                  }
-                  $modifiedDrivers++
-                  Write-Host "Updated LoadsDespiteHVCI for driver $($sample.SHA256) to $newValue"
-                }
-              } catch {
-                Write-Host "Warning: Failed to update LoadsDespiteHVCI for driver $($sample.SHA256): $_"
-                # Try creating a new object with the property
-                $newSample = [PSCustomObject]@{}
-                foreach ($prop in $sample.PSObject.Properties) {
-                  $newSample | Add-Member -MemberType NoteProperty -Name $prop.Name -Value $prop.Value
-                }
-                $newSample | Add-Member -MemberType NoteProperty -Name "LoadsDespiteHVCI" -Value $newValue -Force
-                
-                # Replace the sample in the array (this requires more complex logic)
-                Write-Host "Created new object with LoadsDespiteHVCI property"
-              }
-
               
               # Add to result collections for CSV
               $driverInfo = [PSCustomObject]@{
@@ -333,57 +302,11 @@ jobs:
         
         $allDrivers | Export-Csv -Path $csvPath -NoTypeInformation
         Write-Host "CSV file created at $csvPath with $($allDrivers.Count) entries"
-        
-        # ──────────────────────────────────────────────────────────────
-        # Update ONLY the LoadsDespiteHVCI field without re-serialising
-        # ──────────────────────────────────────────────────────────────
-
-        # 1) Build a map: SHA256 → new TRUE / FALSE value  (skip empty keys)
-        $updates = @{}      # hashtable
-
-        foreach ($driver in $driversData) {
-            foreach ($sample in $driver.KnownVulnerableSamples) {
-
-                $sha = $sample.SHA256
-                if ([string]::IsNullOrWhiteSpace($sha)) { continue }   # skip bad entries
-
-                # get current value or default to FALSE
-                $newVal = if ($sample.PSObject.Properties.Name -contains 'LoadsDespiteHVCI') {
-                            $sample.LoadsDespiteHVCI
-                          } else { 'FALSE' }
-
-                $updates[$sha] = $newVal
-            }
-        }
-
-        # 2) Read the original JSON file as raw text
-        $jsonPath     = "data/drv.json"
-        $originalJson = Get-Content $jsonPath -Raw
-
-        # 3) Replace the LoadsDespiteHVCI value for every SHA256 found
-        foreach ($sha in $updates.Keys) {
-            $newVal = $updates[$sha]          # "TRUE" or "FALSE"
-            $shaEsc = [regex]::Escape($sha)
-
-            # Regex: look inside the object that owns this SHA256,
-            # then replace the value of LoadsDespiteHVCI
-            # build the look-behind pattern without PowerShell escape hell
-            $pattern = '(?<="SHA256"\s*:\s*"' + [regex]::Escape($shaEsc) +
-                      '"[^{}]*?"LoadsDespiteHVCI"\s*:\s*)"(?:(?:TRUE|FALSE))"'
-            $replace = '"' + $newVal + '"'
-
-            $originalJson = [regex]::Replace($originalJson, $pattern, $replace, 'IgnoreCase')
-        }
-
-        # 4) Write the modified text back unchanged except for those fields
-        Set-Content -Path $jsonPath -Value $originalJson -Encoding UTF8 -NoNewline
-        Write-Host "drv.json updated in-place (structure preserved)"
 
         # Set environment variables for summary
         Write-Output "total_drivers=$($allDrivers.Count)" >> $env:GITHUB_ENV
         Write-Output "allowed_drivers=$($allowed.Count)" >> $env:GITHUB_ENV
         Write-Output "blocked_drivers=$($blocked.Count)" >> $env:GITHUB_ENV
-        Write-Output "modified_drivers=$modifiedDrivers" >> $env:GITHUB_ENV
     
     - name: Generate Summary
       if: env.skip_processing == 'false'
@@ -396,18 +319,15 @@ jobs:
         - **Total Drivers Processed**: $env:total_drivers
         - **Allowed Drivers**: $env:allowed_drivers
         - **Blocked Drivers**: $env:blocked_drivers
-        - **Modified Driver Entries**: $env:modified_drivers
         
         ## Details
         - Drivers marked as **Allowed** can potentially load despite HVCI restrictions
         - Drivers marked as **Blocked** are prevented from loading by the HVCI policy
-        - The LoadsDespiteHVCI field has been updated for modified entries
+        - Results saved to CSV file for analysis
         - Updated CSV file saved to data/hvci_drivers.csv
-        - Updated JSON file saved to data/drv.json
         
         ## Files Updated
         - data/hvci_drivers.csv
-        - data/drv.json
         - data/blocklist-hash.txt
         - .github/hvci-stats.json
         "@
@@ -457,11 +377,10 @@ jobs:
         git config --local user.name "GitHub Action"
         
         git add data/hvci_drivers.csv
-        git add data/drv.json
         git add data/blocklist-hash.txt
         git add .github/hvci-stats.json
         
-        $commitMessage = "Update HVCI driver check results - $env:modified_drivers drivers modified"
+        $commitMessage = "Update HVCI driver check results - CSV updated"
         git commit -m $commitMessage
         git push
         
