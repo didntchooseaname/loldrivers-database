@@ -158,7 +158,19 @@ jobs:
           exit 1
         }
         
-        $driversData = Get-Content "data/drv.json" -Raw | ConvertFrom-Json -AsHashtable
+        # Load JSON with duplicate key handling
+        $jsonContent = Get-Content "data/drv.json" -Raw
+        # Clean up potential BOM and normalize line endings
+        $jsonContent = $jsonContent.Trim()
+        try {
+          $driversData = $jsonContent | ConvertFrom-Json
+        } catch {
+          Write-Host "JSON conversion failed, attempting to fix duplicate keys..."
+          # If there are duplicate keys, try to fix common issues
+          $jsonContent = $jsonContent -replace '"init":', '"init_lowercase":'
+          $driversData = $jsonContent | ConvertFrom-Json
+        }
+
         Write-Host "Loaded $($driversData.Count) drivers from data/drv.json"
         
         # Load the XML policy
