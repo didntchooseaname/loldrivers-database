@@ -86,7 +86,7 @@ jobs:
           exit 1
         }
         
-        $driversData = Get-Content "data/drv.json" -Raw | ConvertFrom-Json
+        $driversData = Get-Content "data/drv.json" -Raw | ConvertFrom-Json -AsHashtable
         Write-Host "Loaded $($driversData.Count) drivers from data/drv.json"
         
         # Load the XML policy
