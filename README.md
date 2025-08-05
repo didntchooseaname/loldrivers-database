@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A comprehensive driver security research platform addressing critical gaps in existing driver analysis tools**
+**Find the known vulnerable driver that suit your needs**
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield&issueType=license)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield&issueType=security)
@@ -45,6 +45,9 @@ Unlike static driver lists, this platform analyzes imported functions to automat
 - **File system access** (file creation, modification, I/O operations)
 
 ### 🛡️ Strict HVCI Verification
+[![HVCI Drivers Check](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml/badge.svg)](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml)
+[![HVCI Statistics](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/didntchooseaname/loldrivers-database/main/.github/hvci-stats.json)](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml)
+
 - **Direct Microsoft drivers blocklist integration** - Queries official vulnerable driver blocklist
 - **Automated workflows** - GitHub Actions fetch latest XML blocklist
 - **Up-to-date** - No reliance on static local lists (Trails of bit local script)

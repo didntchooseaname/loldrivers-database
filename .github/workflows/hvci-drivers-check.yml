@@ -258,11 +258,31 @@ jobs:
         - data/hvci_drivers.csv
         - data/drv.json
         - data/blocklist-hash.txt
+        - .github/hvci-stats.json
         "@
         
         Write-Host $summary
         $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
     
+    - name: Create Statistics Badge
+      if: env.skip_processing == 'false'
+      shell: powershell
+      run: |
+        $badgeData = @{
+          schemaVersion = 1
+          label = "HVCI Drivers"
+          message = "Allowed: $env:allowed_drivers | Blocked: $env:blocked_drivers"
+          color = if ([int]$env:allowed_drivers -gt [int]$env:blocked_drivers) { "orange" } else { "green" }
+        }
+        
+        if (-not (Test-Path ".github")) {
+          New-Item -ItemType Directory -Path ".github" -Force
+        }
+        
+        $badgeData | ConvertTo-Json | Out-File -FilePath ".github/hvci-stats.json" -Encoding utf8
+        git add .github/hvci-stats.json
+
+
     - name: Check for changes
       if: env.skip_processing == 'false'
       id: changes
@@ -288,6 +308,7 @@ jobs:
         git add data/hvci_drivers.csv
         git add data/drv.json
         git add data/blocklist-hash.txt
+        git add .github/hvci-stats.json
         
         $commitMessage = "Update HVCI driver check results - $env:modified_drivers drivers modified"
         git commit -m $commitMessage
