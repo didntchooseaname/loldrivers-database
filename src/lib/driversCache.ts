@@ -83,6 +83,37 @@ const readFileWithEncodingDetection = (filePath: string): string => {
   }
 };
 
+// Utility function to parse CSV and get HVCI allowed hashes
+const loadHVCIAllowedHashes = (): Set<string> => {
+  try {
+    const csvPath = path.join(process.cwd(), 'data', 'hvci_drivers.csv');
+    const csvContent = readFileWithEncodingDetection(csvPath);
+    const lines = csvContent.split('\n');
+    const allowedHashes = new Set<string>();
+    
+    // Skip header line
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      // Parse CSV line (simple parsing for quoted CSV)
+      const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
+      if (columns.length >= 4 && columns[3] === 'Allowed') {
+        // Add MD5, SHA1, SHA256 if they exist
+        if (columns[0]) allowedHashes.add(columns[0].toLowerCase());
+        if (columns[1]) allowedHashes.add(columns[1].toLowerCase());
+        if (columns[2]) allowedHashes.add(columns[2].toLowerCase());
+      }
+    }
+    
+    console.log(`Loaded ${allowedHashes.size} HVCI allowed hashes from CSV`);
+    return allowedHashes;
+  } catch (error) {
+    console.warn('Could not load HVCI CSV file:', error);
+    return new Set();
+  }
+};
+
 // Pre-compiled regex for better performance
 const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
 
@@ -92,6 +123,7 @@ class DriversCache {
   private isLoaded = false;
   private fileHash: string = '';
   private indexedData: Map<string, ProcessedDriver[]> = new Map();
+  private hvciAllowedHashes: Set<string> = new Set();
 
   static getInstance(): DriversCache {
     if (!DriversCache.instance) {
@@ -110,10 +142,21 @@ class DriversCache {
   }
 
   private buildSearchIndex(): void {
+    // Load HVCI allowed hashes from CSV
+    this.hvciAllowedHashes = loadHVCIAllowedHashes();
+    
     // Index by filter type for fast access
-    const hvciDrivers = this.drivers.filter(driver => 
-      driver.LoadsDespiteHVCI?.toString().toUpperCase() === 'TRUE'
-    );
+    // HVCI compatible drivers based on CSV hashes
+    const hvciDrivers = this.drivers.filter(driver => {
+      if (!driver.MD5 && !driver.SHA1 && !driver.SHA256) return false;
+      
+      // Check if any of the driver's hashes are in the HVCI allowed list
+      const md5Match = driver.MD5 && this.hvciAllowedHashes.has(driver.MD5.toLowerCase());
+      const sha1Match = driver.SHA1 && this.hvciAllowedHashes.has(driver.SHA1.toLowerCase());
+      const sha256Match = driver.SHA256 && this.hvciAllowedHashes.has(driver.SHA256.toLowerCase());
+      
+      return md5Match || sha1Match || sha256Match;
+    });
     
     const killerDrivers = this.drivers.filter(driver => 
       driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions) && 
@@ -381,10 +424,33 @@ class DriversCache {
       console.warn('Could not read HVCI blocklist metadata:', error);
     }
     
+    // Count HVCI compatible drivers directly from CSV file
+    let hvciCompatibleCount = 0;
+    try {
+      const csvPath = path.join(process.cwd(), 'data', 'hvci_drivers.csv');
+      const csvContent = readFileWithEncodingDetection(csvPath);
+      const lines = csvContent.split('\n');
+      
+      // Count "Allowed" status entries
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
+        if (columns.length >= 4 && columns[3] === 'Allowed') {
+          hvciCompatibleCount++;
+        }
+      }
+    } catch (error) {
+      console.warn('Could not read HVCI CSV for stats:', error);
+      // Fallback to indexed data
+      hvciCompatibleCount = this.indexedData.get('hvci')?.length || 0;
+    }
+    
     // Utilisation de l'index pour des stats plus rapides
     const stats = {
       total: drivers.length,
-      hvciCompatible: this.indexedData.get('hvci')?.length || 0,
+      hvciCompatible: hvciCompatibleCount,
       killerDrivers: this.indexedData.get('killer')?.length || 0,
       recentDrivers: this.indexedData.get('recent')?.length || 0,
       memoryManipulatorDrivers: this.indexedData.get('memoryManipulator')?.length || 0,
