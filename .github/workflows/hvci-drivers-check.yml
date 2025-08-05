@@ -334,11 +334,40 @@ jobs:
         $allDrivers | Export-Csv -Path $csvPath -NoTypeInformation
         Write-Host "CSV file created at $csvPath with $($allDrivers.Count) entries"
         
-        # Save updated JSON with proper formatting
-        $jsonOutput = $driversData | ConvertTo-Json -Depth 100
-        $jsonOutput | Out-File -FilePath "data/drv.json" -Encoding UTF8 -NoNewline
-        Write-Host "Updated drv.json with $modifiedDrivers modified driver entries"
-        
+        # ──────────────────────────────────────────────────────────────
+        # Update ONLY the LoadsDespiteHVCI field without re-serialising
+        # ──────────────────────────────────────────────────────────────
+
+        # 1) Build a map: SHA256  →  new TRUE/FALSE value
+        $updates = @{}    # key = SHA256, value = "TRUE" or "FALSE"
+
+        foreach ($driver in $driversData) {
+            foreach ($sample in $driver.KnownVulnerableSamples) {
+                $updates[$sample.SHA256] = if ($sample.LoadsDespiteHVCI) { $sample.LoadsDespiteHVCI } else { "FALSE" }
+            }
+        }
+
+        # 2) Read the original JSON file as raw text
+        $jsonPath     = "data/drv.json"
+        $originalJson = Get-Content $jsonPath -Raw
+
+        # 3) Replace the LoadsDespiteHVCI value for every SHA256 found
+        foreach ($sha in $updates.Keys) {
+            $newVal = $updates[$sha]          # "TRUE" or "FALSE"
+            $shaEsc = [regex]::Escape($sha)
+
+            # Regex: look inside the object that owns this SHA256,
+            # then replace the value of LoadsDespiteHVCI
+            $pattern = "(?<=\\\"SHA256\\\"\\s*:\\s*\\\"$shaEsc\\\"[^\\{\\}]*?\\\"LoadsDespiteHVCI\\\"\\s*:\\s*)\\\"(?:TRUE|FALSE)\\\""
+            $replace = '\"' + $newVal + '\"'
+
+            $originalJson = [regex]::Replace($originalJson, $pattern, $replace, 'IgnoreCase')
+        }
+
+        # 4) Write the modified text back unchanged except for those fields
+        Set-Content -Path $jsonPath -Value $originalJson -Encoding UTF8 -NoNewline
+        Write-Host "drv.json updated in-place (structure preserved)"
+
         # Set environment variables for summary
         Write-Output "total_drivers=$($allDrivers.Count)" >> $env:GITHUB_ENV
         Write-Output "allowed_drivers=$($allowed.Count)" >> $env:GITHUB_ENV
