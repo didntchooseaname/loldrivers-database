@@ -358,8 +358,10 @@ jobs:
 
             # Regex: look inside the object that owns this SHA256,
             # then replace the value of LoadsDespiteHVCI
-            $pattern = "(?<=\\\"SHA256\\\"\\s*:\\s*\\\"$shaEsc\\\"[^\\{\\}]*?\\\"LoadsDespiteHVCI\\\"\\s*:\\s*)\\\"(?:TRUE|FALSE)\\\""
-            $replace = '\"' + $newVal + '\"'
+            # build the look-behind pattern without PowerShell escape hell
+            $pattern = '(?<="SHA256"\s*:\s*"' + [regex]::Escape($shaEsc) +
+                      '"[^{}]*?"LoadsDespiteHVCI"\s*:\s*)"(?:(?:TRUE|FALSE))"'
+            $replace = '"' + $newVal + '"'
 
             $originalJson = [regex]::Replace($originalJson, $pattern, $replace, 'IgnoreCase')
         }
