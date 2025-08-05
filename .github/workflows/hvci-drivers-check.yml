@@ -338,12 +338,21 @@ jobs:
         # Update ONLY the LoadsDespiteHVCI field without re-serialising
         # ──────────────────────────────────────────────────────────────
 
-        # 1) Build a map: SHA256  →  new TRUE/FALSE value
-        $updates = @{}    # key = SHA256, value = "TRUE" or "FALSE"
+        # 1) Build a map: SHA256 → new TRUE / FALSE value  (skip empty keys)
+        $updates = @{}      # hashtable
 
         foreach ($driver in $driversData) {
             foreach ($sample in $driver.KnownVulnerableSamples) {
-                $updates[$sample.SHA256] = if ($sample.LoadsDespiteHVCI) { $sample.LoadsDespiteHVCI } else { "FALSE" }
+
+                $sha = $sample.SHA256
+                if ([string]::IsNullOrWhiteSpace($sha)) { continue }   # skip bad entries
+
+                # get current value or default to FALSE
+                $newVal = if ($sample.PSObject.Properties.Name -contains 'LoadsDespiteHVCI') {
+                            $sample.LoadsDespiteHVCI
+                          } else { 'FALSE' }
+
+                $updates[$sha] = $newVal
             }
         }
 
