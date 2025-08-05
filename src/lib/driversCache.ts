@@ -63,6 +63,26 @@ const createSearchKey = (query: string, filters: Record<string, unknown>, page: 
 
 const normalizeString = (str: string): string => str.toLowerCase().trim();
 
+// Utility function to read file with automatic encoding detection
+const readFileWithEncodingDetection = (filePath: string): string => {
+  const buffer = fs.readFileSync(filePath);
+  
+  // Check for BOM and handle different encodings
+  if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+    // UTF-8 with BOM
+    return buffer.toString('utf8').slice(1); // Remove BOM
+  } else if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE) {
+    // UTF-16 LE with BOM
+    return buffer.toString('utf16le').slice(1);
+  } else if (buffer.length >= 2 && buffer[0] === 0xFE && buffer[1] === 0xFF) {
+    // UTF-16 BE with BOM
+    return buffer.toString('utf16le').slice(1);
+  } else {
+    // No BOM detected, assume UTF-8
+    return buffer.toString('utf8');
+  }
+};
+
 // Pre-compiled regex for better performance
 const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
 
@@ -198,7 +218,7 @@ class DriversCache {
 
     try {
       console.log('Loading drivers from file...');
-      const fileContent = fs.readFileSync(dataPath, 'utf8');
+      const fileContent = readFileWithEncodingDetection(dataPath);
       const rawData: Driver[] = JSON.parse(fileContent);
 
       // Optimized data processing
@@ -354,7 +374,7 @@ class DriversCache {
     let hvciBlocklistCheck;
     try {
       const dataPath = path.join(process.cwd(), 'data', 'drv.json');
-      const fileContent = fs.readFileSync(dataPath, 'utf8');
+      const fileContent = readFileWithEncodingDetection(dataPath);
       const jsonData = JSON.parse(fileContent);
       hvciBlocklistCheck = jsonData._metadata?.hvciBlocklistCheck;
     } catch (error) {
@@ -424,20 +444,21 @@ class DriversCache {
     switch (filterType) {
       case 'recent':
         return this.isRecentDriver(driver);
-      case 'trustedCert':
-        return this.hasTrustedCertificate(driver);
-      case 'untrustedCert':
-        return this.hasUntrustedCertificate(driver);
-      case 'certRevoked':
-        return this.hasCertificateAttributeStatus(driver, 'Revoked');
-      case 'certExpired':
-        return this.hasCertificateAttributeStatus(driver, 'Expired');
-      case 'certSuspicious':
-        return this.hasCertificateAttributeStatus(driver, 'Invalid');
-      case 'certValid':
-        return this.hasCertificateAttributeStatus(driver, 'Valid');
-      case 'certMissing':
-        return this.hasCertificateAttributeStatus(driver, 'Unknown');
+      // TODO: Certificate filters are not yet functional in quick filters
+      // case 'trustedCert':
+      //   return this.hasTrustedCertificate(driver);
+      // case 'untrustedCert':
+      //   return this.hasUntrustedCertificate(driver);
+      // case 'certRevoked':
+      //   return this.hasCertificateAttributeStatus(driver, 'Revoked');
+      // case 'certExpired':
+      //   return this.hasCertificateAttributeStatus(driver, 'Expired');
+      // case 'certSuspicious':
+      //   return this.hasCertificateAttributeStatus(driver, 'Invalid');
+      // case 'certValid':
+      //   return this.hasCertificateAttributeStatus(driver, 'Valid');
+      // case 'certMissing':
+      //   return this.hasCertificateAttributeStatus(driver, 'Unknown');
       default:
         return true;
     }
@@ -461,6 +482,10 @@ class DriversCache {
     }
   }
 
+  // TODO: Certificate filtering methods - currently not functional in quick filters
+  // These methods need to be integrated with the frontend quick filter system
+  
+  /*
   private hasTrustedCertificate(driver: ProcessedDriver): boolean {
     // Use the new CertificateStatus field for more accurate filtering
     return this.hasCertificateAttributeStatus(driver, 'Valid');
@@ -481,6 +506,7 @@ class DriversCache {
       return false;
     });
   }
+  */
 
   private searchInDriverOptimized(driver: ProcessedDriver, searchTerm: string): boolean {
     // Pre-compile search fields to avoid repetition
@@ -549,6 +575,10 @@ class DriversCache {
     return false;
   }
 
+  // TODO: Certificate utility methods - currently not used in quick filters
+  // These methods are available for future certificate filtering implementation
+  
+  /*
   private hasCertificateTag(driver: ProcessedDriver, tag: string): boolean {
     if (!driver.Tags || !Array.isArray(driver.Tags)) {
       return false;
@@ -566,6 +596,7 @@ class DriversCache {
       sample && typeof sample === 'object' && sample[attributeName] === true
     );
   }
+  */
 
   private hasCertificateAttributeStatus(driver: ProcessedDriver, status: string): boolean {
     if (!driver.KnownVulnerableSamples || !Array.isArray(driver.KnownVulnerableSamples)) {
