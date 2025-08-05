@@ -30,8 +30,44 @@ jobs:
         $extractPath = "blocklist_temp"
         
         try {
-          Invoke-WebRequest -Uri $blocklistUrl -OutFile $zipPath -UserAgent "Mozilla/5.0"
-          Write-Host "Downloaded blocklist ZIP successfully"
+          # Download with retry mechanism
+          $maxRetries = 3
+          $retryCount = 0
+          $downloadSuccess = $false
+          
+          while ($retryCount -lt $maxRetries -and -not $downloadSuccess) {
+            try {
+              Write-Host "Downloading blocklist ZIP (attempt $($retryCount + 1)/$maxRetries)..."
+              
+              # Use WebClient for more reliable download
+              $webClient = New-Object System.Net.WebClient
+              $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+              $webClient.DownloadFile($blocklistUrl, $zipPath)
+              $webClient.Dispose()
+              
+              # Verify the file exists and has content
+              if ((Test-Path $zipPath) -and ((Get-Item $zipPath).Length -gt 0)) {
+                Write-Host "Downloaded blocklist ZIP successfully"
+                $downloadSuccess = $true
+              } else {
+                throw "Downloaded file is empty or doesn't exist"
+              }
+            } catch {
+              $retryCount++
+              Write-Host "Download attempt failed: $_"
+              if ($retryCount -lt $maxRetries) {
+                Write-Host "Retrying in 5 seconds..."
+                Start-Sleep -Seconds 5
+              }
+              if (Test-Path $zipPath) {
+                Remove-Item $zipPath -Force
+              }
+            }
+          }
+          
+          if (-not $downloadSuccess) {
+            throw "Failed to download blocklist after $maxRetries attempts"
+          }
           
           # Calculate hash of downloaded ZIP
           $downloadHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash
@@ -55,17 +91,53 @@ jobs:
             Write-Output "skip_processing=false" >> $env:GITHUB_ENV
           }
           
-          # Extract ZIP
-          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          # Test ZIP integrity before extraction
+          try {
+            $shell = New-Object -ComObject Shell.Application
+            $zip = $shell.NameSpace($zipPath)
+            if ($null -eq $zip) {
+              throw "ZIP file appears to be corrupted"
+            }
+            Write-Host "ZIP file integrity check passed"
+          } catch {
+            Write-Host "ZIP integrity check failed, trying alternative extraction..."
+          }
+          
+          # Extract ZIP with error handling
+          try {
+            Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+            Write-Host "ZIP extracted successfully"
+          } catch {
+            Write-Host "PowerShell extraction failed, trying alternative method..."
+            
+            # Alternative extraction using .NET
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            if (Test-Path $extractPath) {
+              Remove-Item $extractPath -Recurse -Force
+            }
+            New-Item -ItemType Directory -Path $extractPath -Force
+            [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $extractPath)
+            Write-Host "Alternative extraction successful"
+          }
           
           # Verify SiPolicy_Enforced.xml exists
           $xmlPath = Join-Path $extractPath "VulnerableDriverBlockList\SiPolicy_Enforced.xml"
           if (Test-Path $xmlPath) {
-            Write-Host "Found SiPolicy_Enforced.xml"
+            Write-Host "Found SiPolicy_Enforced.xml at: $xmlPath"
             Write-Output "xml_path=$xmlPath" >> $env:GITHUB_ENV
           } else {
-            Write-Error "SiPolicy_Enforced.xml not found in extracted files"
-            exit 1
+            # Try to find the file in case directory structure is different
+            $xmlFiles = Get-ChildItem -Path $extractPath -Recurse -Name "SiPolicy_Enforced.xml"
+            if ($xmlFiles.Count -gt 0) {
+              $xmlPath = Join-Path $extractPath $xmlFiles[0]
+              Write-Host "Found SiPolicy_Enforced.xml at alternative location: $xmlPath"
+              Write-Output "xml_path=$xmlPath" >> $env:GITHUB_ENV
+            } else {
+              Write-Host "Available files in extracted archive:"
+              Get-ChildItem -Path $extractPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+              Write-Error "SiPolicy_Enforced.xml not found in extracted files"
+              exit 1
+            }
           }
           
           # Store the new hash
