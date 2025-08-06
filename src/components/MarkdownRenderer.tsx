@@ -26,6 +26,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       .replace(/^#\s+(.*$)/gm, '<h2>$1</h2>')
       // Bold text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // Images - process before links to avoid conflicts
+      .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="/content/assets/$2" alt="$1" class="help-image" loading="lazy" />')
+      // Links - process after images
+      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="help-link">$1</a>')
       // Code/technical terms with backticks
       .replace(/`([^`]+)`/g, '<code class="tech-term">$1</code>')
       // Special styling for disclaimer and legal content

@@ -99,6 +99,7 @@ export default function DriversClient({
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showHelpPopup, setShowHelpPopup] = useState(false);
   const [showFilterHelpPopup, setShowFilterHelpPopup] = useState(false);
+  const [showAuthentihashHelpPopup, setShowAuthentihashHelpPopup] = useState(false);
   const [showChangelogPopup, setShowChangelogPopup] = useState(false);
   const [showTermsPopup, setShowTermsPopup] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
@@ -108,6 +109,7 @@ export default function DriversClient({
   const [helpContent, setHelpContent] = useState<{
     globalHelp: string;
     filterHelp: string;
+    authentihashHelp: string;
   } | null>(null);
   
   // Pagination state
@@ -660,7 +662,7 @@ export default function DriversClient({
   }, []);
 
   // Gestion des sections collapsibles
-  const renderHashTags = (hashes: { MD5?: string; SHA1?: string; SHA256?: string }) => {
+  const renderHashTags = (hashes: { MD5?: string; SHA1?: string; SHA256?: string }, authentihash?: { MD5?: string; SHA1?: string; SHA256?: string }, index?: number) => {
     const copyToClipboard = async (hashType: string, hashValue: string) => {
       try {
         await navigator.clipboard.writeText(hashValue);
@@ -671,14 +673,15 @@ export default function DriversClient({
       }
     };
 
-    const hasHashes = hashes.MD5 || hashes.SHA1 || hashes.SHA256;
+    const hasStandardHashes = hashes.MD5 || hashes.SHA1 || hashes.SHA256;
+    const hasAuthentihashes = authentihash?.MD5 || authentihash?.SHA1 || authentihash?.SHA256;
     
-    if (!hasHashes) {
+    if (!hasStandardHashes && !hasAuthentihashes) {
       return (
         <div className="hash-section">
           <div className="hash-section-header">
             <i className="fas fa-fingerprint"></i>
-            <span className="hash-section-title">Hashes</span>
+            <span className="hash-section-title">File Hashes</span>
           </div>
           <div className="hash-section-content">
             <span className="text-muted">No hashes available</span>
@@ -687,13 +690,17 @@ export default function DriversClient({
       );
     }
 
+    const authentihashSectionId = `authentihash-${index || 0}`;
+    const isAuthentihashExpanded = expandedSections.has(authentihashSectionId);
+
     return (
       <div className="hash-section">
         <div className="hash-section-header">
           <i className="fas fa-fingerprint"></i>
-          <span className="hash-section-title">Hashes</span>
+          <span className="hash-section-title">File Hashes</span>
         </div>
         <div className="hash-section-content">
+          {/* Standard Hashes */}
           {hashes.MD5 && (
             <div 
               className="clickable-hash md5" 
@@ -722,6 +729,68 @@ export default function DriversClient({
             >
               <span className="hash-type">SHA256</span>
               <span className="hash-value">{hashes.SHA256}</span>
+            </div>
+          )}
+          
+          {/* Authentihash Collapsible Section */}
+          {hasAuthentihashes && (
+            <div className={`collapsible-section authentihash-section ${isAuthentihashExpanded ? 'expanded' : ''}`}>
+              <div className="collapsible-header" onClick={() => toggleSection(authentihashSectionId)}>
+                <span className="collapsible-title">
+                  <div className="authentihash-title-section">
+                    <i className="fas fa-shield-alt"></i> Authentihashes
+                  </div>
+                  <button
+                    className="authentihash-help-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAuthentihashHelpPopup(true);
+                    }}
+                    title="Learn about Authentihashes"
+                  >
+                    <i className="fas fa-question-circle"></i>
+                  </button>
+                </span>
+                <span className="collapsible-icon">
+                  <i className={isAuthentihashExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
+                </span>
+              </div>
+              {isAuthentihashExpanded && (
+                <div className="collapsible-content">
+                  <div className="collapsible-inner">
+                    {authentihash?.MD5 && (
+                      <div 
+                        className="clickable-hash md5" 
+                        onClick={() => copyToClipboard('Authentihash MD5', authentihash.MD5!)}
+                        title="Click to copy Authentihash MD5"
+                      >
+                        <span className="hash-type">MD5</span>
+                        <span className="hash-value">{authentihash.MD5}</span>
+                      </div>
+                    )}
+                    {authentihash?.SHA1 && (
+                      <div 
+                        className="clickable-hash sha1" 
+                        onClick={() => copyToClipboard('Authentihash SHA1', authentihash.SHA1!)}
+                        title="Click to copy Authentihash SHA1"
+                      >
+                        <span className="hash-type">SHA1</span>
+                        <span className="hash-value">{authentihash.SHA1}</span>
+                      </div>
+                    )}
+                    {authentihash?.SHA256 && (
+                      <div 
+                        className="clickable-hash sha256" 
+                        onClick={() => copyToClipboard('Authentihash SHA256', authentihash.SHA256!)}
+                        title="Click to copy Authentihash SHA256"
+                      >
+                        <span className="hash-type">SHA256</span>
+                        <span className="hash-value">{authentihash.SHA256}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1769,9 +1838,9 @@ export default function DriversClient({
   // Create driver card
   const createDriverCard = (driver: Driver, index: number) => {
     const hashes = {
-      MD5: driver.MD5 || (driver.Authentihash && driver.Authentihash.MD5),
-      SHA1: driver.SHA1 || (driver.Authentihash && driver.Authentihash.SHA1),
-      SHA256: driver.SHA256 || (driver.Authentihash && driver.Authentihash.SHA256)
+      MD5: driver.MD5,
+      SHA1: driver.SHA1,
+      SHA256: driver.SHA256
     };
     const statusTags = generateStatusTags(driver);
     const capacityTags = generateCapacityTags(driver);
@@ -1804,7 +1873,7 @@ export default function DriversClient({
             {renderStatusTags(certificateTags)}
           </div>
         )}
-        {renderHashTags(hashes)}
+        {renderHashTags(hashes, driver.Authentihash, index)}
         {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
         {renderSimpleSection('Description', getBestDescription(driver), 'fas fa-info-circle')}
         {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
@@ -2426,6 +2495,36 @@ export default function DriversClient({
                 <i className="fas fa-chevron-down"></i>
                 <span>Scroll for more information</span>
                 <i className="fas fa-chevron-down"></i>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Authentihash Help Popup */}
+      {showAuthentihashHelpPopup && (
+        <div className="help-popup-overlay" onClick={() => setShowAuthentihashHelpPopup(false)}>
+          <div 
+            className="help-popup" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              className="help-popup-close"
+              onClick={() => setShowAuthentihashHelpPopup(false)}
+              aria-label="Close authentihash help"
+            >
+              <i className="fas fa-times"></i>
+            </button>
+            
+            <h3>
+              <i className="fas fa-shield-alt"></i> Authentihash Information
+            </h3>
+            
+            {helpContent ? (
+              <MarkdownRenderer content={helpContent.authentihashHelp} />
+            ) : (
+              <div className="loading-content">
+                <p>Loading authentihash help content...</p>
               </div>
             )}
           </div>

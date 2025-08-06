@@ -4,6 +4,7 @@ import path from 'path';
 export interface HelpContent {
   globalHelp: string;
   filterHelp: string;
+  authentihashHelp: string;
 }
 
 export interface TermsResponse {
@@ -44,13 +45,16 @@ export async function getHelpContent(type?: string): Promise<HelpContent | Terms
     
     const globalHelpPath = path.join(contentDir, 'global-help.md');
     const filterHelpPath = path.join(contentDir, 'filter-help.md');
+    const authentihashHelpPath = path.join(contentDir, 'authentihash-help.md');
     
     const globalHelp = fs.readFileSync(globalHelpPath, 'utf-8');
     const filterHelp = fs.readFileSync(filterHelpPath, 'utf-8');
+    const authentihashHelp = fs.readFileSync(authentihashHelpPath, 'utf-8');
     
     cachedContent = {
       globalHelp,
-      filterHelp
+      filterHelp,
+      authentihashHelp
     };
     
     return cachedContent;
@@ -58,7 +62,8 @@ export async function getHelpContent(type?: string): Promise<HelpContent | Terms
     console.error('Error loading help content:', error);
     return {
       globalHelp: '# Help content not available',
-      filterHelp: '# Filter help content not available'
+      filterHelp: '# Filter help content not available',
+      authentihashHelp: '# Authentihash help content not available'
     };
   }
 }
