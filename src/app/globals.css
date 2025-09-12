@@ -1689,7 +1689,7 @@ select.form-control {
   color: var(--color-red-500);
 }
 
-/* HVCI Compatible styling - Green Theme */
+/* Green Theme */
 .hvci-item .stat-label {
   color: var(--color-text-primary);
   font-weight: 600;

@@ -6,9 +6,9 @@
 
 **Microsoft Blocklist:** https://aka.ms/VulnerableDriverBlockList
 
-## HVCI Compatible Filter
+## MVDB Passed Filter
 
-**What it does:** Shows only drivers that are compatible with `Hypervisor-protected Code Integrity (HVCI)` and are NOT present in Microsoft&apos;s vulnerable driver blocklist.
+**What it does:** Shows only drivers that passed the  `Microsoft Vulnerable Drivers Blocklist (MVDB)` automated daily check action.
 
 **Technical Details:** This filter uses a `GitHub Action` workflow that automatically fetches Microsoft&apos;s official vulnerable driver blocklist from https://aka.ms/VulnerableDriverBlockList and cross-references it with our driver database. The check runs on a scheduled basis to ensure up-to-date results.
 
@@ -140,8 +140,8 @@ The certificate validation system provides comprehensive analysis of driver sign
 
 **Combination Strategy:** Filters can be combined (except mutually exclusive ones) to create precise queries. Examples:
 
-- **HVCI Compatible + Process Killer:** HVCI-compatible drivers with process termination capabilities
-- **HVCI Compatible + Recent Drivers:** Newly discovered drivers that are HVCI-compatible
+- **MVDB + Process Killer:** HVCI-compatible drivers with process termination capabilities
+- **MVDB + Recent Drivers:** Newly discovered drivers that are HVCI-compatible
 - **Memory Manipulator + Process Killer:** Highly dangerous drivers with multiple attack capabilities
 - **Debug Bypass + Memory Manipulator:** Advanced evasion tools with memory manipulation
 - **Registry Manipulator + File Manipulator:** Drivers with comprehensive system manipulation capabilities

@@ -1950,7 +1950,7 @@ export default function DriversClient({
             onClick={() => applyDirectFilter('hvci')}
           >
             <span className="stat-label">
-              <i className="fas fa-check"></i> HVCI Compatible
+              <i className="fas fa-check"></i> MVDB Passed
             </span>
             <span className="stat-value">{statsData?.stats?.hvciCompatible || 0}</span>
           </div>
@@ -2005,7 +2005,7 @@ export default function DriversClient({
               className={`filter-btn hvci-filter ${pendingFilters.has('hvci') ? 'active' : ''}`}
               onClick={() => toggleFilter('hvci')}
             >
-              <i className="fas fa-check"></i> HVCI Compatible
+              <i className="fas fa-check"></i> MVDB Passed
             </button>
 
             <button 

@@ -146,7 +146,7 @@ class DriversCache {
     this.hvciAllowedHashes = loadHVCIAllowedHashes();
     
     // Index by filter type for fast access
-    // HVCI compatible drivers based on CSV hashes
+    // MVDB Passed drivers based on CSV hashes
     const hvciDrivers = this.drivers.filter(driver => {
       if (!driver.MD5 && !driver.SHA1 && !driver.SHA256) return false;
       
@@ -424,7 +424,7 @@ class DriversCache {
       console.warn('Could not read HVCI blocklist metadata:', error);
     }
     
-    // Count HVCI compatible drivers directly from CSV file
+    // Count MVDB drivers directly from CSV file
     let hvciCompatibleCount = 0;
     try {
       const csvPath = path.join(process.cwd(), 'data', 'hvci_drivers.csv');
