@@ -23,7 +23,7 @@
 
 Traditional driver analysis tools can have limitations:
 - **Static cataloging** without behavioral analysis
-- **Inaccurate HVCI compatibility** checks using outdated local lists
+- **Inaccurate Microsoft drivers blocklist compatibility** checks using outdated local lists
 - **Limited search capabilities** across driver metadata
 - **Poor user experience** for security researchers
 
@@ -31,7 +31,7 @@ Traditional driver analysis tools can have limitations:
 
 This platform goes **beyond simple cataloging** to provide:
 - **Behavioral analysis** through imported function examination
-- **Strict HVCI verification** using Microsoft's official blocklist
+- **Strict Microsoft drivers blocklist verification** using latest official blocklist from xml source
 - **Advanced filtering** by capabilities, architecture, and HVCI compatibility
 
 ## ✨ Features
@@ -45,17 +45,16 @@ Unlike static driver lists, this platform analyzes imported functions to automat
 - **File system access** (file creation, modification, I/O operations)
 
 ### 🛡️ Strict HVCI Verification
-[![HVCI Drivers Check](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml/badge.svg)](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml)
-[![HVCI Statistics](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/didntchooseaname/loldrivers-database/main/.github/hvci-stats.json)](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml)
+[![Microsoft vulnerable drivers blocklist Check](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml/badge.svg)](https://github.com/didntchooseaname/loldrivers-database/actions/workflows/hvci-drivers-check.yml)
 
-- **Direct Microsoft drivers blocklist integration** - Queries official vulnerable driver blocklist
+- **Direct Microsoft vulnerable drivers blocklist integration** - Queries official vulnerable driver blocklist
 - **Automated workflows** - GitHub Actions fetch latest XML blocklist
 - **Up-to-date** - No reliance on static local lists (Trails of bit local script)
 
 ### 🔍 Search & Filtering
 - **Multi-attribute search** - Hashes, company names, descriptions
 - **Behavioral filters** - Search by detected capabilities
-- **HVCI compatibility** - Filter by HVCI-compatible vs. blocked drivers
+- **Microsoft vulnerable drivers blocklist compatibility** - Filter by HVCI-compatible (drivers that passed the Microsoft vulnerable drivers blocklist check)
 - **Architecture-aware** - Filter by x64, x32, ARM64 with visual indicators
 - **URL state management** - Bookmark and share search queries
 
@@ -203,5 +202,6 @@ This project is provided **"as is"** without any warranty, guarantee, or reliabi
 **Made with ❤️ for the cybersecurity research community**
 
 [⭐ Star this project](https://github.com/didntchooseaname/loldrivers-database) if it helps your security research!
+
 
 </div>
