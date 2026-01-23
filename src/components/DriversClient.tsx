@@ -805,7 +805,7 @@ export default function DriversClient({
     if (driver.LoadsDespiteHVCI) {
       const isTrue = driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE';
       tags.push({
-        text: isTrue ? 'HVCI Compatible' : 'HVCI BLOCKED',
+        text: isTrue ? 'MVDB PASSED' : 'HVCI BLOCKED',
         type: isTrue ? 'success' : 'danger',
         icon: isTrue ? 'fas fa-check-circle' : 'fas fa-times-circle'
       });
