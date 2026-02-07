@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "description": "LOLDrivers Database with SSR and caching",
-  "packageManager": "pnpm@9.12.0",
+  "packageManager": "bun@1.3.5",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +12,7 @@
     "type-check": "tsc --noEmit",
     "clean": "rimraf .next",
     "update-data": "node scripts/update-data.js",
-    "postinstall": "pnpm run type-check"
+    "postinstall": "bun run type-check"
   },
   "dependencies": {
     "critters": "^0.0.25",
@@ -34,16 +34,13 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=24.0.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=20.0.0"
   },
-  "pnpm": {
-    "overrides": {
-      "@types/react": "^18.3.12",
-      "@types/react-dom": "^18.3.1",
-      "entities": "^5.0.0",
-      "js-tokens": "^9.0.1",
-      "supports-color": "^9.4.0"
-    }
+  "overrides": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "entities": "^5.0.0",
+    "js-tokens": "^9.0.1",
+    "supports-color": "^9.4.0"
   }
 }
