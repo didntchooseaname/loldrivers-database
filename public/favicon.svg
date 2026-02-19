@@ -1,12 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#32809d;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#5e82a8;stop-opacity:1" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#27272a"/>
+      <stop offset="100%" stop-color="#18181b"/>
     </linearGradient>
   </defs>
-  <circle cx="50" cy="50" r="45" fill="url(#grad)" stroke="#1f3335" stroke-width="3"/>
-  <text x="50" y="35" text-anchor="middle" font-family="monospace" font-size="16" fill="white" font-weight="bold">LOL</text>
-  <text x="50" y="55" text-anchor="middle" font-family="monospace" font-size="12" fill="white">DRV</text>
-  <circle cx="50" cy="70" r="3" fill="#ff5459"/>
+  <rect width="32" height="32" rx="7" fill="url(#bg)" stroke="#3f3f46" stroke-width="0.8"/>
+  <text x="16" y="20" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="10" font-weight="700" fill="#fafafa" letter-spacing="0.02em">LOL</text>
+  <circle cx="16" cy="25" r="1.25" fill="#dc2626"/>
 </svg>
