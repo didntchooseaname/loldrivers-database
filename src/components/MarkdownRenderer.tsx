@@ -5,25 +5,63 @@ interface MarkdownRendererProps {
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+  function convertListBlocks(text: string): string {
+    const lines = text.split('\n');
+    const result: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const ulMatch = line.match(/^[-*]\s+(.*)$/);
+      const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
+      if (ulMatch) {
+        const items: string[] = [];
+        while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^[-*]\s+/, ''));
+          i++;
+        }
+        result.push('<ul>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ul>');
+        continue;
+      }
+      if (olMatch) {
+        const items: string[] = [];
+        while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\d+\.\s+/, ''));
+          i++;
+        }
+        result.push('<ol>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ol>');
+        continue;
+      }
+      result.push(line);
+      i++;
+    }
+    return result.join('\n');
+  }
+
   // Simple markdown to HTML conversion with help-specific styling
   const processMarkdown = (md: string): string => {
-    return md
+    let out = md
       // Add newlines before headers for proper spacing
       .replace(/^(#+\s+.*$)/gm, '\n\n$1')
       // Clean up multiple consecutive newlines
       .replace(/\n{3,}/g, '\n\n')
-      // Trim leading/trailing whitespace
-      .trim()
+      .trim();
+
+    // Headers first (so list conversion doesn't see ## lines)
+    out = out
       // Headers with automatic icons based on content - treat all levels the same
-      .replace(/^###\s+(.*$)/gm, (match, title) => {
+      .replace(/^###\s+(.*$)/gm, (_m, title) => {
         const icon = getIconForTitle(title);
         return `</div><div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
       })
-      .replace(/^##\s+(.*$)/gm, (match, title) => {
+      .replace(/^##\s+(.*$)/gm, (_m, title) => {
         const icon = getIconForTitle(title);
         return `</div><div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
       })
-      .replace(/^#\s+(.*$)/gm, '<h2>$1</h2>')
+      .replace(/^#\s+(.*$)/gm, '<h2>$1</h2>');
+
+    out = convertListBlocks(out);
+
+    out = out
       // Bold text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       // Images - process before links to avoid conflicts
@@ -40,16 +78,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       .replace(/&quot;/g, '"')
       .replace(/&ldquo;/g, '"')
       .replace(/&rdquo;/g, '"')
-      // Paragraphs
-      .replace(/^(?!<[hd])(.*$)/gm, '<p>$1</p>')
+      // Paragraphs (do not wrap lines that already start with a tag)
+      .replace(/^(?!<)(.+)$/gm, '<p>$1</p>')
       // Clean up empty paragraphs
       .replace(/<p><\/p>/g, '')
-      // Fix paragraph wrapping around headers and divs
+      // Fix paragraph wrapping around headers, divs, lists
       .replace(/<p>(<h[234].*?<\/h[234]>)<\/p>/g, '$1')
       .replace(/<p>(<\/div>.*?<div.*?>)<\/p>/g, '$1')
       .replace(/<p>(<div.*?>)<\/p>/g, '$1')
+      .replace(/<p>(<ul>.*?<\/ul>)<\/p>/gs, '$1')
+      .replace(/<p>(<ol>.*?<\/ol>)<\/p>/gs, '$1')
       // Close the last help-section
       + '</div>';
+    return out;
   };
 
   // Function to get appropriate icon based on title content
@@ -66,7 +107,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     
     // Filter help icons
     if (titleLower.includes('information') || titleLower.includes('notice')) return 'fas fa-info-circle';
-    if (titleLower.includes('hvci')) return 'fas fa-shield-alt';
+    if (titleLower.includes('microsoft vulnerable') || titleLower.includes('mvdb') || titleLower.includes('blocklist')) return 'fas fa-shield-alt';
     if (titleLower.includes('process killer')) return 'fas fa-skull-crossbones';
     if (titleLower.includes('behavioral') || titleLower.includes('analysis')) return 'fas fa-brain';
     if (titleLower.includes('memory')) return 'fas fa-memory';

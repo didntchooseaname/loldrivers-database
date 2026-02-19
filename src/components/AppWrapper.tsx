@@ -9,10 +9,8 @@ interface AppWrapperProps {
 export const AppWrapper: React.FC<AppWrapperProps> = ({ children }) => {
 
   return (
-    <>
-      <main className="min-h-screen">
-        {children}
-      </main>
-    </>
+    <main id="main-content" className="min-h-screen bg-background text-foreground">
+      {children}
+    </main>
   );
 };

@@ -1,13 +1,33 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import useSWR from 'swr';
+import { toast } from 'sonner';
 import SafeDate from '@/components/SafeDate';
 import HVCIBlocklistInfo from '@/components/HVCIBlocklistInfo';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { ChangelogPopup } from '@/components/ChangelogPopup';
 import { TermsPopup } from '@/components/TermsPopup';
+import { HelpDialog } from '@/components/HelpDialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Separator } from '@/components/ui/separator';
+import { Download, Cpu, History, Share2, HelpCircle, Search, Eraser, Database, Check, Skull, BookOpen, Filter, Shield, ChevronDown, Code2, ShieldCheck, ShieldAlert, Clock, ArrowDown, ArrowUp, MemoryStick, Bug, FileCode, Terminal, ExternalLink, AlertTriangle, Copy, Network, Settings, MoreHorizontal, Loader2, Heart, Github, Scale } from 'lucide-react';
 import type { Driver, DriversResponse, Stats } from '@/types';
 
 const fetcher = async (url: string) => {
@@ -95,15 +115,16 @@ export default function DriversClient({
   const [activeFilters, setActiveFilters] = useState(initialParams.activeFilters);
   const [pendingFilters, setPendingFilters] = useState(initialParams.activeFilters);
   const [expandedSections, setExpandedSections] = useState(new Set<string>());
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showHelpPopup, setShowHelpPopup] = useState(false);
   const [showFilterHelpPopup, setShowFilterHelpPopup] = useState(false);
   const [showAuthentihashHelpPopup, setShowAuthentihashHelpPopup] = useState(false);
+  const openAuthentihashHelp = useCallback(() => setShowAuthentihashHelpPopup(true), []);
   const [showChangelogPopup, setShowChangelogPopup] = useState(false);
   const [showTermsPopup, setShowTermsPopup] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
   const [showFilterHelpScrollIndicator, setShowFilterHelpScrollIndicator] = useState(true);
+  const [filterAnnouncement, setFilterAnnouncement] = useState('');
   
   // Help content state
   const [helpContent, setHelpContent] = useState<{
@@ -376,7 +397,14 @@ export default function DriversClient({
 
   const applyFilters = useCallback(() => {
     setActiveFilters(new Set(pendingFilters));
+    setFilterAnnouncement('Filters applied. List updated.');
   }, [pendingFilters]);
+
+  useEffect(() => {
+    if (!filterAnnouncement) return;
+    const t = setTimeout(() => setFilterAnnouncement(''), 2000);
+    return () => clearTimeout(t);
+  }, [filterAnnouncement]);
 
   // Fonction pour appliquer directement un filtre depuis le header
   const applyDirectFilter = useCallback((filterType: string) => {
@@ -414,7 +442,12 @@ export default function DriversClient({
 
   // Fonction pour effectuer la recherche
   const performSearch = useCallback(() => {
-    setSearchQuery(inputValue.trim());
+    const trimmed = inputValue.trim();
+    if (!trimmed) {
+      toast.warning('Please enter a search term');
+      return;
+    }
+    setSearchQuery(trimmed);
     // Force SWR revalidation for new data
     if (mutate) {
       mutate();
@@ -428,16 +461,6 @@ export default function DriversClient({
     }
   }, [performSearch]);
 
-  // Fonction pour afficher le toast
-  const showToast = useCallback((message: string) => {
-    setToastMessage(message);
-    const timeoutId = setTimeout(() => {
-      setToastMessage(null);
-    }, 3000); // Toast disappears after 3 seconds
-    
-    // Return cleanup function to allow cancellation if needed
-    return () => clearTimeout(timeoutId);
-  }, []);
 
   // Fonction pour partager la recherche actuelle
   const shareCurrentSearch = useCallback(async () => {
@@ -491,16 +514,16 @@ export default function DriversClient({
       // Copy to clipboard
       try {
         await navigator.clipboard.writeText(shareUrl);
-        showToast('Link copied to clipboard!');
+        toast.success('Link copied to clipboard!');
       } catch (error) {
         console.warn('Clipboard API failed:', error);
-        showToast('Failed to copy link - please copy manually');
+        toast.error('Failed to copy link - please copy manually');
       }
     } catch (error) {
       console.error('Failed to create share URL:', error);
-      showToast('Failed to create share link');
+      toast.error('Failed to create share link');
     }
-  }, [searchQuery, activeFilters, currentPage, showToast]);
+  }, [searchQuery, activeFilters, currentPage]);
 
   // Apply URL parameters only during navigation changes (popstate)
   useEffect(() => {
@@ -601,28 +624,6 @@ export default function DriversClient({
     });
   }, []);
 
-  // Function to scroll to bottom of help popup
-  const scrollHelpToBottom = useCallback(() => {
-    const helpPopup = document.querySelector('.help-popup') as HTMLDivElement;
-    if (helpPopup) {
-      helpPopup.scrollTo({
-        top: helpPopup.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, []);
-
-  // Function to scroll to bottom of filter help popup
-  const scrollFilterHelpToBottom = useCallback(() => {
-    const filterHelpPopup = document.querySelectorAll('.help-popup')[1] as HTMLDivElement; // Second popup (filter help)
-    if (filterHelpPopup) {
-      filterHelpPopup.scrollTo({
-        top: filterHelpPopup.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  }, []);
-
   // Fonctions de pagination
   const goToPage = useCallback((page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -661,137 +662,94 @@ export default function DriversClient({
     });
   }, []);
 
+  // Hash row for copy-to-clipboard
+  const HashRow = ({ type, value, onCopy }: { type: string; value: string; onCopy: () => void }) => (
+    <button
+      type="button"
+      onClick={onCopy}
+      className="hash-row flex items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/60 transition-colors duration-smooth ease-apple w-full"
+      title={`Click to copy ${type}`}
+    >
+      <span className="font-medium text-muted-foreground shrink-0 pt-0.5">{type}</span>
+      <span className="font-mono text-xs break-all text-foreground min-w-0 flex-1">{value}</span>
+    </button>
+  );
+
   // Gestion des sections collapsibles
   const renderHashTags = (hashes: { MD5?: string; SHA1?: string; SHA256?: string }, authentihash?: { MD5?: string; SHA1?: string; SHA256?: string }, index?: number) => {
     const copyToClipboard = async (hashType: string, hashValue: string) => {
       try {
         await navigator.clipboard.writeText(hashValue);
-        showToast(`${hashType} hash copied to clipboard!`);
+        toast.success(`${hashType} hash copied to clipboard!`);
       } catch (err) {
         console.error('Failed to copy: ', err);
-        showToast(`Failed to copy ${hashType} hash`);
+        toast.error(`Failed to copy ${hashType} hash`);
       }
     };
 
     const hasStandardHashes = hashes.MD5 || hashes.SHA1 || hashes.SHA256;
     const hasAuthentihashes = authentihash?.MD5 || authentihash?.SHA1 || authentihash?.SHA256;
     
+    const authentihashSectionId = `authentihash-${index || 0}`;
+    const isAuthentihashExpanded = expandedSections.has(authentihashSectionId);
+
     if (!hasStandardHashes && !hasAuthentihashes) {
       return (
-        <div className="hash-section">
-          <div className="hash-section-header">
-            <i className="fas fa-fingerprint"></i>
-            <span className="hash-section-title">File Hashes</span>
+        <div className="card-section">
+          <div className="card-section-header">
+            <i className="fas fa-fingerprint" aria-hidden />
+            <span className="card-section-title">File Hashes</span>
           </div>
-          <div className="hash-section-content">
-            <span className="text-muted">No hashes available</span>
-          </div>
+          <p className="text-sm text-muted-foreground">No hashes available</p>
         </div>
       );
     }
 
-    const authentihashSectionId = `authentihash-${index || 0}`;
-    const isAuthentihashExpanded = expandedSections.has(authentihashSectionId);
-
     return (
-      <div className="hash-section">
-        <div className="hash-section-header">
-          <i className="fas fa-fingerprint"></i>
-          <span className="hash-section-title">File Hashes</span>
+      <div className="card-section">
+        <div className="card-section-header">
+          <i className="fas fa-fingerprint" aria-hidden />
+          <span className="card-section-title">File Hashes</span>
         </div>
-        <div className="hash-section-content">
-          {/* Standard Hashes */}
+        <div className="space-y-2">
           {hashes.MD5 && (
-            <div 
-              className="clickable-hash md5" 
-              onClick={() => copyToClipboard('MD5', hashes.MD5!)}
-              title="Click to copy MD5 hash"
-            >
-              <span className="hash-type">MD5</span>
-              <span className="hash-value">{hashes.MD5}</span>
-            </div>
+            <HashRow type="MD5" value={hashes.MD5} onCopy={() => copyToClipboard('MD5', hashes.MD5!)} />
           )}
           {hashes.SHA1 && (
-            <div 
-              className="clickable-hash sha1" 
-              onClick={() => copyToClipboard('SHA1', hashes.SHA1!)}
-              title="Click to copy SHA1 hash"
-            >
-              <span className="hash-type">SHA1</span>
-              <span className="hash-value">{hashes.SHA1}</span>
-            </div>
+            <HashRow type="SHA1" value={hashes.SHA1} onCopy={() => copyToClipboard('SHA1', hashes.SHA1!)} />
           )}
           {hashes.SHA256 && (
-            <div 
-              className="clickable-hash sha256" 
-              onClick={() => copyToClipboard('SHA256', hashes.SHA256!)}
-              title="Click to copy SHA256 hash"
-            >
-              <span className="hash-type">SHA256</span>
-              <span className="hash-value">{hashes.SHA256}</span>
-            </div>
+            <HashRow type="SHA256" value={hashes.SHA256} onCopy={() => copyToClipboard('SHA256', hashes.SHA256!)} />
           )}
-          
-          {/* Authentihash Collapsible Section */}
           {hasAuthentihashes && (
-            <div className={`collapsible-section authentihash-section ${isAuthentihashExpanded ? 'expanded' : ''}`}>
-              <div className="collapsible-header" onClick={() => toggleSection(authentihashSectionId)}>
-                <span className="collapsible-title">
-                  <div className="authentihash-title-section">
-                    <i className="fas fa-shield-alt"></i> Authentihashes
-                  </div>
-                  <button
-                    className="authentihash-help-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAuthentihashHelpPopup(true);
-                    }}
-                    title="Learn about Authentihashes"
-                  >
-                    <i className="fas fa-question-circle"></i>
-                  </button>
-                </span>
-                <span className="collapsible-icon">
-                  <i className={isAuthentihashExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
-                </span>
+            <Collapsible open={isAuthentihashExpanded} onOpenChange={() => toggleSection(authentihashSectionId)}>
+              <div className="flex w-full items-center justify-between gap-2">
+                <CollapsibleTrigger className="collapsible-trigger group flex flex-1 items-center justify-between gap-2 text-left text-sm font-medium">
+                  <span className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    Authentihashes
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-smooth ease-apple group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={openAuthentihashHelp}
+                  title="Learn about Authentihashes"
+                  aria-label="Authentihash help"
+                >
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
               </div>
-              {isAuthentihashExpanded && (
-                <div className="collapsible-content">
-                  <div className="collapsible-inner">
-                    {authentihash?.MD5 && (
-                      <div 
-                        className="clickable-hash md5" 
-                        onClick={() => copyToClipboard('Authentihash MD5', authentihash.MD5!)}
-                        title="Click to copy Authentihash MD5"
-                      >
-                        <span className="hash-type">MD5</span>
-                        <span className="hash-value">{authentihash.MD5}</span>
-                      </div>
-                    )}
-                    {authentihash?.SHA1 && (
-                      <div 
-                        className="clickable-hash sha1" 
-                        onClick={() => copyToClipboard('Authentihash SHA1', authentihash.SHA1!)}
-                        title="Click to copy Authentihash SHA1"
-                      >
-                        <span className="hash-type">SHA1</span>
-                        <span className="hash-value">{authentihash.SHA1}</span>
-                      </div>
-                    )}
-                    {authentihash?.SHA256 && (
-                      <div 
-                        className="clickable-hash sha256" 
-                        onClick={() => copyToClipboard('Authentihash SHA256', authentihash.SHA256!)}
-                        title="Click to copy Authentihash SHA256"
-                      >
-                        <span className="hash-type">SHA256</span>
-                        <span className="hash-value">{authentihash.SHA256}</span>
-                      </div>
-                    )}
-                  </div>
+              <CollapsibleContent>
+                <div className="collapsible-content-block space-y-2">
+                  {authentihash?.MD5 && <HashRow type="MD5" value={authentihash.MD5} onCopy={() => copyToClipboard('Authentihash MD5', authentihash!.MD5!)} />}
+                {authentihash?.SHA1 && <HashRow type="SHA1" value={authentihash.SHA1} onCopy={() => copyToClipboard('Authentihash SHA1', authentihash!.SHA1!)} />}
+                  {authentihash?.SHA256 && <HashRow type="SHA256" value={authentihash.SHA256} onCopy={() => copyToClipboard('Authentihash SHA256', authentihash!.SHA256!)} />}
                 </div>
-              )}
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
         </div>
       </div>
@@ -805,7 +763,7 @@ export default function DriversClient({
     if (driver.LoadsDespiteHVCI) {
       const isTrue = driver.LoadsDespiteHVCI.toString().toUpperCase() === 'TRUE';
       tags.push({
-        text: isTrue ? 'MVDB PASSED' : 'HVCI BLOCKED',
+        text: isTrue ? 'MVDB PASSED' : 'MVDB BLOCKED',
         type: isTrue ? 'success' : 'danger',
         icon: isTrue ? 'fas fa-check-circle' : 'fas fa-times-circle'
       });
@@ -1003,24 +961,37 @@ export default function DriversClient({
     return certTags;
   };
 
-  // Render capacities section
+  // Fixed capacity types in display order so every card shows the same pills (consistent like left panels)
+  const CAPACITY_ORDER: Array<{ key: string; text: string; type: string }> = [
+    { key: 'process-killer', text: 'Process Killer', type: 'process-killer' },
+    { key: 'memory-manipulator', text: 'Memory Manipulator', type: 'memory-manipulator' },
+    { key: 'debug-bypass', text: 'Debug Bypass', type: 'debug-bypass' },
+    { key: 'registry-manipulator', text: 'Registry Manipulator', type: 'registry-manipulator' },
+    { key: 'file-manipulator', text: 'File Manipulator', type: 'file-manipulator' },
+  ];
+
+  // Render capacities section: always show same four pills; present = outline, absent = muted (layout consistent like left)
   const renderCapacitiesSection = (capacities: Array<{ text: string; type: string; icon?: string }>) => {
-    if (!capacities.length) return null;
-    
+    const byType = new Map(capacities.map(c => [c.type, c]));
     return (
-      <div className="simple-section">
-        <div className="simple-section-header">
-          <i className="fas fa-cogs"></i>
-          <span className="simple-section-title">Capacities</span>
+      <div className="card-section">
+        <div className="card-section-header">
+          <i className="fas fa-cogs" aria-hidden />
+          <span className="card-section-title">Capacities</span>
         </div>
-        <div className="simple-section-content">
-          <div className="capacity-tags">
-            {capacities.map((capacity, index) => (
-              <span key={index} className={`capacity-tag ${capacity.type}`}>
-                {capacity.icon && <i className={capacity.icon}></i>} {capacity.text}
-              </span>
-            ))}
-          </div>
+        <div className="grid grid-cols-2 gap-2 min-h-[4.25rem]">
+          {CAPACITY_ORDER.map(({ key, text, type }) => {
+            const present = byType.has(type);
+            return (
+              <Badge
+                key={key}
+                variant={present ? 'outline' : 'secondary'}
+                className={`text-xs ${present ? '' : 'opacity-50'}`}
+              >
+                {text}
+              </Badge>
+            );
+          })}
         </div>
       </div>
     );
@@ -1028,13 +999,20 @@ export default function DriversClient({
 
   const renderStatusTags = (tags: Array<{ text: string; type: string; icon?: string }>) => {
     if (!tags.length) return null;
-    
+    const variant = (tag: { text: string; type: string }) =>
+      tag.type === 'danger' || tag.type === 'process-killer'
+        ? 'destructive'
+        : tag.text === 'MVDB PASSED'
+          ? 'success'
+          : tag.type === 'success'
+            ? 'secondary'
+            : 'outline';
     return (
-      <div className="status-tags">
+      <div className="flex flex-wrap gap-2">
         {tags.map((tag, index) => (
-          <span key={index} className={`status-tag ${tag.type}`}>
-            {tag.icon && <i className={tag.icon}></i>} {tag.text}
-          </span>
+          <Badge key={index} variant={variant(tag)} className="text-xs">
+            {tag.text}
+          </Badge>
         ))}
       </div>
     );
@@ -1042,19 +1020,19 @@ export default function DriversClient({
 
   // Section simple (non-collapsible)
   const renderSimpleSection = (title: string, content: string, icon: string) => {
-    if (!content || 
-        content.toLowerCase() === 'unknown' || 
+    if (!content ||
+        content.toLowerCase() === 'unknown' ||
         content.toLowerCase() === 'no description available') return null;
-    
+
     return (
-      <div className="simple-section">
-        <div className="simple-section-header">
-          <i className={icon}></i>
-          <span className="simple-section-title">{title}</span>
+      <div className="card-section">
+        <div className="card-section-header">
+          <i className={icon} aria-hidden />
+          <span className="card-section-title">{title}</span>
         </div>
-        <div className="simple-section-content">
+        <p className="card-section-content text-sm text-muted-foreground leading-relaxed">
           {content}
-        </div>
+        </p>
       </div>
     );
   };
@@ -1063,31 +1041,27 @@ export default function DriversClient({
   const copyFunctionToClipboard = async (functionName: string) => {
     try {
       await navigator.clipboard.writeText(functionName);
-      showToast(`Function "${functionName}" copied to clipboard!`);
+      toast.success(`Function "${functionName}" copied to clipboard!`);
     } catch (err) {
       console.error('Failed to copy function:', err);
-      showToast('Failed to copy function to clipboard');
+      toast.error('Failed to copy function to clipboard');
     }
   };
 
   // Imported functions section
   const renderImportedFunctionsSection = (functions: string[] | undefined, driver: Driver, index: number) => {
-    // Si pas de fonctions ou tableau vide, affichage simple non-collapsible
     if (!functions || functions.length === 0) {
       return (
-        <div className="simple-section">
-          <div className="simple-section-header">
-            <i className="fas fa-code"></i>
-            <span className="simple-section-title">Imported Functions</span>
+        <div className="card-section">
+          <div className="card-section-header">
+            <Code2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="card-section-title">Imported Functions</span>
           </div>
-          <div className="simple-section-content">
-            No Imported Functions
-          </div>
+          <p className="text-sm text-muted-foreground">No imported functions</p>
         </div>
       );
     }
 
-    // Si des fonctions existent, section collapsible avec classification
     const sectionId = `functions-${index}`;
     const isExpanded = expandedSections.has(sectionId);
     
@@ -1192,380 +1166,75 @@ export default function DriversClient({
     });
     
     return (
-      <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
-        <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
-          <span className="collapsible-title">
-            <i className="fas fa-code"></i> Imported Functions ({functions.length})
-          </span>
-          <span className="collapsible-icon">
-            <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
-          </span>
-        </div>
-        {isExpanded && (
-          <div className="collapsible-content">
-            <div className="collapsible-inner">
-              {/* Critical functions first - expanded by default */}
-              {categorizedFunctions.critical.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title critical clickable-category"
-                    onClick={() => toggleSection(`critical-${index}`)}
-                    aria-expanded={expandedSections.has(`critical-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-exclamation-triangle"></i> 
-                    <span>Critical Functions ({categorizedFunctions.critical.length})</span>
-                    <i className={`fas ${expandedSections.has(`critical-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`critical-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.critical.map((func, idx) => (
-                        <li 
-                          key={`critical-${idx}`} 
-                          className="function-item dangerous clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+      <div className="card-section" key={sectionId}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleSection(sectionId)}>
+          <CollapsibleTrigger className="collapsible-trigger group flex w-full items-center justify-between gap-2 text-left text-sm font-medium">
+            <span className="flex items-center gap-2">
+              <Code2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              Imported Functions ({functions.length})
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-smooth ease-apple group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="collapsible-content-block pt-3 space-y-2">
+              {(() => {
+                const renderFuncCategory = (
+                  categoryKey: string,
+                  label: string,
+                  Icon: React.ComponentType<{ className?: string }>,
+                  funcs: string[],
+                  danger?: boolean
+                ) =>
+                  funcs.length > 0 ? (
+                    <Collapsible
+                      key={categoryKey}
+                      open={expandedSections.has(categoryKey)}
+                      onOpenChange={() => toggleSection(categoryKey)}
+                    >
+                      <CollapsibleTrigger className="func-cat-trigger group flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background/60 px-2.5 py-2 text-left text-xs font-medium transition-colors duration-smooth ease-apple hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 data-[state=open]:border-ring/50">
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                          {label} ({funcs.length})
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-smooth ease-apple group-data-[state=open]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <ul className="func-list mt-1.5 space-y-0.5 rounded-md border border-border bg-muted/20 p-1.5">
+                          {funcs.map((func, idx) => (
+                            <li key={`${categoryKey}-${idx}`}>
+                              <button
+                                type="button"
+                                onClick={() => copyFunctionToClipboard(func)}
+                                title={`Copy ${func}`}
+                                className={`func-row flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs font-mono transition-colors duration-smooth ease-apple hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${danger ? 'text-destructive' : 'text-foreground'}`}
+                              >
+                                <span className="min-w-0 truncate">{func}</span>
+                                <Copy className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : null;
 
-              {/* Gestion des processus */}
-              {categorizedFunctions.process.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title process clickable-category"
-                    onClick={() => toggleSection(`process-${index}`)}
-                    aria-expanded={expandedSections.has(`process-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-microchip"></i> 
-                    <span>Process Management ({categorizedFunctions.process.length})</span>
-                    <i className={`fas ${expandedSections.has(`process-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`process-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.process.map((func, idx) => (
-                        <li 
-                          key={`process-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Memory management */}
-              {categorizedFunctions.memory.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title memory clickable-category"
-                    onClick={() => toggleSection(`memory-${index}`)}
-                    aria-expanded={expandedSections.has(`memory-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-memory"></i> 
-                    <span>Memory Management ({categorizedFunctions.memory.length})</span>
-                    <i className={`fas ${expandedSections.has(`memory-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`memory-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.memory.map((func, idx) => (
-                        <li 
-                          key={`memory-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* File system */}
-              {categorizedFunctions.file.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title file clickable-category"
-                    onClick={() => toggleSection(`file-${index}`)}
-                    aria-expanded={expandedSections.has(`file-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-file"></i> 
-                    <span>File System ({categorizedFunctions.file.length})</span>
-                    <i className={`fas ${expandedSections.has(`file-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`file-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.file.map((func, idx) => (
-                        <li 
-                          key={`file-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Registre */}
-              {categorizedFunctions.registry.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title registry clickable-category"
-                    onClick={() => toggleSection(`registry-${index}`)}
-                    aria-expanded={expandedSections.has(`registry-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-database"></i> 
-                    <span>Registry ({categorizedFunctions.registry.length})</span>
-                    <i className={`fas ${expandedSections.has(`registry-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`registry-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.registry.map((func, idx) => (
-                        <li 
-                          key={`registry-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Network */}
-              {categorizedFunctions.network.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title network clickable-category"
-                    onClick={() => toggleSection(`network-${index}`)}
-                    aria-expanded={expandedSections.has(`network-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-network-wired"></i> 
-                    <span>Network ({categorizedFunctions.network.length})</span>
-                    <i className={`fas ${expandedSections.has(`network-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`network-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.network.map((func, idx) => (
-                        <li 
-                          key={`network-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Security */}
-              {categorizedFunctions.security.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title security clickable-category"
-                    onClick={() => toggleSection(`security-${index}`)}
-                    aria-expanded={expandedSections.has(`security-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-shield-alt"></i> 
-                    <span>Security ({categorizedFunctions.security.length})</span>
-                    <i className={`fas ${expandedSections.has(`security-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`security-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.security.map((func, idx) => (
-                        <li 
-                          key={`security-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Fonctions kernel */}
-              {categorizedFunctions.kernel.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title kernel clickable-category"
-                    onClick={() => toggleSection(`kernel-${index}`)}
-                    aria-expanded={expandedSections.has(`kernel-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-cog"></i> 
-                    <span>Kernel/System ({categorizedFunctions.kernel.length})</span>
-                    <i className={`fas ${expandedSections.has(`kernel-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`kernel-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.kernel.map((func, idx) => (
-                        <li 
-                          key={`kernel-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Autres fonctions */}
-              {categorizedFunctions.other.length > 0 && (
-                <div className="function-category collapsible-category">
-                  <div 
-                    className="category-title other clickable-category"
-                    onClick={() => toggleSection(`other-${index}`)}
-                    aria-expanded={expandedSections.has(`other-${index}`)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <i className="fas fa-ellipsis-h"></i> 
-                    <span>Other ({categorizedFunctions.other.length})</span>
-                    <i className={`fas ${expandedSections.has(`other-${index}`) ? 'fa-chevron-down' : 'fa-chevron-right'} category-chevron`}></i>
-                  </div>
-                  {expandedSections.has(`other-${index}`) && (
-                    <ul className="functions-list category-functions-list">
-                      {categorizedFunctions.other.map((func, idx) => (
-                        <li 
-                          key={`other-${idx}`} 
-                          className="function-item clickable-function"
-                          onClick={() => copyFunctionToClipboard(func)}
-                          title={`Click to copy "${func}" to clipboard`}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              copyFunctionToClipboard(func);
-                            }
-                          }}
-                        >
-                          <span className="function-name">{func}</span>
-                          <i className="fas fa-copy copy-icon" aria-hidden="true"></i>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+                return (
+                  <>
+                    {renderFuncCategory(`critical-${index}`, 'Critical', AlertTriangle, categorizedFunctions.critical, true)}
+                    {renderFuncCategory(`process-${index}`, 'Process', Cpu, categorizedFunctions.process)}
+                    {renderFuncCategory(`memory-${index}`, 'Memory', MemoryStick, categorizedFunctions.memory)}
+                    {renderFuncCategory(`file-${index}`, 'File system', FileCode, categorizedFunctions.file)}
+                    {renderFuncCategory(`registry-${index}`, 'Registry', Database, categorizedFunctions.registry)}
+                    {renderFuncCategory(`network-${index}`, 'Network', Network, categorizedFunctions.network)}
+                    {renderFuncCategory(`security-${index}`, 'Security', Shield, categorizedFunctions.security)}
+                    {renderFuncCategory(`kernel-${index}`, 'Kernel/System', Settings, categorizedFunctions.kernel)}
+                    {renderFuncCategory(`other-${index}`, 'Other', MoreHorizontal, categorizedFunctions.other)}
+                  </>
+                );
+              })()}
             </div>
-          </div>
-        )}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     );
   };
@@ -1589,72 +1258,53 @@ export default function DriversClient({
     const isExpanded = expandedSections.has(sectionId);
     
     return (
-      <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
-        <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
-          <span className="collapsible-title">
-            <i className="fas fa-external-link-alt"></i> Resources ({filteredResources.length})
-          </span>
-          <span className="collapsible-icon">
-            <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
-          </span>
-        </div>
-        {isExpanded && (
-          <div className="collapsible-content">
-            <div className="collapsible-inner">
-              <div className="resources-list">
-                {filteredResources.map((resource, resourceIndex) => {
-                  if (!resource || !resource.trim()) return null;
-                  
-                  // Extract domain for favicon and display name
-                  let domain = '';
-                  let displayName = resource;
-                  try {
-                    const url = new URL(resource);
-                    domain = url.hostname;
-                    // Create a shorter display name
-                    displayName = `${domain}${url.pathname}`;
-                    if (displayName.length > 60) {
-                      displayName = displayName.substring(0, 57) + '...';
-                    }
-                  } catch {
-                    // If URL parsing fails, use the resource as is
-                    displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
-                  }
-
-                  const faviconUrl = domain && domain.length > 0 && domain.length < 100 
-                    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16` 
-                    : null;
-                  
-                  return (
-                    <div 
-                      key={`resource-${resourceIndex}`}
-                      className="clickable-hash resource-link"
-                      onClick={() => window.open(resource, '_blank', 'noopener,noreferrer')}
-                      title={resource}
-                    >
-                      <span className="hash-type">
-                        {faviconUrl ? (
-                          <Image 
-                            src={faviconUrl} 
-                            alt={`${domain} favicon`}
-                            width={16} 
-                            height={16}
-                            onError={() => {
-                              // Fallback to Font Awesome icon if favicon fails to load
-                            }}
-                            style={{ display: 'inline-block' }}
-                          />
-                        ) : null}
-                        <i className="fas fa-external-link-alt" style={{ display: faviconUrl ? 'none' : 'inline' }}></i>
-                      </span>
-                      <span className="hash-value">{displayName}</span>
-                    </div>
-                  );
-                })}
-              </div>
+      <div className="card-section" key={sectionId}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleSection(sectionId)}>
+          <CollapsibleTrigger className="collapsible-trigger group flex w-full items-center justify-between gap-2 text-left text-sm font-medium">
+            <span className="flex items-center gap-2">
+              <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              Resources ({filteredResources.length})
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-smooth ease-apple group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="collapsible-content-block space-y-1.5 pt-3">
+              {filteredResources.map((resource, resourceIndex) => {
+                if (!resource?.trim()) return null;
+                let domain = '';
+                let displayName = resource;
+                try {
+                  const url = new URL(resource);
+                  domain = url.hostname;
+                  displayName = `${domain}${url.pathname}`;
+                  if (displayName.length > 60) displayName = displayName.substring(0, 57) + '...';
+                } catch {
+                  displayName = resource.length > 60 ? resource.substring(0, 57) + '...' : resource;
+                }
+                const faviconUrl = domain && domain.length > 0 && domain.length < 100
+                  ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=16`
+                  : null;
+                return (
+                  <a
+                    key={`resource-${resourceIndex}`}
+                    href={resource}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="resource-link flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors duration-smooth ease-apple"
+                    title={resource}
+                  >
+                    {faviconUrl ? (
+                      <Image src={faviconUrl} alt="" width={14} height={14} className="shrink-0" />
+                    ) : (
+                      <i className="fas fa-external-link-alt text-muted-foreground shrink-0" aria-hidden />
+                    )}
+                    <span className="truncate">{displayName}</span>
+                  </a>
+                );
+              })}
             </div>
-          </div>
-        )}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     );
   };
@@ -1664,89 +1314,61 @@ export default function DriversClient({
   // Section des commandes
   const renderCommandsSection = (commands: Driver['Commands'], driver: Driver, index: number) => {
     if (!commands || typeof commands !== 'object') return null;
-    
+
     const sectionId = `commands-${index}`;
     const isExpanded = expandedSections.has(sectionId);
-    
+
     const copyToClipboard = (text: string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        showToast('Command copied to clipboard!');
-      }).catch(() => {
-        showToast('Failed to copy command');
-      });
+      navigator.clipboard.writeText(text).then(() => toast.success('Command copied to clipboard!')).catch(() => toast.error('Failed to copy command'));
     };
-    
+
     return (
-      <div className={`collapsible-section ${isExpanded ? 'expanded' : ''}`} key={sectionId}>
-        <div className="collapsible-header" onClick={() => toggleSection(sectionId)}>
-          <span className="collapsible-title">
-            <i className="fas fa-terminal"></i> Commands & Usage
-          </span>
-          <span className="collapsible-icon">
-            <i className={isExpanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'}></i>
-          </span>
-        </div>
-        {isExpanded && (
-          <div className="collapsible-content">
-            <div className="collapsible-inner">
+      <div className="card-section" key={sectionId}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleSection(sectionId)}>
+          <CollapsibleTrigger className="collapsible-trigger group flex w-full items-center justify-between gap-2 text-left text-sm font-medium">
+            <span className="flex items-center gap-2">
+              <Terminal className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              Commands & Usage
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-smooth ease-apple group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="collapsible-content-block space-y-3 pt-3">
               {commands.OperatingSystem && (
-                <div className="command-field">
-                  <div className="command-field-header">
-                    <i className="fas fa-desktop"></i>
-                    <strong>Operating System</strong>
-                  </div>
-                  <div className="command-field-content">{commands.OperatingSystem}</div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-0.5">Operating System</p>
+                  <p className="text-sm">{commands.OperatingSystem}</p>
                 </div>
               )}
               {commands.Privileges && (
-                <div className="command-field">
-                  <div className="command-field-header">
-                    <i className="fas fa-user-shield"></i>
-                    <strong>Privileges</strong>
-                  </div>
-                  <div className="command-field-content">{commands.Privileges}</div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-0.5">Privileges</p>
+                  <p className="text-sm">{commands.Privileges}</p>
                 </div>
               )}
               {commands.Usecase && (
-                <div className="command-field">
-                  <div className="command-field-header">
-                    <i className="fas fa-bullseye"></i>
-                    <strong>Use Case</strong>
-                  </div>
-                  <div className="command-field-content">{commands.Usecase}</div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-0.5">Use Case</p>
+                  <p className="text-sm">{commands.Usecase}</p>
                 </div>
               )}
-              {commands.Command && commands.Command.trim() && (
-                <div className="command-field">
-                  <div className="command-field-header">
-                    <i className="fas fa-code"></i>
-                    <strong>Command</strong>
-                  </div>
-                  <div className="terminal-window">
-                    <div className="terminal-header">
-                      <div className="terminal-buttons">
-                        <span className="terminal-button red"></span>
-                        <span className="terminal-button yellow"></span>
-                        <span className="terminal-button green"></span>
-                      </div>
-                      <div className="terminal-title">Command Prompt</div>
-                      <button 
-                        className="copy-button"
-                        onClick={() => copyToClipboard(commands.Command || '')}
-                        title="Copy command"
-                      >
-                        <i className="fas fa-copy"></i>
-                      </button>
+              {commands.Command?.trim() && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Command</p>
+                  <div className="rounded-lg border border-border bg-muted/30 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/50">
+                      <span className="text-xs text-muted-foreground">Terminal</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(commands.Command || '')} title="Copy command">
+                        <i className="fas fa-copy text-muted-foreground" aria-hidden />
+                      </Button>
                     </div>
-                    <div className="terminal-content">
-                      <code>{commands.Command}</code>
-                    </div>
+                    <pre className="p-3 text-xs font-mono overflow-x-auto"><code>{commands.Command}</code></pre>
                   </div>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     );
   };
@@ -1777,7 +1399,7 @@ export default function DriversClient({
     const filename = getDriverName(driver);
     
     if (!hash) {
-      showToast('No MD5 hash available for download');
+      toast.error('No MD5 hash available for download');
       return;
     }
     
@@ -1794,8 +1416,8 @@ export default function DriversClient({
     link.click();
     document.body.removeChild(link);
     
-    showToast(`Downloading ${filename}...`);
-  }, [showToast]);
+    toast.success(`Downloading ${filename}...`);
+  }, []);
 
   // Helper function to format architecture display
   const formatArchitecture = (machineType: string | undefined): string | null => {
@@ -1835,6 +1457,10 @@ export default function DriversClient({
     return 'Unknown Driver';
   };
 
+  // Check if driver is process killer (for card accent)
+  const isProcessKiller = (d: Driver) =>
+    d.ImportedFunctions?.some((f) => f.toLowerCase().includes('zwterminateprocess')) ?? false;
+
   // Create driver card
   const createDriverCard = (driver: Driver, index: number) => {
     const hashes = {
@@ -1847,52 +1473,73 @@ export default function DriversClient({
     const certificateTags = generateCertificateTags(driver);
     const filename = getDriverName(driver);
     const formattedArch = formatArchitecture(driver.MachineType as string);
-    
+    const danger = isProcessKiller(driver);
+
     return (
-      <div className="driver-card" key={`driver-${index}-${driver.MD5 || driver.SHA256}`}>
-        <div className="driver-header">
-          <h3 className="driver-title">
-            <i className="fas fa-microchip"></i> {filename}
-            {formattedArch && (
-              <span className="driver-architecture">{formattedArch}</span>
-            )}
-          </h3>
-          <button 
-            className="download-btn"
-            onClick={() => downloadDriver(driver)}
-            title={`Download ${filename}`}
-            aria-label={`Download ${filename}`}
-          >
-            <i className="fas fa-download"></i>
-          </button>
-        </div>
-        
-        {renderStatusTags(statusTags)}
-        {certificateTags.length > 0 && (
-          <div className="certificate-tags-section">
-            {renderStatusTags(certificateTags)}
+      <Card
+        key={`driver-${index}-${driver.MD5 || driver.SHA256}`}
+        className={`driver-card flex h-full flex-col overflow-hidden transition-shadow duration-smooth ease-apple hover:shadow-md ${danger ? 'driver-card--danger border-l-4 border-l-destructive' : ''}`}
+      >
+        <CardHeader className="driver-card-header shrink-0 pb-3">
+          <div className="flex flex-row items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="driver-card-icon shrink-0 rounded-md bg-muted p-1.5">
+                  <Cpu className="h-4 w-4 text-muted-foreground" />
+                </span>
+                <span className="flex items-baseline gap-2 flex-wrap min-w-0">
+                  <h3 className="text-base font-semibold leading-tight tracking-tight">
+                    {filename}
+                  </h3>
+                  {formattedArch && (
+                    <Badge variant="secondary" className="font-normal text-xs shrink-0">{formattedArch}</Badge>
+                  )}
+                </span>
+              </div>
+              {(driver.Company || driver.Created) && (
+                <p className="text-xs text-muted-foreground pl-9">
+                  {[driver.Company, driver.Created].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0 h-9 w-9"
+              onClick={() => downloadDriver(driver)}
+              title={`Download ${filename}`}
+              aria-label={`Download ${filename}`}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
-        )}
-        {renderHashTags(hashes, driver.Authentihash, index)}
-        {renderSimpleSection('Company', driver.Company || 'Unknown', 'fas fa-building')}
-        {renderSimpleSection('Description', getBestDescription(driver), 'fas fa-info-circle')}
-        {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
-        {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
-        {driver.Created && renderSimpleSection('Created Date', driver.Created, 'fas fa-calendar')}
-        {renderCapacitiesSection(capacityTags)}
-        {renderCommandsSection(driver.Commands, driver, index)}
-        {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
-        {renderResourcesSection(driver.Resources, driver, index)}
-      </div>
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {renderStatusTags(statusTags)}
+            {certificateTags.length > 0 && renderStatusTags(certificateTags)}
+          </div>
+        </CardHeader>
+        <CardContent className="driver-card-body flex flex-1 flex-col min-h-0 pt-0 space-y-0">
+          {renderHashTags(hashes, driver.Authentihash, index)}
+
+          {renderSimpleSection('Description', getBestDescription(driver), 'fas fa-info-circle')}
+          {driver.Category && renderSimpleSection('Category', driver.Category, 'fas fa-tags')}
+          {driver.Author && renderSimpleSection('Author', driver.Author, 'fas fa-user')}
+          {driver.Created && renderSimpleSection('Created Date', driver.Created, 'fas fa-calendar')}
+          {renderCapacitiesSection(capacityTags)}
+          {renderCommandsSection(driver.Commands, driver, index)}
+          {renderImportedFunctionsSection(driver.ImportedFunctions, driver, index)}
+          {renderResourcesSection(driver.Resources, driver, index)}
+        </CardContent>
+      </Card>
     );
   };
 
   return (
     <div className="container">
       <header className="header">
-        <div className="header-top">
+        <div className="header-top flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="header-content">
-            <h1>LOLDrivers Database</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">LOLDrivers Database</h1>
             <p className="header-subtitle">Vulnerable and malicious Windows drivers database</p>
             <p className="last-updated">
               <SafeDate 
@@ -1902,180 +1549,209 @@ export default function DriversClient({
               />
             </p>
           </div>
-          <div className="header-controls">
-            <button 
-              className="changelog-button"
+          <div className="header-controls flex shrink-0 gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowChangelogPopup(true)}
               title="View changelog and recent updates"
               aria-label="View changelog and recent updates"
             >
-              <i className="fas fa-history"></i>
-            </button>
-            <button 
-              className="share-button"
+              <History className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={shareCurrentSearch}
               title="Share current search and filters"
               aria-label="Share current search and filters"
             >
-              <i className="fas fa-share"></i>
-            </button>
-            <button 
-              className="help-button" 
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowHelpPopup(true)}
               aria-label="Help - Technical Definitions"
               title="Help - Technical Definitions"
             >
-              <i className="fas fa-question-circle"></i>
-            </button>
-            <button id="themeToggle" className="theme-toggle" aria-label="Toggle theme">
-              <div className="theme-toggle-track">
-                <div className="theme-toggle-thumb">
-                  <span className="theme-icon theme-icon-sun">☀️</span>
-                  <span className="theme-icon theme-icon-moon">🌙</span>
-                </div>
-              </div>
-            </button>
+              <HelpCircle className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         
-        <div className="stats-section">
-          <div className="stat-item">
-            <span className="stat-label">
-              <i className="fas fa-database"></i> Total Drivers
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stats-section">
+          <div className="stat-item flex flex-col gap-0.5">
+            <span className="stat-label flex items-center gap-1.5">
+              <Database className="h-3.5 w-3.5 opacity-70" /> Total Drivers
             </span>
             <span className="stat-value">{statsData?.stats?.total || 0}</span>
           </div>
           <div 
-            className={`stat-item clickable hvci-item ${activeFilters.has('hvci') ? 'active' : ''}`}
+            role="button"
+            tabIndex={0}
+            className={`stat-item clickable flex flex-col gap-0.5 ${activeFilters.has('hvci') ? 'active' : ''}`}
             onClick={() => applyDirectFilter('hvci')}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), applyDirectFilter('hvci'))}
           >
-            <span className="stat-label">
-              <i className="fas fa-check"></i> MVDB Passed
+            <span className="stat-label flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5 opacity-70" /> MVDB Passed
             </span>
             <span className="stat-value">{statsData?.stats?.hvciCompatible || 0}</span>
           </div>
           <div 
-            className={`stat-item clickable process-killer-item ${activeFilters.has('process-killer') ? 'active' : ''}`}
+            role="button"
+            tabIndex={0}
+            className={`stat-item clickable process-killer-item flex flex-col gap-0.5 ${activeFilters.has('process-killer') ? 'active' : ''}`}
             onClick={() => applyDirectFilter('process-killer')}
+            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), applyDirectFilter('process-killer'))}
           >
-            <span className="stat-label">
-              <i className="fas fa-skull"></i> Process Killer Drivers
+            <span className="stat-label flex items-center gap-1.5">
+              <Skull className="h-3.5 w-3.5 opacity-70" /> Process Killer Drivers
             </span>
             <span className="stat-value">{statsData?.stats?.processKillerDrivers || 0}</span>
           </div>
         </div>
         
-        {/* HVCI Blocklist Information */}
+        {/* Microsoft Vulnerable Drivers Blocklist information */}
         <HVCIBlocklistInfo stats={statsData?.stats} />
       </header>
 
       <div className="search-section">
-        <div className="search-container">
-          <div className="search-input-wrapper">
-            <input 
-              type="text" 
-              className="form-control search-input" 
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              id="driver-search"
+              name="search"
+              type="text"
               placeholder="Search drivers by name, hash, company, description..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={(e) => e.key === 'Enter' && performSearch()}
               disabled={isLoading}
+              className="h-10"
+              aria-label="Search drivers by name, hash, company, or description"
             />
           </div>
-          <button 
-            className="btn btn--primary search-button"
+          <Button
             onClick={performSearch}
             disabled={isLoading}
           >
-            <i className="fas fa-search"></i> {isLoading ? 'Searching...' : 'Search'}
-          </button>
-          <button 
-            className={`btn btn--outline btn--sm clear-button ${(!searchQuery.trim() && activeFilters.size === 0) ? 'disabled' : ''}`}
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4" />
+            )}
+            {isLoading ? 'Searching...' : 'Search'}
+          </Button>
+          <Button
+            variant="outline"
             onClick={clearAllFilters}
             disabled={!searchQuery.trim() && activeFilters.size === 0}
           >
-            <i className="fas fa-eraser"></i> Clear
-          </button>
+            <Eraser className="h-4 w-4" />
+            Clear
+          </Button>
         </div>
         
         <div className="filter-options">
           <div className="filter-group">
-            <span className="filter-label"><i className="fas fa-filter"></i> Quick Filters:</span>
-            <button 
-              className={`filter-btn hvci-filter ${pendingFilters.has('hvci') ? 'active' : ''}`}
+            <span className="filter-label">Quick Filters:</span>
+            <Button
+              variant={pendingFilters.has('hvci') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('hvci')}
             >
-              <i className="fas fa-check"></i> MVDB Passed
-            </button>
-
-            <button 
-              className={`filter-btn trusted-cert-filter ${pendingFilters.has('trusted-cert') ? 'active' : ''} ${pendingFilters.has('untrusted-cert') ? 'disabled' : ''}`}
+              <Check className="h-3.5 w-3.5" />
+              MVDB Passed
+            </Button>
+            <Button
+              variant={pendingFilters.has('trusted-cert') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('trusted-cert')}
               disabled={pendingFilters.has('untrusted-cert')}
             >
-              <i className="fas fa-certificate"></i> Trusted Certificate
-            </button>
-            <button 
-              className={`filter-btn untrusted-cert-filter ${pendingFilters.has('untrusted-cert') ? 'active' : ''} ${pendingFilters.has('trusted-cert') ? 'disabled' : ''}`}
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Trusted Certificate
+            </Button>
+            <Button
+              variant={pendingFilters.has('untrusted-cert') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('untrusted-cert')}
               disabled={pendingFilters.has('trusted-cert')}
             >
-              <i className="fas fa-exclamation-triangle"></i> Unknown Certificate
-            </button>
-            <button 
-              className={`filter-btn ${pendingFilters.has('recent') ? 'active' : ''}`}
+              <ShieldAlert className="h-3.5 w-3.5" />
+              Unknown Certificate
+            </Button>
+            <Button
+              variant={pendingFilters.has('recent') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('recent')}
             >
-              <i className="fas fa-clock"></i> Recent Drivers
-            </button>
-            <button 
-              className={`filter-btn ${pendingFilters.has('newest-first') ? 'active' : ''} ${pendingFilters.has('oldest-first') ? 'disabled' : ''}`}
+              <Clock className="h-3.5 w-3.5" />
+              Recent Drivers
+            </Button>
+            <Button
+              variant={pendingFilters.has('newest-first') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('newest-first')}
               disabled={pendingFilters.has('oldest-first')}
             >
-              <i className="fas fa-sort-amount-down"></i> Newest First
-            </button>
-            <button 
-              className={`filter-btn ${pendingFilters.has('oldest-first') ? 'active' : ''} ${pendingFilters.has('newest-first') ? 'disabled' : ''}`}
+              <ArrowDown className="h-3.5 w-3.5" />
+              Newest First
+            </Button>
+            <Button
+              variant={pendingFilters.has('oldest-first') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('oldest-first')}
               disabled={pendingFilters.has('newest-first')}
             >
-              <i className="fas fa-sort-amount-up"></i> Oldest First
-            </button>
+              <ArrowUp className="h-3.5 w-3.5" />
+              Oldest First
+            </Button>
           </div>
-          
           <div className="filter-group advanced-filters">
-            <span className="filter-label"><i className="fas fa-cogs"></i> Behaviors:</span>
-            <button 
-              className={`filter-btn process-killer-filter ${pendingFilters.has('process-killer') ? 'active' : ''}`}
+            <span className="filter-label">Behaviors:</span>
+            <Button
+              variant={pendingFilters.has('process-killer') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('process-killer')}
             >
-              <i className="fas fa-skull-crossbones"></i> Process Killer
-            </button>
-            <button 
-              className={`filter-btn behavior-filter ${pendingFilters.has('memory-manipulator') ? 'active' : ''}`}
+              <Skull className="h-3.5 w-3.5" />
+              Process Killer
+            </Button>
+            <Button
+              variant={pendingFilters.has('memory-manipulator') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('memory-manipulator')}
             >
-              <i className="fas fa-memory"></i> Memory Manipulator
-            </button>
-            <button 
-              className={`filter-btn behavior-filter ${pendingFilters.has('debug-bypass') ? 'active' : ''}`}
+              <MemoryStick className="h-3.5 w-3.5" />
+              Memory Manipulator
+            </Button>
+            <Button
+              variant={pendingFilters.has('debug-bypass') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('debug-bypass')}
             >
-              <i className="fas fa-bug"></i> Debug Bypass
-            </button>
-            <button 
-              className={`filter-btn behavior-filter ${pendingFilters.has('registry-manipulator') ? 'active' : ''}`}
+              <Bug className="h-3.5 w-3.5" />
+              Debug Bypass
+            </Button>
+            <Button
+              variant={pendingFilters.has('registry-manipulator') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('registry-manipulator')}
             >
-              <i className="fas fa-edit"></i> Registry Manipulator
-            </button>
-            <button 
-              className={`filter-btn behavior-filter ${pendingFilters.has('file-manipulator') ? 'active' : ''}`}
+              <Database className="h-3.5 w-3.5" />
+              Registry Manipulator
+            </Button>
+            <Button
+              variant={pendingFilters.has('file-manipulator') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('file-manipulator')}
             >
-              <i className="fas fa-file-alt"></i> File Manipulator
-            </button>
+              <FileCode className="h-3.5 w-3.5" />
+              File Manipulator
+            </Button>
           </div>
           
           {/* Certificate filters temporarily disabled
@@ -2106,50 +1782,66 @@ export default function DriversClient({
           */}
           
           <div className="filter-group meta-filters">
-            <span className="filter-label"><i className="fas fa-microchip"></i> Architecture:</span>
-            <button 
-              className={`filter-btn arch-filter ${pendingFilters.has('architecture-AMD64') ? 'active' : ''}`}
+            <span className="filter-label">Architecture:</span>
+            <Button
+              variant={pendingFilters.has('architecture-AMD64') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('architecture-AMD64')}
             >
-              <i className="fas fa-microchip"></i> x64
-            </button>
-            <button 
-              className={`filter-btn arch-filter ${pendingFilters.has('architecture-I386') ? 'active' : ''}`}
+              <Cpu className="h-3.5 w-3.5" />
+              x64
+            </Button>
+            <Button
+              variant={pendingFilters.has('architecture-I386') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('architecture-I386')}
             >
-              <i className="fas fa-microchip"></i> x32
-            </button>
-            <button 
-              className={`filter-btn arch-filter ${pendingFilters.has('architecture-ARM64') ? 'active' : ''}`}
+              <Cpu className="h-3.5 w-3.5" />
+              x32
+            </Button>
+            <Button
+              variant={pendingFilters.has('architecture-ARM64') ? 'secondary' : 'outline'}
+              size="sm"
               onClick={() => toggleFilter('architecture-ARM64')}
             >
-              <i className="fas fa-microchip"></i> arm64
-            </button>
+              <Cpu className="h-3.5 w-3.5" />
+              arm64
+            </Button>
           </div>
-          
           <div className="filter-group control-filters">
-            <button 
-              className="btn btn--primary apply-filters-btn"
+            <Button
               onClick={applyFilters}
               disabled={pendingFilters.size === 0 && searchQuery.trim() === ''}
+              size="sm"
             >
-              <i className="fas fa-check"></i> Apply Filters
-            </button>
-            <button 
-              className={`filter-btn clear ${(!searchQuery.trim() && activeFilters.size === 0) ? 'disabled' : ''}`}
+              <Check className="h-3.5 w-3.5" />
+              Apply Filters
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={clearAllFilters}
               disabled={!searchQuery.trim() && activeFilters.size === 0}
             >
-              <i className="fas fa-times"></i> Clear Filters
-            </button>
-            <button 
-              className="filter-btn help-filter-btn"
+              <Eraser className="h-3.5 w-3.5" />
+              Clear Filters
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowFilterHelpPopup(true)}
               title="How filters work"
             >
-              <i className="fas fa-question-circle"></i> Filter Help
-            </button>
+              <HelpCircle className="h-3.5 w-3.5" />
+              Filter Help
+            </Button>
           </div>
+        </div>
+        <p className="filter-apply-hint text-xs text-muted-foreground mt-1.5" id="filter-apply-hint">
+          Changes apply when you click Apply Filters.
+        </p>
+        <div aria-live="polite" aria-atomic="true" className="sr-only">
+          {filterAnnouncement}
         </div>
         
         {/* Barre de chargement */}
@@ -2179,7 +1871,7 @@ export default function DriversClient({
           </div>
         )}
         
-        <div className="search-stats">
+        <div className="search-stats mb-4">
           <span>
             {isLoading 
               ? 'Searching...' 
@@ -2191,7 +1883,7 @@ export default function DriversClient({
         </div>
       </div>
 
-      <div className="drivers-grid">        
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 drivers-grid items-stretch">        
         {!isLoading && paginatedDrivers.length > 0 ? (
           paginatedDrivers.map((driver, index) => {
             // Calculate global index for uniqueness
@@ -2281,255 +1973,135 @@ export default function DriversClient({
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="toast-notification">
-          <div className="toast-content">
-            <i className="fas fa-check-circle"></i>
-            <span>{toastMessage}</span>
-          </div>
-        </div>
-      )}
-
       {/* Back to Top Button */}
       {showBackToTop && (
-        <button 
-          className="back-to-top"
+        <Button
+          size="icon"
+          className="fixed bottom-6 right-6 rounded-full shadow-lg z-50 back-to-top-enter"
           onClick={scrollToTop}
           aria-label="Back to top"
         >
-          <i className="fas fa-chevron-up"></i>
-        </button>
+          <span className="sr-only">Back to top</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        </Button>
       )}
 
       {/* Footer */}
       <footer className="footer">
-        <div className="footer-content">
-          <div className="footer-section">
-            <h4 className="footer-title">
-              <i className="fas fa-heart"></i> Special Thanks
-            </h4>
-            <p className="footer-text">
-              This database is based on the amazing work from the{' '}
-              <a 
-                href="https://loldrivers.io" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="footer-link"
-              >
-                LOLDrivers.io
-              </a>{' '}
-              project and its contributors.
-            </p>
+        <div className="footer__inner">
+          <div className="footer__grid">
+            <section className="footer__block" aria-labelledby="footer-thanks">
+              <h2 id="footer-thanks" className="footer__heading">
+                <Heart className="footer__icon" aria-hidden />
+                Special Thanks
+              </h2>
+              <p className="footer__text">
+                This database is based on the amazing work from the{' '}
+                <a
+                  href="https://loldrivers.io"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer__link"
+                >
+                  LOLDrivers.io
+                </a>{' '}
+                project and its contributors.
+              </p>
+            </section>
+            <section className="footer__block" aria-labelledby="footer-source">
+              <h2 id="footer-source" className="footer__heading">
+                <Github className="footer__icon" aria-hidden />
+                Source & Contributors
+              </h2>
+              <p className="footer__text">
+                Original project:{' '}
+                <a
+                  href="https://github.com/magicsword-io/LOLDrivers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer__link"
+                >
+                  <Github className="footer__icon-inline" aria-hidden />
+                  magicsword-io/LOLDrivers
+                </a>
+              </p>
+              <p className="footer__text">
+                This project:{' '}
+                <a
+                  href="https://github.com/didntchooseaname/loldrivers-database"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer__link"
+                >
+                  <Github className="footer__icon-inline" aria-hidden />
+                  didntchooseaname/loldrivers-database
+                </a>
+              </p>
+            </section>
           </div>
-          
-          <div className="footer-section">
-            <h4 className="footer-title">
-              <i className="fab fa-github"></i> Source & Contributors
-            </h4>
-            <p className="footer-text">
-              Original project:{' '}
-              <a 
-                href="https://github.com/magicsword-io/LOLDrivers" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="footer-link"
-              >
-                <i className="fab fa-github"></i> magicsword-io/LOLDrivers
-              </a>
+          <div className="footer__bar">
+            <p className="footer__disclaimer">
+              Independent interface for educational and research purposes.
             </p>
-                        <p className="footer-text">
-              This project:{' '}
-              <a 
-                href="https://github.com/didntchooseaname/loldrivers-database" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="footer-link"
+            <div className="footer__actions">
+              <button
+                type="button"
+                onClick={() => setShowTermsPopup(true)}
+                className="footer__legal"
               >
-                <i className="fab fa-github"></i> didntchooseaname/loldrivers-database
-              </a>
-            </p>
-          </div>
-        </div>
-        
-        <div className="footer-bottom">
-          <p className="footer-disclaimer">
-            This is an independent interface for educational and research purposes.
-          </p>
-          <div className="footer-links">
-            <button 
-              onClick={() => setShowTermsPopup(true)}
-              className="footer-legal-link"
-            >
-              <i className="fas fa-gavel"></i> Terms of Service
-            </button>
+                <Scale className="footer__icon-inline" aria-hidden />
+                Terms of Service
+              </button>
+            </div>
           </div>
         </div>
       </footer>
 
-      {/* Help Popup */}
-      {showHelpPopup && (
-        <div className="help-popup-overlay" onClick={() => {
-          setShowHelpPopup(false);
-          setShowScrollIndicator(true); // Reset scroll indicator when closing
-        }}>
-          <div 
-            className="help-popup" 
-            onClick={(e) => e.stopPropagation()}
-            onScroll={(e) => {
-              const element = e.target as HTMLDivElement;
-              const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
-              setShowScrollIndicator(!isAtBottom);
-              
-              // Hide scroll indicator as soon as user starts scrolling
-              if (element.scrollTop > 0) {
-                setShowScrollIndicator(false);
-              }
-            }}
-          >
-            <button 
-              className="help-popup-close"
-              onClick={() => {
-                setShowHelpPopup(false);
-                setShowScrollIndicator(true); // Reset scroll indicator when closing
-              }}
-              aria-label="Close help"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-            
-            <h3>
-              <i className="fas fa-book"></i> About LOLDrivers Database - Project Vision & Capabilities
-            </h3>
-            
-            <div className="help-intro">
-              {helpContent ? (
-                <MarkdownRenderer content={helpContent.globalHelp} />
-              ) : (
-                <div className="loading-content">
-                  <p>Loading help content...</p>
-                </div>
-              )}
-            </div>
+      {/* Help Dialog */}
+      <HelpDialog
+        open={showHelpPopup}
+        onOpenChange={(o) => { setShowHelpPopup(o); if (!o) setShowScrollIndicator(true); }}
+        title="About LOLDrivers Database"
+        description="Technical definitions, project vision, and key terms for the LOLDrivers database."
+        icon={<BookOpen className="h-5 w-5 text-muted-foreground" />}
+      >
+        {helpContent ? (
+          <MarkdownRenderer content={helpContent.globalHelp} />
+        ) : (
+          <p className="text-muted-foreground">Loading help content...</p>
+        )}
+      </HelpDialog>
 
-            {showScrollIndicator && (
-              <div 
-                className="help-scroll-indicator"
-                onClick={scrollHelpToBottom}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    scrollHelpToBottom();
-                  }
-                }}
-                aria-label="Scroll to bottom for more information"
-              >
-                <i className="fas fa-chevron-down"></i>
-                <span>Scroll for more information</span>
-                <i className="fas fa-chevron-down"></i>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Filter Help Dialog */}
+      <HelpDialog
+        open={showFilterHelpPopup}
+        onOpenChange={(o) => { setShowFilterHelpPopup(o); if (!o) setShowFilterHelpScrollIndicator(true); }}
+        title="Filter Help – How Each Filter Works"
+        description="Explanation of each filter option and how to apply them."
+        icon={<Filter className="h-5 w-5 text-muted-foreground" />}
+      >
+        {helpContent ? (
+          <MarkdownRenderer content={helpContent.filterHelp} />
+        ) : (
+          <p className="text-muted-foreground">Loading filter help...</p>
+        )}
+      </HelpDialog>
 
-      {/* Filter Help Popup */}
-      {showFilterHelpPopup && (
-        <div className="help-popup-overlay" onClick={() => {
-          setShowFilterHelpPopup(false);
-          setShowFilterHelpScrollIndicator(true); // Reset scroll indicator when closing
-        }}>
-          <div 
-            className="help-popup" 
-            onClick={(e) => e.stopPropagation()}
-            onScroll={(e) => {
-              const element = e.target as HTMLDivElement;
-              const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 10;
-              setShowFilterHelpScrollIndicator(!isAtBottom);
-              
-              // Hide scroll indicator as soon as user starts scrolling
-              if (element.scrollTop > 0) {
-                setShowFilterHelpScrollIndicator(false);
-              }
-            }}
-          >
-            <button 
-              className="help-popup-close"
-              onClick={() => {
-                setShowFilterHelpPopup(false);
-                setShowFilterHelpScrollIndicator(true); // Reset scroll indicator when closing
-              }}
-              aria-label="Close filter help"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-            
-            <h3>
-              <i className="fas fa-filter"></i> Filter Help - How Each Filter Works
-            </h3>
-            
-            {helpContent ? (
-              <MarkdownRenderer content={helpContent.filterHelp} />
-            ) : (
-              <div className="loading-content">
-                <p>Loading filter help content...</p>
-              </div>
-            )}
-
-            {showFilterHelpScrollIndicator && (
-              <div 
-                className="help-scroll-indicator"
-                onClick={scrollFilterHelpToBottom}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    scrollFilterHelpToBottom();
-                  }
-                }}
-                aria-label="Scroll to bottom for more information"
-              >
-                <i className="fas fa-chevron-down"></i>
-                <span>Scroll for more information</span>
-                <i className="fas fa-chevron-down"></i>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Authentihash Help Popup */}
-      {showAuthentihashHelpPopup && (
-        <div className="help-popup-overlay" onClick={() => setShowAuthentihashHelpPopup(false)}>
-          <div 
-            className="help-popup" 
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button 
-              className="help-popup-close"
-              onClick={() => setShowAuthentihashHelpPopup(false)}
-              aria-label="Close authentihash help"
-            >
-              <i className="fas fa-times"></i>
-            </button>
-            
-            <h3>
-              <i className="fas fa-shield-alt"></i> Authentihash Information
-            </h3>
-            
-            {helpContent ? (
-              <MarkdownRenderer content={helpContent.authentihashHelp} />
-            ) : (
-              <div className="loading-content">
-                <p>Loading authentihash help content...</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Authentihash Help Dialog */}
+      <HelpDialog
+        open={showAuthentihashHelpPopup}
+        onOpenChange={setShowAuthentihashHelpPopup}
+        title="Authentihash Information"
+        description="What authentihashes are and how they are used for driver verification."
+        icon={<Shield className="h-5 w-5 text-muted-foreground" />}
+        showScrollIndicator={false}
+      >
+        {helpContent ? (
+          <MarkdownRenderer content={helpContent.authentihashHelp} />
+        ) : (
+          <p className="text-muted-foreground">Loading authentihash help...</p>
+        )}
+      </HelpDialog>
 
       {/* Changelog Popup */}
       <ChangelogPopup 

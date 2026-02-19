@@ -1,57 +1,51 @@
+# About LOLDrivers Database
+
+A driver security research platform that goes beyond cataloging: advanced filtering, behavioral analysis, and Microsoft Vulnerable Drivers Blocklist compatibility verification for Windows drivers used in real-world attacks.
+
+**Audience:** Security researchers, threat hunters, malware analysts, and system administrators.
+
+---
+
 ## Project Vision
 
-**Project Vision:** I created this comprehensive driver security research platform to address  gaps in existing driver analysis tools. This database goes beyond simple cataloging to provide advanced filtering, behavioral analysis, and HVCI compatibility verification for Windows drivers (used in real-world attack campaigns).  
-
-Enable security researchers, threat hunters, malware analysts, and system administrators to efficiently identify, analyze, and defend against driver-based attacks through sophisticated search and filtering capabilities that weren&apos;t available in existing solutions.
+- Address gaps in existing driver analysis tools with a comprehensive, research-focused platform.
+- Enable efficient identification, analysis, and defense against driver-based attacks through search and filtering that existing solutions do not offer.
 
 ## Features
 
-**Advanced Behavioral Analysis:** Unlike static driver lists, this platform analyzes imported functions to automatically detect capabilities like memory manipulation, process killing, debug bypass, registry manipulation, and file system access.
-
-**Periodic HVCI Verification:** Implemented proper HVCI compatibility checking that directly queries Microsoft&apos;s official vulnerable driver blocklist, providing more accurate results than local static lists used by other tools.
-
-**Intelligent Search & Filtering:** Quickly search and filter drivers by attributes including hashes, company names, descriptions, HVCI compatibility, architecture, and behavioral patterns.
-
-**Certificate Information Display:** Comprehensive certificate validation system that shows certificate status information in driver details for security assessment purposes.
-
-**Architecture-Aware Filtering:** Filter by specific processor architectures (x64, x32, arm64) with clear visual indicators in driver cards for quick identification.
+- **Behavioral analysis** — Imported functions are analyzed to detect capabilities such as memory manipulation, process killing, debug bypass, registry manipulation, and file system access.
+- **Microsoft Vulnerable Drivers Blocklist verification** — Compatibility is checked against Microsoft’s Vulnerable Driver Blocklist (MVDB) for more accurate results than static lists.
+- **Search and filtering** — Find drivers by hashes, company, description, Microsoft Vulnerable Drivers Blocklist status, architecture, and behavioral patterns.
+- **Certificate information** — Certificate validation and status are shown in driver details for security assessment.
+- **Architecture-aware filtering** — Filter by x64, x32, or arm64 with clear labels on each driver card.
 
 ## Technical Implementation
 
-**Automated Data Pipeline:** Continuous integration with the LOLDrivers project ensures up-to-date threat intelligence and newly discovered vulnerable drivers.
+- **Data pipeline** — Continuous integration with the LOLDrivers project for up-to-date threat intelligence.
+- **Server-side processing** — Filtering and search run on the server for good performance on large datasets.
+- **Microsoft Vulnerable Drivers Blocklist data** — Automated workflows fetch and parse Microsoft’s Vulnerable Driver Blocklist (MVDB) so blocklist compatibility data stays current.
+- **URL state** — Filter and search state live in the URL for sharing and bookmarking.
+- **Responsive layout** — Usable on desktop and smaller screens.
 
-**Server-side Processing:** Advanced filtering and search operations are performed server-side for optimal performance with large datasets.
+## Research Use
 
-**GitHub Actions Integration:** Automated workflows fetch and parse Microsoft&apos;s vulnerable driver blocklist, ensuring HVCI compatibility data remains current.
+- Support for cybersecurity research, threat intelligence, and academic work on driver-based attack vectors.
+- Open-source and community-oriented to encourage contributions and collaborative research.
 
-**URL State Management:** Filter combinations and search queries are preserved in URLs, enabling collaboration and bookmarking of specific research queries.
+## Quick Reference — Key Terms
 
-**Responsive Design:** Optimized for security researchers working across different devices and screen sizes during investigations.
-
-## Research
-
-**Research:** Support cybersecurity research, threat intelligence development, and academic studies of driver-based attack vectors.
-
-**Community Contribution:** Open-source approach encourages community contributions and collaborative security research efforts.
-
-## Quick Reference - Key Terms
-
-**HVCI:** Hypervisor-protected Code Integrity - Windows security feature that protects kernel code integrity using hypervisor technology.
-
-**Process Killer Drivers:** Legitimate drivers with vulnerabilities that can be exploited to terminate processes with elevated privileges.
-
-**Behavioral Analysis:** Automated detection of driver capabilities based on imported function analysis (memory manipulation, debug bypass, etc.).
-
-**Architecture Display:** Quick visual indicators (x64, x32, arm64) shown next to driver titles for immediate architecture identification.
-
-**Capacities Section:** Dedicated area in driver cards showing behavioral capabilities detected through function analysis.
+- **Microsoft Vulnerable Drivers Blocklist (MVDB)** — The official list of driver hashes that Windows blocks when Hypervisor-protected Code Integrity is enabled; our checks compare against this list.
+- **Process killer drivers** — Legitimate drivers with vulnerabilities that can be abused to terminate processes with elevated privileges.
+- **Behavioral analysis** — Automated detection of driver capabilities from imported function analysis.
+- **Architecture display** — x64, x32, or arm64 shown next to driver names for quick identification.
+- **Capacities section** — Part of each driver card that lists behavioral capabilities from function analysis.
 
 ## Legal & Ethical Notice
 
-**Legal & Ethical Notice:** This database is designed for legitimate security research and defensive purposes only. Users must comply with applicable laws, organizational policies, and ethical guidelines. Misuse of this information for malicious purposes is strictly prohibited.
+This database is for legitimate security research and defensive use only. Use must comply with applicable laws, organizational policies, and ethical standards. Misuse for malicious purposes is prohibited.
 
-**Community:** Join the security research community in improving driver security through responsible disclosure, collaborative research, offensive and defensive innovation.
+**Community:** Improve driver security through responsible disclosure and collaborative offensive and defensive research.
 
 ## Disclaimer
 
-**Disclaimer:** This project is provided &quot;as is&quot; without any warranty, guarantee, or reliability assurance. The maintainers are not responsible for the accuracy, completeness, or functionality of the data or platform. Users assume all risks and responsibilities when using this database and its information.
+This project is provided “as is” without warranty or guarantee. Maintainers are not responsible for the accuracy, completeness, or fitness of the data or platform. Users assume all risk when using the database and its information.

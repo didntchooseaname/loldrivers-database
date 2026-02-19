@@ -1,4 +1,4 @@
-﻿// Application configuration
+// Application configuration
 export const APP_CONFIG = {
   // Cache durations
   CACHE_TTL: 3600,
@@ -34,7 +34,7 @@ export const APP_CONFIG = {
 } as const;
 
 export const FILTER_TYPES = {
-  HVCI: 'hvci',
+  MVDB: 'hvci',
   KILLER: 'killer', 
   SIGNED: 'signed',
   UNSIGNED: 'unsigned',

@@ -1,5 +1,18 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { History, ExternalLink, Loader2, AlertTriangle, RotateCw, Github } from 'lucide-react';
 
 interface Commit {
   sha: string;
@@ -54,13 +67,13 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
   const fetchCommits = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch('/api/commits?per_page=20');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       if (data.success) {
         setCommits(data.data.map((commit: ProcessedCommit) => ({
@@ -91,25 +104,8 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
     const lines = message.split('\n').filter(line => line.trim());
     const title = lines[0] || 'No commit message';
     const description = lines.slice(1).join('\n').trim();
-    
-    return { title, description };
-  };
 
-  const getCommitIcon = (message: string): string => {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('feat') || lowerMessage.includes('feature')) return 'fas fa-star';
-    if (lowerMessage.includes('fix') || lowerMessage.includes('bug')) return 'fas fa-bug';
-    if (lowerMessage.includes('docs') || lowerMessage.includes('documentation')) return 'fas fa-book';
-    if (lowerMessage.includes('style') || lowerMessage.includes('ui')) return 'fas fa-paint-brush';
-    if (lowerMessage.includes('refactor')) return 'fas fa-recycle';
-    if (lowerMessage.includes('perf') || lowerMessage.includes('performance')) return 'fas fa-bolt';
-    if (lowerMessage.includes('test')) return 'fas fa-check-square';
-    if (lowerMessage.includes('build') || lowerMessage.includes('ci')) return 'fas fa-tools';
-    if (lowerMessage.includes('security')) return 'fas fa-shield-alt';
-    if (lowerMessage.includes('initial') || lowerMessage.includes('init')) return 'fas fa-flag';
-    
-    return 'fas fa-edit';
+    return { title, description };
   };
 
   const formatDate = (dateString: string): string => {
@@ -117,11 +113,11 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    
+
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
@@ -132,12 +128,9 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
   const sanitizeGitHubUrl = (url: string): string => {
     try {
       const urlObj = new URL(url);
-      // Only allow GitHub URLs with HTTPS protocol
       if (urlObj.hostname === 'github.com' && urlObj.protocol === 'https:') {
-        // Additional check to ensure the path matches expected GitHub commit URL pattern
-        const pathPattern = /^\/[^\/]+\/[^\/]+\/commit\/[a-f0-9]+$/;
+        const pathPattern = /^\/[^/]+\/[^/]+\/commit\/[a-f0-9]+$/;
         if (pathPattern.test(urlObj.pathname)) {
-          // Return a new clean URL to prevent any potential XSS
           return `https://github.com${urlObj.pathname}`;
         }
       }
@@ -147,103 +140,103 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
     return '#';
   };
 
-  if (!isVisible) return null;
-
   return (
-    <div className="popup-overlay" onClick={onClose}>
-      <div className="popup-container changelog-popup" onClick={(e) => e.stopPropagation()}>
-        <div className="popup-header">
-          <h2>
-            <i className="fas fa-history"></i>
+    <Dialog open={isVisible} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="modal-panel max-w-2xl max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden sm:rounded-xl">
+        <DialogHeader className="shrink-0 px-6 py-5 bg-muted/30">
+          <DialogTitle className="flex items-center gap-3 text-xl font-semibold tracking-tight">
+            <History className="h-5 w-5 text-muted-foreground" />
             Changelog
-          </h2>
-          <button className="popup-close" onClick={onClose}>
-            <i className="fas fa-times"></i>
-          </button>
-        </div>
-        
-        <div className="popup-content">
-          {loading ? (
-            <div className="changelog-loading">
-              <i className="fas fa-spinner fa-spin"></i>
-              <span>Loading changelog...</span>
-            </div>
-          ) : error ? (
-            <div className="changelog-error">
-              <i className="fas fa-exclamation-triangle"></i>
-              <span>{error}</span>
-              <button onClick={fetchCommits} className="retry-button">
-                <i className="fas fa-redo"></i>
-                Retry
-              </button>
-            </div>
-          ) : (
-            <div className="changelog-timeline">
-              {commits.map((commit) => {
-                const { title, description } = formatCommitMessage(commit.commit.message);
-                const icon = getCommitIcon(commit.commit.message);
-                
-                return (
-                  <div key={commit.sha} className="changelog-item">
-                    <div className="commit-icon">
-                      <i className={icon}></i>
-                    </div>
-                    <div className="commit-content">
-                      <div className="commit-header">
-                        <h4 className="commit-title">{title}</h4>
-                        <span className="commit-date">{formatDate(commit.commit.author.date)}</span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="px-6 py-5">
+            {loading ? (
+              <div className="flex flex-col gap-4 py-4">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading changelog...
+                </div>
+                <Skeleton className="h-20 w-full rounded-lg" />
+                <Skeleton className="h-20 w-full rounded-lg" />
+                <Skeleton className="h-20 w-full rounded-lg" />
+              </div>
+            ) : error ? (
+              <Alert variant="destructive" className="rounded-lg">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex flex-col gap-2">
+                  <span>{error}</span>
+                  <Button variant="outline" size="sm" onClick={fetchCommits} className="w-fit">
+                    <RotateCw className="h-3 w-3 mr-2" />
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="space-y-3">
+                {commits.map((commit) => {
+                  const { title, description } = formatCommitMessage(commit.commit.message);
+                  return (
+                    <div
+                      key={commit.sha}
+                      className="commit-card flex gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground transition-colors duration-smooth ease-apple hover:bg-muted/30"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-medium text-sm">
+                        {title.slice(0, 1).toUpperCase()}
                       </div>
-                      
-                      {description && (
-                        <p className="commit-description">{description}</p>
-                      )}
-                      
-                      <div className="commit-meta">
-                        {commit.author && (
-                          <div className="commit-author">
-                            <Image 
-                              src={commit.author.avatar_url} 
-                              alt={`${commit.author.login}'s avatar`}
-                              width={16} 
-                              height={16}
-                              className="author-avatar"
-                            />
-                            <span className="author-name">{commit.author.login}</span>
-                          </div>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <h4 className="font-medium leading-tight text-sm">{title}</h4>
+                          <span className="text-xs text-muted-foreground shrink-0">{formatDate(commit.commit.author.date)}</span>
+                        </div>
+                        {description && (
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{description}</p>
                         )}
-                        
-                        <div className="commit-actions">
+                        <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+                          {commit.author && (
+                            <div className="flex items-center gap-1.5">
+                              <Image
+                                src={commit.author.avatar_url}
+                                alt=""
+                                width={16}
+                                height={16}
+                                className="rounded-full"
+                              />
+                              <span className="text-muted-foreground">{commit.author.login}</span>
+                            </div>
+                          )}
                           <a
                             href={sanitizeGitHubUrl(commit.html_url)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="commit-link"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
                           >
-                            <i className="fas fa-external-link-alt"></i>
+                            <ExternalLink className="h-3 w-3" />
                             {commit.sha.substring(0, 7)}
                           </a>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-6 pt-4">
+              <a
+                href="https://github.com/didntchooseaname/loldrivers-database/commits/main"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                <Github className="h-4 w-4" />
+                View all commits on GitHub
+              </a>
             </div>
-          )}
-          
-          <div className="changelog-footer">
-            <a 
-              href="https://github.com/didntchooseaname/loldrivers-database/commits/main"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="view-all-link"
-            >
-              <i className="fab fa-github"></i>
-              View all commits on GitHub
-            </a>
           </div>
-        </div>
-      </div>
-    </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 };

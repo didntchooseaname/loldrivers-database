@@ -1,97 +1,81 @@
-## What are Authentihashes?
+# What Are Authentihashes?
+
+Authentihashes identify **code** rather than the whole file. They stay the same when a file is re-signed, so they are better for tracking variants and evading simple hash changes.
+
+---
+
+## Standard Hashes vs Authentihashes
 
 ### Standard Hashes (MD5, SHA1, SHA256)
-- **Include entire file content** - All bytes including digital signatures
-- **Change when re-signed** - Same code with different signatures produces different hashes
-- **File-level identification** - Useful for exact file matching
+
+- Include the **entire file** (all bytes, including digital signatures).
+- **Change when re-signed** — Same code with a different signature gives different hashes.
+- **Use:** Exact file matching.
 
 ### Authentihashes
-- **Exclude signature data** - Only hash the actual executable code and metadata
-- **Consistent across re-signing** - Same code produces same authentihash regardless of signature
-- **Code-level identification** - Useful for identifying malicious code variants
+
+- **Exclude signature data** — Only the executable code and relevant metadata are hashed.
+- **Stable across re-signing** — Same code gives the same authentihash regardless of signature.
+- **Use:** Identifying the same code across different signed builds.
 
 ## Security Applications
 
 ### Malware Detection
-- **Variant identification** - Same malware with different signatures shares authentihashes
-- **Evasion detection** - Attackers cannot change authentihash by simply re-signing
-- **Family clustering** - Related malware samples often share authentihash patterns
+
+- **Variants** — Same malware with different signatures can share the same authentihash.
+- **Evasion** — Re-signing does not change the authentihash.
+- **Families** — Related samples often share authentihash patterns.
 
 ### Threat Intelligence
-- **Consistent tracking** - Track malicious drivers across different signature campaigns
-- **Attribution analysis** - Link samples to common code bases or development practices
-- **Timeline analysis** - Understand evolution of malicious driver families
+
+- **Tracking** — Follow malicious drivers across different signing campaigns.
+- **Attribution** — Link samples to common code bases or tooling.
+- **Timeline** — Study how a driver family evolves over time.
 
 ## Technical Implementation
 
 ### Calculation Process
-The authentihash calculation follows a precise algorithm that excludes signature-related data from the hash computation:
 
-1. **Parse PE Headers**
-   - Read DOS header and locate PE signature
-   - Parse COFF header and optional header
-   - Extract section table information
-   - Identify data directories (especially Certificate Table)
+The authentihash is computed by excluding signature-related data from the hash:
 
-2. **Calculate Checksum Exclusion Range**
-   - Locate the PE checksum field in optional header
-   - Mark bytes at offset `OptionalHeader.CheckSum` (4 bytes) for exclusion
-   - This ensures checksum changes don't affect authentihash
+1. **Parse PE headers** — DOS header, PE signature, COFF and optional headers, section table, data directories (including Certificate Table).
+2. **Checksum exclusion** — Mark the 4-byte PE checksum in the optional header so checksum changes do not affect the hash.
+3. **Certificate table** — Read the Certificate Table data directory; exclude its full range from the hash.
+4. **Sections** — Include all PE headers (up to the certificate reference), all section data (.text, .data, .rdata, etc.), and overlay data before the certificate table. Exclude the checksum field, the certificate directory entry, and the entire certificate table.
+5. **Hash** — Build the hash (MD5, SHA1, or SHA256) over only the included bytes.
 
-**Yes we can change a file hash without altering his signature:**
+The checksum field in the optional header can be changed without altering the signature:
 
 ![Checksum field could be modified in optional header](cff.png)
 
-3. **Identify Certificate Table**
-   - Read Certificate Table data directory entry
-   - Extract `VirtualAddress` and `Size` of certificate data
-   - Mark this entire range for exclusion from hash calculation
+**Reference tool:** [AuthHashCalc](https://github.com/hfiref0x/AuthHashCalc) — Open-source authentihash calculator for PE files.
 
-4. **Process File Sections**
-   - **Include**: All PE headers up to certificate table reference
-   - **Include**: All section data (.text, .data, .rdata, etc.)
-   - **Include**: Any overlay data before certificate table
-   - **Exclude**: PE checksum field (4 bytes)
-   - **Exclude**: Certificate table directory entry (8 bytes)
-   - **Exclude**: Entire certificate table and signature data
-
-5. **Hash Calculation**
-   - Create hash context (MD5, SHA1, or SHA256)
-   - Process file sequentially, skipping excluded ranges
-   - Update hash with included byte ranges only
-   - Finalize hash computation
-
-**Reference Tool**: [**AuthHashCalc** - Authenticode Hash Calculator](https://github.com/hfiref0x/AuthHashCalc)  
-*Open source tool for calculating PE file authentihashes*
-
-**Reference**: [**Authicode Microsoft documentation** - Authenticode Hash Calculator](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/authenticode)  
-*Authenticode Microsoft documentation*
+**Microsoft docs:** [Authenticode](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/authenticode).
 
 ### Use Cases in Analysis
-- **Memory forensics** - Match loaded drivers regardless of on-disk signatures
-- **Incident response** - Identify known threats across different environments
-- **Threat hunting** - Search for code patterns independent of signing status
+
+- **Memory forensics** — Match loaded drivers regardless of on-disk signature.
+- **Incident response** — Identify known threats across environments.
+- **Threat hunting** — Search by code pattern instead of signing status.
 
 ## Limitations and Considerations
 
 ### When Authentihashes Change
-- **Code modifications** - Any change to executable code or resources
-- **Compiler differences** - Same source code compiled differently
-- **Packing or obfuscation** - Code transformations affect authentihash
 
-### Analysis Best Practices
-- **Use in combination** - Combine with standard hashes for complete analysis
-- **Consider context** - Evaluate both code similarity and signature legitimacy
-- **Temporal analysis** - Track changes over time for trend identification
+- Code or resource changes.
+- Different compiler or build options.
+- Packing or obfuscation that changes the code.
 
-## Integration with LOLDrivers Database
+### Best Practices
 
-### Why Authentihashes Matter Here
-- **Comprehensive identification** - Track vulnerable drivers across signature variants
-- **Research correlation** - Link findings across different security research
-- **Detection coverage** - Improve security tool effectiveness with code-level identification
+- **Combine** with standard hashes for a full picture.
+- **Context** — Use both code similarity and signature information.
+- **Over time** — Track changes for trend and campaign analysis.
 
-### Practical Applications
-- **IOC development** - Create more robust indicators of compromise
-- **Rule creation** - Develop detection rules based on code patterns
-- **Intelligence sharing** - Share threat information using consistent identifiers
+## Why Authentihashes Matter Here
+
+- **Identification** — Track vulnerable drivers across signature variants.
+- **Research** — Correlate findings across sources using a stable identifier.
+- **Detection** — Build better IOCs and rules with code-level identification.
+
+**Practical uses:** Stronger indicators of compromise, rules based on code patterns, and more consistent sharing of threat intelligence.

@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import SafeDate from '@/components/SafeDate';
 import type { Stats } from '@/types';
+import { Shield, ExternalLink } from 'lucide-react';
 
 interface HVCIBlocklistInfoProps {
   stats?: Stats;
@@ -16,49 +18,40 @@ export default function HVCIBlocklistInfo({ stats }: HVCIBlocklistInfoProps) {
   }
 
   return (
-    <div className="hvci-blocklist-info">
-      <div className="info-header">
-        <i className="fas fa-shield-alt"></i>
-        <span>Microsoft HVCI Block List Check</span>
-      </div>
-      
-      <div className="info-content">
-        <div className="info-item">
-          <span className="info-label">Last Check:</span>
-          <span className="info-value">
-            <SafeDate date={hvciCheck.lastCheck} />
-          </span>
+    <Card className="bg-card text-card-foreground border-border">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2 text-base font-medium">
+          <Shield className="h-4 w-4 text-muted-foreground" />
+          <span>Microsoft Vulnerable Drivers Blocklist Check</span>
         </div>
-        
-        <div className="info-item">
-          <span className="info-label">Microsoft Last Update:</span>
-          <span className="info-value">
-            <SafeDate date={hvciCheck.microsoftLastModified} />
-          </span>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div className="flex justify-between gap-4">
+          <span className="text-muted-foreground">Last Check:</span>
+          <SafeDate date={hvciCheck.lastCheck} />
         </div>
-        
-        <div className="info-item">
-          <span className="info-label">Blocked Hashes:</span>
-          <span className="info-value">{hvciCheck.totalBlockedHashes.toLocaleString()}</span>
+        <div className="flex justify-between gap-4">
+          <span className="text-muted-foreground">Microsoft Last Update:</span>
+          <SafeDate date={hvciCheck.microsoftLastModified} />
         </div>
-        
-        <div className="info-item">
-          <span className="info-label">Matched Drivers:</span>
-          <span className="info-value matched-count">{hvciCheck.matchedDrivers}</span>
+        <div className="flex justify-between gap-4">
+          <span className="text-muted-foreground">Blocked Hashes:</span>
+          <span>{hvciCheck.totalBlockedHashes.toLocaleString()}</span>
         </div>
-        
-        <div className="info-source">
-          <a 
-            href={hvciCheck.source} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="source-link"
-          >
-            <i className="fas fa-external-link-alt"></i>
-            Microsoft Official Block List
-          </a>
+        <div className="flex justify-between gap-4">
+          <span className="text-muted-foreground">Matched Drivers:</span>
+          <span className="font-medium">{hvciCheck.matchedDrivers}</span>
         </div>
-      </div>
-    </div>
+        <a
+          href={hvciCheck.source}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-primary hover:underline mt-2"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          Microsoft Official Block List
+        </a>
+      </CardContent>
+    </Card>
   );
 }

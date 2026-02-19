@@ -1,179 +1,107 @@
+# How Filters Work
+
+This guide explains each filter and how to combine them for precise queries.
+
+---
+
 ## Information Notice
 
-**Information Notice:** This implementation was inspired by the work from loldrivers.com for the `HVCI` check functionality, but their implementation wasn&apos;t accurate. Unlike the Trail of Bits script that compares against a local version of the driver blocklist, our `HVCI` check uses Microsoft&apos;s direct link to the vulnerable driver blocklist for more precise comparison and testing.
+This implementation was inspired by loldrivers.com’s Microsoft Vulnerable Drivers Blocklist check; their implementation was not accurate. Unlike the Trail of Bits script (which uses a local blocklist), we query **Microsoft’s direct vulnerable driver blocklist** for comparison.
 
-**Reference:** Trail of Bits script: https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1
-
-**Microsoft Blocklist:** https://aka.ms/VulnerableDriverBlockList
+- **Trail of Bits script:** https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1  
+- **Microsoft blocklist:** https://aka.ms/VulnerableDriverBlockList
 
 ## MVDB Passed Filter
 
-**What it does:** Shows only drivers that passed the  `Microsoft Vulnerable Drivers Blocklist (MVDB)` automated daily check action.
-
-**Technical Details:** This filter uses a `GitHub Action` workflow that automatically fetches Microsoft&apos;s official vulnerable driver blocklist from https://aka.ms/VulnerableDriverBlockList and cross-references it with our driver database. The check runs on a scheduled basis to ensure up-to-date results.
-
-**Use Case:** Identify drivers that can safely run on systems with `HVCI` enabled, which is crucial for `Windows 11` and enterprise security configurations.
-
-**GitHub Workflow:** The automated process downloads the latest `XML` blocklist, parses the driver hashes, and marks drivers accordingly. This ensures real-time accuracy compared to static local lists.
+- **What it does:** Shows only drivers that passed the Microsoft Vulnerable Driver Blocklist (MVDB) automated daily check.
+- **How it works:** A GitHub Action fetches the blocklist from https://aka.ms/VulnerableDriverBlockList and cross-references it with this database.
+- **Use case:** Find drivers that can run on systems with Microsoft Vulnerable Drivers Blocklist in effect (important for Windows 11 and enterprise security).
 
 ## Process Killer Filter
 
-**What it does:** Displays drivers that are known to be exploitable and have been used in real-world attacks, with specific capabilities to terminate processes.
-
-**Technical Details:** These are legitimate drivers with security vulnerabilities that attackers exploit to gain elevated privileges or perform malicious actions. They&apos;re catalogued based on public threat intelligence and security research.
-
-**Attack Vector:** Commonly used in `BYOVD (Bring Your Own Vulnerable Driver)` attacks where attackers load these legitimate-but-vulnerable drivers to bypass security controls and terminate security processes.
-
-**Detection:** Security teams can use this filter to identify potentially dangerous drivers in their environment and prioritize them for blocking or monitoring.
+- **What it does:** Shows drivers that are known to be exploitable and have been used in real attacks, with the ability to terminate processes.
+- **Technical:** Legitimate drivers with security flaws that attackers use for privilege escalation or other malicious actions.
+- **Attack vector:** Often used in BYOVD (Bring Your Own Vulnerable Driver) attacks to load a vulnerable driver and bypass security.
+- **Use case:** Identify potentially dangerous drivers in your environment for blocking or monitoring.
 
 ## Memory Manipulator Filter
 
-**What it does:** Identifies drivers with capabilities to manipulate memory, allocate virtual memory, or map memory sections.
-
-**Function Analysis:** Detects functions like `ZwProtectVirtualMemory`, `ZwAllocateVirtualMemory`, `ZwMapViewOfSection`, and memory-related kernel APIs.
-
-**Security Implications:** Memory manipulation capabilities can be used for code injection, privilege escalation, or bypassing memory protections.
-
-**Legitimate Uses:** Many legitimate drivers also manipulate memory for normal operations, so context and additional analysis are important.
+- **What it does:** Finds drivers that can manipulate memory, allocate virtual memory, or map memory sections.
+- **Detection:** Looks for functions such as `ZwProtectVirtualMemory`, `ZwAllocateVirtualMemory`, `ZwMapViewOfSection`, and related kernel APIs.
+- **Security impact:** Can support code injection, privilege escalation, or bypass of memory protections.
+- **Note:** Many legitimate drivers also use memory APIs; context and further analysis are important.
 
 ## Debug Bypass Filter
 
-**What it does:** Finds drivers that can potentially bypass debugging protections or manipulate debug-related system information.
-
-**Function Analysis:** Looks for functions like `ZwSetInformationProcess`, `ZwQuerySystemInformation`, and debug-related kernel APIs.
-
-**Attack Techniques:** Can be used to hide processes from debuggers, disable debugging features, or manipulate debug ports.
-
-**Anti-Analysis:** Commonly used by malware to evade detection and analysis by security researchers and sandboxes.
+- **What it does:** Finds drivers that can bypass debugging protections or manipulate debug-related system information.
+- **Detection:** Looks for functions such as `ZwSetInformationProcess`, `ZwQuerySystemInformation`, and debug-related kernel APIs.
+- **Use:** Can hide processes from debuggers, disable debugging, or manipulate debug ports; often used by malware to evade analysis.
 
 ## Registry Manipulator Filter
 
-**What it does:** Identifies drivers capable of creating, modifying, or deleting Windows registry keys and values.
-
-**Function Analysis:** Detects registry-related functions like `ZwCreateKey`, `ZwSetValueKey`, `ZwDeleteKey`, and registry manipulation APIs.
-
-**Persistence Mechanisms:** Registry manipulation is often used for establishing persistence, modifying system configurations, or hiding malicious activities.
-
-**System Impact:** Can affect system startup, security settings, application behavior, and overall system stability.
+- **What it does:** Finds drivers that can create, modify, or delete Windows registry keys and values.
+- **Detection:** Registry-related functions such as `ZwCreateKey`, `ZwSetValueKey`, `ZwDeleteKey`, and similar APIs.
+- **Use:** Often used for persistence, changing system configuration, or hiding malicious activity.
 
 ## File Manipulator Filter
 
-**What it does:** Shows drivers with file system manipulation capabilities including creating, reading, writing, or deleting files.
-
-**Function Analysis:** Identifies file-related functions like `ZwCreateFile`, `ZwReadFile`, `ZwWriteFile`, `ZwDeleteFile`, and I/O operations.
-
-**Data Exfiltration:** File manipulation capabilities can be used for data theft, log tampering, or deploying additional malicious payloads.
-
-**System Modification:** Can modify critical system files, application binaries, or configuration files to maintain persistence.
+- **What it does:** Finds drivers with file system capabilities: create, read, write, or delete files.
+- **Detection:** File-related functions such as `ZwCreateFile`, `ZwReadFile`, `ZwWriteFile`, `ZwDeleteFile`, and I/O operations.
+- **Security impact:** Can be used for data theft, log tampering, or deploying more malware.
 
 ## Certificate Manipulator Filter
 
-**What it does:** Locates drivers that can manipulate digital certificates and certificate stores.
-
-**Function Analysis:** Identifies certificate-related functions like `CertCreateCertificateStore`, `CertAddCertificateContextToStore`, and certificate validation APIs.
-
-**Security Implications:** Certificate manipulation can bypass code signing verification, install malicious certificates, or compromise `PKI` infrastructure.
-
-**Trust Chain Impact:** Can affect the entire certificate validation process and system trust mechanisms.
+- **What it does:** Finds drivers that can manipulate digital certificates and certificate stores.
+- **Detection:** Certificate-related functions and validation APIs.
+- **Security impact:** Can bypass code-signing checks, install malicious certificates, or undermine PKI.
 
 ## IoControlCode Filter
 
-**What it does:** Filters drivers based on their `IoControlCode` (`IOCTL`) usage patterns.
-
-**Device Communication:** `IOCTL` codes define how user-mode applications communicate with kernel drivers through `DeviceIoControl` API.
-
-**Custom Controls:** Malicious drivers often implement custom `IOCTL` handlers for unauthorized operations.
-
-**Attack Surface:** Poorly validated `IOCTL` handlers represent significant attack vectors for privilege escalation.
+- **What it does:** Filters by `IoControlCode` (IOCTL) usage patterns.
+- **Context:** IOCTL codes define how user-mode applications talk to kernel drivers via `DeviceIoControl`.
+- **Use case:** Malicious drivers often implement custom IOCTL handlers; poorly validated handlers are a common privilege-escalation vector.
 
 ## Architecture Filters
 
-**What it does:** Filters drivers by their target processor architecture.
+Filter by target processor architecture. Only one can be active at a time.
 
-**x64 (AMD64):** 64-bit x86 architecture drivers (most common on modern Windows systems).
+- **x64 (AMD64)** — 64-bit x86; most common on modern Windows.
+- **x32 (I386)** — 32-bit x86; legacy and compatibility.
+- **arm64 (ARM64)** — ARM 64-bit; Windows on ARM devices.
 
-**x32 (I386):** 32-bit x86 architecture drivers (legacy systems and compatibility).
-
-**arm64 (ARM64):** ARM 64-bit architecture drivers (Windows on ARM devices).
-
-**Mutual Exclusivity:** Only one architecture can be selected at a time since drivers are compiled for specific architectures.
-
-**Display:** Architecture is also shown directly in driver cards next to the driver title for quick identification.
+Architecture is also shown on each driver card next to the name.
 
 ## Certificate Validation Filters
 
-*Note: Certificate filtering is currently disabled in the UI while the certificate validation system is being updated. Certificate status information is still displayed in driver details for informational purposes.*
+*Certificate-based filtering is currently disabled in the UI while the validation system is updated. Certificate status is still shown in driver details.*
 
-The certificate validation system provides comprehensive analysis of driver signing certificates through automated workflows that validate certificate status, expiration, and trust chains.
-
-### Certificate Information (Display Only)
-
-**What it shows:** Driver cards display certificate status information including expired, valid, missing, revoked, or suspicious certificates for security assessment purposes.
-
-**Risk Assessment:** Certificate information helps assess driver legitimacy - expired certificates can indicate outdated drivers or potentially suspicious signing practices.
-
-**Security Note:** While certificate status is shown for informational purposes, all certificate-based filtering has been temporarily disabled.
+- **Display:** Driver cards show certificate status (expired, valid, missing, revoked, suspicious) for assessment.
+- **Risk:** Certificate data helps assess legitimacy; expired or suspicious certs can indicate outdated or risky signing.
 
 ## Recent Drivers Filter
 
-**What it does:** Shows drivers that were added to the database within the last 6 months.
+- **What it does:** Shows drivers added to the database in the last 6 months.
+- **Use:** Spot newly discovered malicious drivers or recently reported threats.
+- **Logic:** Based on the “Created” date of the driver entry.
 
-**Threat Hunting:** Useful for identifying newly discovered malicious drivers or recently reported threats.
+## Newest First / Oldest First
 
-**Date Logic:** Based on the "Created" field in the database, indicating when the driver entry was first added.
+- **What it does:** Sorts all results by the date the driver was added to the database.
+- **Newest first** — Recent discoveries at the top; good for emerging threats.
+- **Oldest first** — Long-known drivers first; good for historical patterns.
+- Only one sort direction can be active. Sorting applies after filtering.
 
-**Analysis Value:** Recent drivers combined with other filters help track emerging threats and active campaigns.
+## Using Filters Effectively
 
-## Newest First and Oldest First
+**Combining filters (except mutually exclusive ones) gives precise queries. Examples:**
 
-**What it does:** Sorts the entire result set by the date the driver was added to our database.
+- MVDB Passed + Process Killer — Microsoft Vulnerable Drivers Blocklist–compatible drivers with process-termination capability.
+- MVDB Passed + Recent — Newly added drivers that are Microsoft Vulnerable Drivers Blocklist–compatible.
+- Memory Manipulator + Process Killer — High-risk drivers with multiple capabilities.
+- Registry + File Manipulator — Drivers with broad system manipulation.
 
-**Newest First:** Shows recently discovered or updated drivers at the top - useful for tracking emerging threats and latest additions.
+**Apply vs Clear:** Changes are applied only when you click **Apply Filters**. Use **Clear Filters** to reset search and all filters.
 
-**Oldest First:** Shows historically known drivers first - useful for studying long-term attack patterns and established threats.
+**Behavioral filters** — Use capability filters (Memory, Debug Bypass, Registry, File, Process Killer) to understand what a driver can do and how it might be abused.
 
-**Mutual Exclusivity:** You can only sort in one direction at a time. These filters affect the entire result ordering, not just filtering.
-
-**Performance Note:** Sorting is applied after filtering, so combining with other filters will sort only the filtered results.
-
-## How to Use Filters Effectively
-
-**Combination Strategy:** Filters can be combined (except mutually exclusive ones) to create precise queries. Examples:
-
-- **MVDB + Process Killer:** HVCI-compatible drivers with process termination capabilities
-- **MVDB + Recent Drivers:** Newly discovered drivers that are HVCI-compatible
-- **Memory Manipulator + Process Killer:** Highly dangerous drivers with multiple attack capabilities
-- **Debug Bypass + Memory Manipulator:** Advanced evasion tools with memory manipulation
-- **Registry Manipulator + File Manipulator:** Drivers with comprehensive system manipulation capabilities
-
-**Certificate Information:** While certificate filtering is currently disabled, certificate status information is still displayed in driver cards for security assessment purposes.
-
-**Technical Analysis Process:**
-- **Certificate Status Display:** Shows certificate validation status (valid, expired, revoked, suspicious, missing) in driver information
-- **Trust Assessment:** Visual indicators help evaluate driver legitimacy based on certificate information
-- **Security Context:** Certificate data provides additional context for threat assessment
-
-**Classification Categories (Display Only):**
-- **Valid:** Current validity period, trusted CA, not revoked, production certificate
-- **Revoked:** Certificate found in revocation lists or known compromised certificate databases
-- **Expired:** ValidTo date is earlier than current timestamp
-- **Suspicious:** Self-signed, unusual patterns, or issued by questionable authorities
-- **Missing:** No digital signature or certificate data present in driver binary
-
-**Information Display:** Certificate status information is shown in driver cards for security assessment, but active filtering by certificate status is currently disabled.
-
-**Behavioral Analysis Strategy:** Use behavioral filters to understand driver capabilities and potential attack vectors:
-
-- **Memory Manipulator:** Drivers with memory allocation, mapping, or protection modification capabilities
-- **Debug Bypass:** Drivers that can manipulate debugging features or hide processes from analysis tools  
-- **Registry Manipulator:** Drivers capable of creating, modifying, or deleting Windows registry entries
-- **File Manipulator:** Drivers with file system manipulation capabilities for reading, writing, or deleting files
-- **Process Killer:** Drivers specifically capable of terminating processes, often used in security bypass attacks
-
-**Architecture Targeting:** Filter by target processor architecture when analyzing platform-specific threats:
-
-- **AMD64 (x64):** Most common on modern Windows systems, highest priority for current threat analysis
-- **I386 (x32):** Legacy 32-bit systems, important for compatibility and historical threat research
-- **ARM64:** Windows on ARM devices, growing importance with ARM-based Windows systems
-
-**Apply vs Clear:** Changes are staged until you click &quot;Apply Filters&quot;. Use &quot;Clear Filters&quot; to reset both search terms and active filters.
+**Architecture** — Filter by architecture when you care about a specific platform (e.g. x64 for most current systems, ARM64 for Windows on ARM).
