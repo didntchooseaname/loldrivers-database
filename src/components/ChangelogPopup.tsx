@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { History, ExternalLink, Loader2, AlertTriangle, RotateCw, Github } from 'lucide-react';
 
 interface Commit {
@@ -165,13 +165,14 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
             ) : error ? (
               <Alert variant="destructive" className="rounded-lg">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="flex flex-col gap-2">
-                  <span>{error}</span>
-                  <Button variant="outline" size="sm" onClick={fetchCommits} className="w-fit">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+                <AlertAction>
+                  <Button variant="outline" size="sm" onClick={fetchCommits}>
                     <RotateCw className="h-3 w-3 mr-2" />
                     Retry
                   </Button>
-                </AlertDescription>
+                </AlertAction>
               </Alert>
             ) : (
               <div className="space-y-3">

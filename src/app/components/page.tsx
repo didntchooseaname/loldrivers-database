@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2, Mail } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,9 @@ import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -61,12 +63,14 @@ import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
@@ -96,8 +100,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -286,13 +292,16 @@ export default function ComponentsShowcasePage() {
                 <div className="space-y-2">
                   <Label>Select</Label>
                   <Select>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Pick one" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="a">Option A</SelectItem>
-                      <SelectItem value="b">Option B</SelectItem>
-                      <SelectItem value="c">Option C</SelectItem>
+                      <SelectGroup>
+                        <SelectLabel>Options</SelectLabel>
+                        <SelectItem value="a">Option A</SelectItem>
+                        <SelectItem value="b">Option B</SelectItem>
+                        <SelectItem value="c">Option C</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
@@ -410,14 +419,16 @@ export default function ComponentsShowcasePage() {
             </Section>
 
             <Section title="Alert">
-              <div className="space-y-4">
+              <div className="grid w-full max-w-xl items-start gap-4">
                 <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
                   <AlertTitle>Default alert</AlertTitle>
                   <AlertDescription>
-                    This is a default alert with title and description.
+                    This is a default alert with icon, title and description.
                   </AlertDescription>
                 </Alert>
                 <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Destructive</AlertTitle>
                   <AlertDescription>
                     This alert uses the destructive variant.
@@ -481,6 +492,12 @@ export default function ComponentsShowcasePage() {
                   <div className="py-6 text-muted-foreground text-sm">
                     Sheet content area.
                   </div>
+                  <SheetFooter>
+                    <SheetClose asChild>
+                      <Button variant="outline">Close</Button>
+                    </SheetClose>
+                    <Button type="submit">Save changes</Button>
+                  </SheetFooter>
                 </SheetContent>
               </Sheet>
             </Section>
@@ -505,7 +522,7 @@ export default function ComponentsShowcasePage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline">Open popover</Button>
                 </PopoverTrigger>
-                <PopoverContent>
+                <PopoverContent className="w-80">
                   <div className="space-y-2">
                     <h4 className="font-medium">Popover title</h4>
                     <p className="text-sm text-muted-foreground">
@@ -605,6 +622,7 @@ export default function ComponentsShowcasePage() {
 
             <Section title="Table">
               <Table>
+                <TableCaption>A list of sample users and roles.</TableCaption>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -624,11 +642,21 @@ export default function ComponentsShowcasePage() {
                     <TableCell>User</TableCell>
                   </TableRow>
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={2}>Total</TableCell>
+                    <TableCell className="text-right">2 users</TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </Section>
 
             <Section title="Avatar">
-              <div className="flex gap-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <Avatar>
+                  <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+                  <AvatarFallback>CN</AvatarFallback>
+                </Avatar>
                 <Avatar>
                   <AvatarFallback>AB</AvatarFallback>
                 </Avatar>
