@@ -1,6 +1,6 @@
 {
   "name": "LOLDrivers Database - Vulnerable Windows Drivers",
-  "short_name": "LOLDrivers",
+  "short_name": "LOLDB",
   "description": "Search and analyze vulnerable and malicious Windows drivers for security research, threat hunting, and MVDB blocklist verification.",
   "start_url": "/",
   "scope": "/",
@@ -12,13 +12,19 @@
     {
       "src": "/favicon.svg",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/favicon.ico",
-      "sizes": "48x48",
-      "type": "image/x-icon"
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

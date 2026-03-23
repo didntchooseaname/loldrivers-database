@@ -69,15 +69,19 @@ test('process killer filter returns results', async ({ page }) => {
   expect(count).toBeGreaterThan(0);
 });
 
-test('MVDB filter returns results', async ({ page }) => {
+test('MVDB filter returns results with MVDB PASSED badge', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.driver-card').first()).toBeVisible({ timeout: 5000 });
 
   await page.locator('.stat-item.clickable').first().click();
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000);
 
   const count = await page.locator('.driver-card').count();
   expect(count).toBeGreaterThan(0);
+
+  // Every card in MVDB filtered results should have the MVDB PASSED badge
+  const firstCard = page.locator('.driver-card').first();
+  await expect(firstCard.getByText('MVDB PASSED')).toBeVisible();
 });
 
 test('quick filter apply/clear cycle works', async ({ page }) => {
