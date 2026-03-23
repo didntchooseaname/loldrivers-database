@@ -1,19 +1,20 @@
-﻿import DriversClient from '@/components/DriversClient';
+import DriversClient from '@/components/DriversClient';
 import DriversCache from '@/lib/driversCache';
 
+// Only load the first page of drivers for SSR (20 items instead of all ~2000+)
+const SSR_PAGE_SIZE = 20;
+
 export default async function HomePage() {
-  // Server-side data preloading (SSR)
   const cache = DriversCache.getInstance();
-  
+
   try {
-    // Load initial data and statistics
     const [initialDrivers, initialStats] = await Promise.all([
-      cache.getDrivers(1), // Load all drivers for SSR
+      cache.getDrivers(1, SSR_PAGE_SIZE),
       cache.getStatistics()
     ]);
 
     return (
-      <DriversClient 
+      <DriversClient
         initialDrivers={{
           success: true,
           ...initialDrivers
@@ -26,8 +27,7 @@ export default async function HomePage() {
     );
   } catch (error) {
     console.error('SSR Error:', error);
-    
-    // Fallback en cas d'erreur
+
     return (
       <div className="container">
         <div className="error-message">
@@ -40,14 +40,4 @@ export default async function HomePage() {
   }
 }
 
-// Metadata for SEO
-export const metadata = {
-  title: 'LOLDrivers Database - Vulnerable Windows Drivers',
-  description: 'Comprehensive database of vulnerable and malicious Windows drivers for security research and threat hunting.',
-  keywords: 'loldrivers, vulnerable drivers, windows security, malware, threat hunting',
-  openGraph: {
-    title: 'LOLDrivers Database',
-    description: 'Vulnerable and malicious Windows drivers database',
-    type: 'website',
-  },
-};
+// SEO metadata inherited from layout.tsx (title template, OG, JSON-LD, etc.)

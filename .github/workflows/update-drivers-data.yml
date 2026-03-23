@@ -10,7 +10,7 @@ permissions:
   contents: write
   actions: read
   pull-requests: write
-  
+
 env:
   REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
   GITHUB_API_URL: https://api.github.com/repos/magicsword-io/LOLDrivers/commits?path=loldrivers.io/content/api/drivers.json&per_page=1
@@ -21,7 +21,7 @@ env:
 jobs:
   update-drivers-data:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -29,278 +29,165 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
         persist-credentials: true
-        
+
     - name: Check for new commits on LOLDrivers JSON file
       id: check_commits
       run: |
         echo "Checking for new commits on LOLDrivers JSON file..."
-        
-        # Construct the API URL directly to avoid environment variable issues
+
         API_URL="https://api.github.com/repos/magicsword-io/LOLDrivers/commits?path=loldrivers.io/content/api/drivers.json&per_page=1"
-        echo "API URL: $API_URL"
-        
-        # Get the latest commit hash for the JSON file with better error handling
-        echo "Making API request..."
-        api_response=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL")
-        
-        # Debug: show response length and first part
-        response_length=$(echo "$api_response" | wc -c)
-        echo "API Response length: $response_length chars"
-        echo "API Response (first 200 chars): $(echo "$api_response" | head -c 200)..."
-        
-        # Check if response is valid JSON
+
+        # Fetch commit info (single call - reused later)
+        api_response=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "$API_URL")
+
+        # Validate JSON
         if ! echo "$api_response" | jq . > /dev/null 2>&1; then
           echo "Invalid JSON response from GitHub API"
-          echo "Full response: $api_response"
           exit 1
         fi
-        
-        # Check if response is an array or has commits
+
+        # Extract commit hash
         if echo "$api_response" | jq -e 'type == "array"' > /dev/null 2>&1; then
-          # Response is an array, get first element
           latest_commit=$(echo "$api_response" | jq -r '.[0].sha // empty')
+          commit_message=$(echo "$api_response" | jq -r '.[0].commit.message // "No message"' | head -1)
+          commit_author=$(echo "$api_response" | jq -r '.[0].commit.author.name // "Unknown"')
+          commit_date=$(echo "$api_response" | jq -r '.[0].commit.committer.date // "Unknown"')
         elif echo "$api_response" | jq -e 'has("sha")' > /dev/null 2>&1; then
-          # Response is a single commit object
           latest_commit=$(echo "$api_response" | jq -r '.sha // empty')
+          commit_message=$(echo "$api_response" | jq -r '.commit.message // "No message"' | head -1)
+          commit_author=$(echo "$api_response" | jq -r '.commit.author.name // "Unknown"')
+          commit_date=$(echo "$api_response" | jq -r '.commit.committer.date // "Unknown"')
         else
-          # Check if it's an error response
           error_msg=$(echo "$api_response" | jq -r '.message // "Unknown error"')
           echo "GitHub API error: $error_msg"
           exit 1
         fi
-        
+
         if [ -z "$latest_commit" ] || [ "$latest_commit" = "null" ]; then
           echo "Failed to get latest commit hash"
-          echo "API response: $api_response"
           exit 1
         fi
-        
-        echo "Latest commit hash: $latest_commit"
-        
-        # Check if we have a stored commit hash
+
+        echo "Latest commit: $latest_commit"
+        echo "Author: $commit_author"
+        echo "Message: $commit_message"
+
+        # Store commit details for later steps (single API call)
+        echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
+        echo "commit_message=$commit_message" >> $GITHUB_OUTPUT
+        echo "commit_author=$commit_author" >> $GITHUB_OUTPUT
+        echo "commit_date=$commit_date" >> $GITHUB_OUTPUT
+
+        # Check stored hash
         if [ -f "$COMMIT_HASH_FILE" ]; then
           stored_commit=$(cat "$COMMIT_HASH_FILE")
           echo "Stored commit hash: $stored_commit"
-          
+
           if [ "$latest_commit" = "$stored_commit" ]; then
             echo "No new commits detected - skipping update"
             echo "has_new_commit=false" >> $GITHUB_OUTPUT
           else
             echo "New commit detected - update needed"
             echo "has_new_commit=true" >> $GITHUB_OUTPUT
-            echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
             echo "stored_commit=$stored_commit" >> $GITHUB_OUTPUT
           fi
         else
-          echo "No stored commit hash - first run or missing file"
+          echo "No stored commit hash - first run"
           echo "has_new_commit=true" >> $GITHUB_OUTPUT
-          echo "latest_commit=$latest_commit" >> $GITHUB_OUTPUT
           echo "stored_commit=none" >> $GITHUB_OUTPUT
         fi
-        
+
     - name: Download and backup files
       if: steps.check_commits.outputs.has_new_commit == 'true'
       id: download
       run: |
         echo "Downloading remote drivers.json..."
         curl -s -L "$REMOTE_URL" -o temp_drivers.json
-        
+
         if [ ! -f temp_drivers.json ]; then
           echo "Failed to download remote file"
           exit 1
         fi
-        
-        echo "Remote file downloaded successfully"
+
         echo "Remote file size: $(stat -c%s temp_drivers.json) bytes"
-        
-        # Create data directory if it doesn't exist
         mkdir -p data
-        
-        # Backup existing drv.json if it exists (overwrite any existing backup)
+
+        # Backup existing file
         if [ -f "$LOCAL_FILE" ]; then
-          echo "Backing up existing drv.json to drv.bak (overwriting if exists)..."
+          echo "Backing up existing drv.json..."
           cp "$LOCAL_FILE" "$BACKUP_FILE"
-          echo "Backup created successfully"
           echo "backup_created=true" >> $GITHUB_OUTPUT
         else
           echo "No existing drv.json to backup"
           echo "backup_created=false" >> $GITHUB_OUTPUT
         fi
-        
-        # Move new file to final location as drv.json
+
         mv temp_drivers.json "$LOCAL_FILE"
-        echo "New file saved as $LOCAL_FILE"
-        
-        # Store the new commit hash
         echo "${{ steps.check_commits.outputs.latest_commit }}" > "$COMMIT_HASH_FILE"
-        echo "Commit hash stored"
-        
-    - name: Generate update summary
-      if: steps.check_commits.outputs.has_new_commit == 'true'
-      id: summary
-      run: |
-        echo "Generating update summary..."
-        
-        # Get commit details for better summary with error handling
-        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
-        
-        # Validate JSON response
-        if ! echo "$commit_info" | jq . > /dev/null 2>&1; then
-          echo "Warning: Invalid JSON response for commit details"
-          commit_message="Unknown commit message"
-          commit_date="Unknown"
-          commit_author="Unknown"
-        else
-          commit_message=$(echo "$commit_info" | jq -r '.commit.message // "No message"')
-          commit_date=$(echo "$commit_info" | jq -r '.commit.committer.date // "Unknown"')
-          commit_author=$(echo "$commit_info" | jq -r '.commit.author.name // "Unknown"')
-        fi
-        
-        # Créer un résumé des changements
-        summary="## LOLDrivers Data Update\n\n"
-        summary+="**Update Type:** New commit detected\n"
-        summary+="**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n"
-        summary+="**Source:** [LOLDrivers GitHub](https://github.com/magicsword-io/LOLDrivers)\n\n"
-        
-        summary+="### Commit Information\n"
-        summary+="- **Commit Hash:** \`${{ steps.check_commits.outputs.latest_commit }}\`\n"
-        summary+="- **Previous Hash:** \`${{ steps.check_commits.outputs.stored_commit }}\`\n"
-        summary+="- **Author:** $commit_author\n"
-        summary+="- **Date:** $commit_date\n"
-        summary+="- **Message:** $commit_message\n\n"
-        
-        summary+="### File Changes\n"
-        summary+="- **New file:** \`data/drv.json\`\n"
-        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
-          summary+="- **Backup created:** \`data/drv.bak\`\n"
-        fi
-        summary+="- **Commit hash stored:** \`data/.last_commit_hash\`\n\n"
-        
-        # Analyse des changements JSON (optionnel)
-        if command -v jq &> /dev/null; then
-          new_count=$(jq '. | length' "$LOCAL_FILE" 2>/dev/null || echo "unknown")
-          summary+="### Statistics\n"
-          summary+="- **Total entries:** $new_count\n"
-          
-          if [ -f "$BACKUP_FILE" ] && [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
-            old_count=$(jq '. | length' "$BACKUP_FILE" 2>/dev/null || echo "unknown")
-            if [[ "$old_count" =~ ^[0-9]+$ ]] && [[ "$new_count" =~ ^[0-9]+$ ]]; then
-              diff=$(($new_count - $old_count))
-              if [ $diff -gt 0 ]; then
-                summary+="- **New entries:** +$diff\n"
-              elif [ $diff -lt 0 ]; then
-                summary+="- **Removed entries:** $diff\n"
-              else
-                summary+="- **No change in count** (content updated)\n"
-              fi
-              summary+="- **Previous entries:** $old_count\n"
-            fi
-          fi
-          summary+="\n"
-        fi
-        
-        summary+="### Links\n"
-        summary+="- [View Updated File](./data/drv.json)\n"
-        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
-          summary+="- [View Backup File](./data/drv.bak)\n"
-        fi
-        summary+="- [LOLDrivers Website](https://loldrivers.io/)\n"
-        summary+="- [Source Repository](https://github.com/magicsword-io/LOLDrivers)\n"
-        summary+="- [Commit Details](https://github.com/magicsword-io/LOLDrivers/commit/${{ steps.check_commits.outputs.latest_commit }})\n"
-        
-        # Sauvegarder pour le commit message
-        echo -e "$summary" > update_summary.md
-        echo "summary_created=true" >> $GITHUB_OUTPUT
-        
+        echo "Files updated successfully"
+
     - name: Commit and push changes
       if: steps.check_commits.outputs.has_new_commit == 'true'
       run: |
-        echo "Configuring git..."
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action - LOLDrivers Updater"
-        
-        echo "Adding changes..."
+
         git add "$LOCAL_FILE" "$COMMIT_HASH_FILE"
-        
-        # Add backup file if created
         if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
           git add "$BACKUP_FILE"
         fi
-        
-        # Get commit info for commit message with error handling
-        commit_info=$(curl -s -H "Accept: application/vnd.github.v3+json" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/repos/magicsword-io/LOLDrivers/commits/${{ steps.check_commits.outputs.latest_commit }}")
-        
-        # Validate JSON and extract commit message safely
-        if echo "$commit_info" | jq . > /dev/null 2>&1; then
-          commit_message=$(echo "$commit_info" | jq -r '.commit.message // "No message"' | head -1)
-        else
-          echo "Warning: Could not fetch commit details for commit message"
-          commit_message="Update from commit ${{ steps.check_commits.outputs.latest_commit }}"
-        fi
-        
-        # Message de commit avec résumé
-        commit_msg="Update LOLDrivers data: $commit_message"
-        commit_msg+="\n\nAutomated update triggered by new commit in LOLDrivers repository"
-        commit_msg+="\nCommit: ${{ steps.check_commits.outputs.latest_commit }}"
-        commit_msg+="\nPrevious: ${{ steps.check_commits.outputs.stored_commit }}"
-        commit_msg+="\nSource: $REMOTE_URL"
-        commit_msg+="\nTimestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-        
-        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
-          commit_msg+="\n\nFiles updated:"
-          commit_msg+="\n- data/drv.json (new data)"
-          commit_msg+="\n- data/drv.bak (backup of previous)"
-          commit_msg+="\n- data/.last_commit_hash (tracking)"
-        else
-          commit_msg+="\n\nFiles created:"
-          commit_msg+="\n- data/drv.json (initial data)"
-          commit_msg+="\n- data/.last_commit_hash (tracking)"
-        fi
-        
-        echo "Committing changes..."
-        git commit -m "$commit_msg"
-        
-        echo "Pushing to repository..."
+
+        # Reuse commit info from step 1 (no redundant API call)
+        COMMIT_MSG="${{ steps.check_commits.outputs.commit_message }}"
+        LATEST="${{ steps.check_commits.outputs.latest_commit }}"
+        STORED="${{ steps.check_commits.outputs.stored_commit }}"
+        TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+        # Build multi-line commit message via temp file
+        {
+          echo "Update LOLDrivers data: $COMMIT_MSG"
+          echo ""
+          echo "Automated update triggered by new commit in LOLDrivers repository"
+          echo "Commit: $LATEST"
+          echo "Previous: $STORED"
+          echo "Source: $REMOTE_URL"
+          echo "Timestamp: $TIMESTAMP"
+        } > /tmp/commit_msg.txt
+
+        git commit -F /tmp/commit_msg.txt
+        rm -f /tmp/commit_msg.txt
+
         git push origin ${{ github.ref_name }}
-        
-        echo "Changes pushed successfully!"
-        
-    - name: Cleanup temporary files
+        echo "Changes pushed successfully"
+
+    - name: Cleanup
       if: always()
-      run: |
-        echo "Cleaning up temporary files..."
-        rm -f temp_drivers.json update_summary.md
-        echo "Cleanup completed"
-        
+      run: rm -f temp_drivers.json
+
     - name: Job Summary
       if: always()
       run: |
-        echo "## Job Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Workflow:** Update LOLDrivers Data" >> $GITHUB_STEP_SUMMARY
-        echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ steps.check_commits.outputs.has_new_commit }}" = "true" ]; then
-          echo "- **Result:** Data updated successfully" >> $GITHUB_STEP_SUMMARY
-          echo "- **New Commit:** \`${{ steps.check_commits.outputs.latest_commit }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Previous Commit:** \`${{ steps.check_commits.outputs.stored_commit }}\`" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
-            echo "- **Backup Created:** data/drv.bak" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## Update LOLDrivers Data"
+          echo "- **Trigger:** ${{ github.event_name }}"
+          echo "- **Status:** ${{ job.status }}"
+          echo "- **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+
+          if [ "${{ steps.check_commits.outputs.has_new_commit }}" = "true" ]; then
+            echo "### Update Applied"
+            echo "- **Commit:** \`${{ steps.check_commits.outputs.latest_commit }}\`"
+            echo "- **Previous:** \`${{ steps.check_commits.outputs.stored_commit }}\`"
+            echo "- **Author:** ${{ steps.check_commits.outputs.commit_author }}"
+            echo "- **Message:** ${{ steps.check_commits.outputs.commit_message }}"
           else
-            echo "- **First Run:** No backup needed" >> $GITHUB_STEP_SUMMARY
+            echo "### No Update Needed"
+            echo "No new commits detected in the upstream LOLDrivers repository."
           fi
-        else
-          echo "- **Result:** No new commits detected" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Files" >> $GITHUB_STEP_SUMMARY
-        echo "- **Main Data:** \`data/drv.json\`" >> $GITHUB_STEP_SUMMARY
-        echo "- **Backup:** \`data/drv.bak\`" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit Tracking:** \`data/.last_commit_hash\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Resources" >> $GITHUB_STEP_SUMMARY
-        echo "- [LOLDrivers Website](https://loldrivers.io/)" >> $GITHUB_STEP_SUMMARY
-        echo "- [Source Repository](https://github.com/magicsword-io/LOLDrivers)" >> $GITHUB_STEP_SUMMARY
-        echo "- [Data File]($REMOTE_URL)" >> $GITHUB_STEP_SUMMARY
+
+          echo ""
+          echo "### Resources"
+          echo "- [LOLDrivers Website](https://loldrivers.io/)"
+          echo "- [Source Repository](https://github.com/magicsword-io/LOLDrivers)"
+        } >> $GITHUB_STEP_SUMMARY

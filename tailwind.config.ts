@@ -10,10 +10,10 @@ const config: Config = {
   theme: {
   	extend: {
   		transitionDuration: {
-  			smooth: '250ms',
-  			'smooth-slow': '350ms',
-  			apple: '250ms',
-  			'apple-slow': '350ms',
+  			smooth: '200ms',
+  			'smooth-slow': '300ms',
+  			apple: '200ms',
+  			'apple-slow': '300ms',
   		},
   		transitionTimingFunction: {
   			smooth: 'cubic-bezier(0.33, 1, 0.68, 1)',

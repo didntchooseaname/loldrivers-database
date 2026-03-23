@@ -11,24 +11,22 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     let i = 0;
     while (i < lines.length) {
       const line = lines[i];
-      const ulMatch = line.match(/^[-*]\s+(.*)$/);
-      const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
-      if (ulMatch) {
+      if (/^[-*]\s+/.test(line)) {
         const items: string[] = [];
         while (i < lines.length && /^[-*]\s+/.test(lines[i])) {
           items.push(lines[i].replace(/^[-*]\s+/, ''));
           i++;
         }
-        result.push('<ul>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ul>');
+        result.push('<ul>' + items.map(t => '<li>' + t + '</li>').join('') + '</ul>');
         continue;
       }
-      if (olMatch) {
+      if (/^\d+\.\s+/.test(line)) {
         const items: string[] = [];
         while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
           items.push(lines[i].replace(/^\d+\.\s+/, ''));
           i++;
         }
-        result.push('<ol>' + items.map((t) => '<li>' + t + '</li>').join('') + '</ol>');
+        result.push('<ol>' + items.map(t => '<li>' + t + '</li>').join('') + '</ol>');
         continue;
       }
       result.push(line);
@@ -37,99 +35,50 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     return result.join('\n');
   }
 
-  // Simple markdown to HTML conversion with help-specific styling
   const processMarkdown = (md: string): string => {
     let out = md
-      // Add newlines before headers for proper spacing
       .replace(/^(#+\s+.*$)/gm, '\n\n$1')
-      // Clean up multiple consecutive newlines
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // Headers first (so list conversion doesn't see ## lines)
+    // Sections with ## or ### become clean section blocks
     out = out
-      // Headers with automatic icons based on content - treat all levels the same
-      .replace(/^###\s+(.*$)/gm, (_m, title) => {
-        const icon = getIconForTitle(title);
-        return `</div><div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
-      })
-      .replace(/^##\s+(.*$)/gm, (_m, title) => {
-        const icon = getIconForTitle(title);
-        return `</div><div class="help-section"><h4><i class="${icon}"></i> ${title}</h4>`;
-      })
+      .replace(/^###\s+(.*$)/gm, (_m, title) =>
+        `</div><div class="help-section"><h4>${title}</h4>`)
+      .replace(/^##\s+(.*$)/gm, (_m, title) =>
+        `</div><div class="help-section"><h4>${title}</h4>`)
       .replace(/^#\s+(.*$)/gm, '<h2>$1</h2>');
 
     out = convertListBlocks(out);
 
     out = out
-      // Bold text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Images - process before links to avoid conflicts
       .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="/content/assets/$2" alt="$1" class="help-image" loading="lazy" />')
-      // Links - process after images
-      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="help-link">$1</a>')
-      // Code/technical terms with backticks
-      .replace(/`([^`]+)`/g, '<code class="tech-term">$1</code>')
-      // Special styling for disclaimer and legal content
-      .replace(/(\*\*Legal & Ethical Notice:\*\*.*?)(\*\*Community:\*\*.*?)(\*\*Disclaimer:\*\*.*?)(?=\n\n|\n$|$)/gs, 
-        '<div class="help-note legal-notice">$1</div><div class="help-note community-note">$2</div><div class="help-note disclaimer-note">$3</div>')
-      // Convert HTML entities back to proper characters
+      .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/---/g, '')
+      // Legal/disclaimer blocks
+      .replace(/(\*\*Legal & Ethical Notice:\*\*.*?)(\*\*Community:\*\*.*?)(\*\*Disclaimer:\*\*.*?)(?=\n\n|\n$|$)/gs,
+        '<div class="help-note">$1</div><div class="help-note">$2</div><div class="help-note">$3</div>')
       .replace(/&apos;/g, "'")
       .replace(/&quot;/g, '"')
-      .replace(/&ldquo;/g, '"')
-      .replace(/&rdquo;/g, '"')
-      // Paragraphs (do not wrap lines that already start with a tag)
+      // Paragraphs (skip lines starting with HTML tags)
       .replace(/^(?!<)(.+)$/gm, '<p>$1</p>')
-      // Clean up empty paragraphs
       .replace(/<p><\/p>/g, '')
-      // Fix paragraph wrapping around headers, divs, lists
       .replace(/<p>(<h[234].*?<\/h[234]>)<\/p>/g, '$1')
       .replace(/<p>(<\/div>.*?<div.*?>)<\/p>/g, '$1')
       .replace(/<p>(<div.*?>)<\/p>/g, '$1')
       .replace(/<p>(<ul>.*?<\/ul>)<\/p>/gs, '$1')
       .replace(/<p>(<ol>.*?<\/ol>)<\/p>/gs, '$1')
-      // Close the last help-section
       + '</div>';
-    return out;
-  };
 
-  // Function to get appropriate icon based on title content
-  const getIconForTitle = (title: string): string => {
-    const titleLower = title.toLowerCase();
-    
-    // Global help icons
-    if (titleLower.includes('vision') || titleLower.includes('about') || titleLower.includes('project')) return 'fas fa-eye';
-    if (titleLower.includes('innovation') || titleLower.includes('feature')) return 'fas fa-lightbulb';
-    if (titleLower.includes('technical') || titleLower.includes('implementation')) return 'fas fa-cogs';
-    if (titleLower.includes('research') || titleLower.includes('professional')) return 'fas fa-graduation-cap';
-    if (titleLower.includes('reference') || titleLower.includes('terms')) return 'fas fa-book';
-    if (titleLower.includes('legal') || titleLower.includes('ethical')) return 'fas fa-balance-scale';
-    
-    // Filter help icons
-    if (titleLower.includes('information') || titleLower.includes('notice')) return 'fas fa-info-circle';
-    if (titleLower.includes('microsoft vulnerable') || titleLower.includes('mvdb') || titleLower.includes('blocklist')) return 'fas fa-shield-alt';
-    if (titleLower.includes('process killer')) return 'fas fa-skull-crossbones';
-    if (titleLower.includes('behavioral') || titleLower.includes('analysis')) return 'fas fa-brain';
-    if (titleLower.includes('memory')) return 'fas fa-memory';
-    if (titleLower.includes('debug')) return 'fas fa-bug';
-    if (titleLower.includes('registry')) return 'fas fa-edit';
-    if (titleLower.includes('file')) return 'fas fa-file-alt';
-    if (titleLower.includes('metadata')) return 'fas fa-tags';
-    if (titleLower.includes('architecture')) return 'fas fa-microchip';
-    if (titleLower.includes('certificate')) return 'fas fa-certificate';
-    if (titleLower.includes('trusted')) return 'fas fa-check-shield';
-    if (titleLower.includes('unknown') || titleLower.includes('untrusted')) return 'fas fa-exclamation-triangle';
-    if (titleLower.includes('time') || titleLower.includes('recent') || titleLower.includes('newest') || titleLower.includes('oldest')) return 'fas fa-clock';
-    if (titleLower.includes('how to') || titleLower.includes('effectively')) return 'fas fa-question-circle';
-    
-    // Default icon
-    return 'fas fa-chevron-right';
+    return out;
   };
 
   const htmlContent = processMarkdown(content);
 
   return (
-    <div 
+    <div
       className="markdown-content"
       dangerouslySetInnerHTML={{ __html: htmlContent }}
     />

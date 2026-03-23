@@ -23,10 +23,13 @@ const nextConfig = {
   
   // Optimisation des images
   images: {
-    unoptimized: true,
     formats: ['image/avif', 'image/webp'],
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    remotePatterns: [
+      { protocol: 'https', hostname: 'www.google.com', pathname: '/s2/favicons**' },
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' },
+    ],
   },
   
   // Compression et optimisations

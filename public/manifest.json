@@ -1,11 +1,13 @@
 {
-  "name": "LOLDrivers Database",
+  "name": "LOLDrivers Database - Vulnerable Windows Drivers",
   "short_name": "LOLDrivers",
-  "description": "Vulnerable and malicious Windows drivers database",
+  "description": "Search and analyze vulnerable and malicious Windows drivers for security research, threat hunting, and MVDB blocklist verification.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#1a1a1a",
-  "theme_color": "#1f2937",
+  "background_color": "#2b2b2b",
+  "theme_color": "#2b2b2b",
+  "categories": ["security", "utilities"],
   "icons": [
     {
       "src": "/favicon.svg",

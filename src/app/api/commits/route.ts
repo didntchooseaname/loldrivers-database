@@ -18,10 +18,24 @@ interface Commit {
   html_url: string;
 }
 
+// In-memory cache to avoid hitting GitHub API rate limits (60/hr for unauthenticated)
+let commitsCache: { data: unknown; timestamp: number } | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const per_page = searchParams.get('per_page') || '50';
   const page = searchParams.get('page') || '1';
+
+  // Check in-memory cache first
+  if (commitsCache && commitsCache.timestamp > Date.now() - CACHE_DURATION) {
+    return NextResponse.json(commitsCache.data, {
+      headers: {
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+        'X-Cache': 'HIT',
+      },
+    });
+  }
 
   try {
     const response = await fetch(
@@ -31,7 +45,7 @@ export async function GET(request: Request) {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'LOLDrivers-Database',
         },
-        next: { revalidate: 300 }, // Cache for 5 minutes
+        next: { revalidate: 300 }, // ISR: revalidate every 5 minutes
       }
     );
 
@@ -41,7 +55,6 @@ export async function GET(request: Request) {
 
     const commits: Commit[] = await response.json();
 
-    // Process commits for better frontend consumption
     const processedCommits = commits.map(commit => {
       const lines = commit.commit.message.split('\n').filter(line => line.trim());
       const title = lines[0] || 'No commit message';
@@ -67,7 +80,7 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({
+    const result = {
       success: true,
       data: processedCommits,
       meta: {
@@ -76,11 +89,21 @@ export async function GET(request: Request) {
         per_page: parseInt(per_page),
         last_updated: new Date().toISOString(),
       },
+    };
+
+    // Update in-memory cache
+    commitsCache = { data: result, timestamp: Date.now() };
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+        'X-Cache': 'MISS',
+      },
     });
 
   } catch (error) {
     console.error('Failed to fetch commits:', error);
-    
+
     return NextResponse.json(
       {
         success: false,
@@ -98,7 +121,6 @@ export async function GET(request: Request) {
   }
 }
 
-// Add CORS headers for potential external usage
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,

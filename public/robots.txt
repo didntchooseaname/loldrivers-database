@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /changelog
+Disallow: /components
+
+Sitemap: https://loldb.xsec.fr/sitemap.xml
