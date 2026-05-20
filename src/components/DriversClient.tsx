@@ -483,6 +483,10 @@ export default function DriversClient({
       tags.push({ text: 'MVDB BLOCKED', type: 'danger' });
     }
 
+    if (driver.FeaturedKiller) {
+      tags.push({ text: 'FEATURED KILLER', type: 'process-killer' });
+    }
+
     if (driver.ImportedFunctions && Array.isArray(driver.ImportedFunctions)) {
       const hasProcessKiller = driver.ImportedFunctions.some(f =>
         f.toLowerCase().includes('zwterminateprocess')
@@ -841,13 +845,14 @@ export default function DriversClient({
 
   // Download driver
   const downloadDriver = useCallback((driver: Driver) => {
-    const hash = driver.MD5;
     const filename = getDriverName(driver);
-    if (!hash) {
-      toast.error('No MD5 hash available for download');
+    const downloadUrl = driver.DownloadUrl || (driver.MD5 ? `https://github.com/magicsword-io/LOLDrivers/raw/main/drivers/${driver.MD5}.bin` : null);
+
+    if (!downloadUrl) {
+      toast.error('No download URL available');
       return;
     }
-    const downloadUrl = `https://github.com/magicsword-io/LOLDrivers/raw/main/drivers/${hash}.bin`;
+
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = filename;

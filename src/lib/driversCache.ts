@@ -40,6 +40,8 @@ interface ProcessedDriver extends Driver {
   Company?: string;
   Description?: string;
   ImportedFunctions?: string[];
+  DownloadUrl?: string;
+  FeaturedKiller?: boolean;
   LoadsDespiteHVCI?: string;
   MD5?: string;
   SHA1?: string;
@@ -152,6 +154,48 @@ const loadHVCIAllowedHashes = (): Set<string> => {
 };
 
 const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
+
+const MANUAL_DRIVERS: ProcessedDriver[] = [
+  {
+    Id: 'manual-redteamfortress-phantomkiller-bootrepair',
+    OriginalFilename: 'BootRepair.sys',
+    Filename: 'BootRepair.sys',
+    Company: 'LENOVO',
+    Description: 'PhantomKiller weaponizes the signed Lenovo BootRepair.sys driver shipped with Lenovo PC Manager. The driver exposes \\\\.\\BootRepair without secure DACL restrictions and accepts IOCTL 0x222014 with a 4-byte PID, then calls PsLookupProcessByProcessId, ObOpenObjectByPointer, and ZwTerminateProcess to terminate protected EDR/AV processes.',
+    SHA256: '5ab36c116767eaae53a466fbc2dae7cfd608ed77721f65e83312037fbd57c946',
+    MachineType: 'AMD64',
+    Created: '2018-01-03',
+    Author: 'redteamfortress / j3h4ck',
+    Category: 'BYOVD Process Killer',
+    Tags: ['PhantomKiller', 'BootRepair.sys', 'Lenovo', 'BYOVD', 'EDR bypass', 'process killer'],
+    ImportedFunctions: ['PsLookupProcessByProcessId', 'ObOpenObjectByPointer', 'ZwTerminateProcess'],
+    Commands: {
+      Command: 'sc.exe create PhantomKiller binPath="C:\\Path\\to\\BootRepair.sys" type=kernel\nsc.exe start PhantomKiller\nPhantomKiller.exe <pid>',
+      Description: 'Loads the signed Lenovo driver and uses the PhantomKiller POC to terminate a target process by PID through IOCTL 0x222014.',
+      OperatingSystem: 'Windows x64',
+      Privileges: 'Driver load requires administrative privileges; an already loaded driver can be abused by a low-privileged user according to the project README.',
+      Usecase: 'BYOVD process termination against EDR/AV protected processes.',
+    },
+    Resources: [
+      'https://github.com/redteamfortress/PhantomKiller',
+      'https://github.com/redteamfortress/PhantomKiller/releases/tag/v1.0.0',
+      'https://github.com/redteamfortress/PhantomKiller/releases/download/v1.0.0/PhantomKiller.zip',
+      'https://github.com/redteamfortress/PhantomKiller/raw/refs/heads/main/PhantomKiller.sys',
+      'https://medium.com/@jehadbudagga/phantom-killer-reverse-engineering-and-weaponizing-a-lenovo-driver-to-terminate-edr-processes-9191cd06374f',
+    ],
+    DownloadUrl: 'https://github.com/redteamfortress/PhantomKiller/releases/download/v1.0.0/PhantomKiller.zip',
+    FeaturedKiller: true,
+    Signer: 'LENOVO (Symantec Class 3 SHA256 Code Signing CA)',
+    DeviceObject: '\\\\.\\BootRepair',
+    Ioctl: '0x222014',
+    VTDetections: '0/71 at time of discovery',
+    ReleaseTag: 'v1.0.0',
+    ReleaseName: 'Driver & compiled POC',
+    ReleasePublishedAt: '2026-05-19T07:04:09Z',
+    ReleaseAssetName: 'PhantomKiller.zip',
+    ReleaseAssetSha256: 'd05dd3a7b92170b201f314ba27aefa8bda3ca47f33c652b2b4f44545c58205b8',
+  },
+];
 
 /**
  * Derive certificate status from the Signatures[].Certificates[].ValidTo dates.
@@ -349,7 +393,7 @@ class DriversCache {
       const fileContent = readFileWithEncodingDetection(dataPath);
       const rawData: Driver[] = JSON.parse(fileContent);
 
-      this.drivers = rawData
+      const jsonDrivers = rawData
         .filter(item => item && typeof item === 'object')
         .flatMap((driver): ProcessedDriver[] => {
           if (driver.KnownVulnerableSamples && Array.isArray(driver.KnownVulnerableSamples)) {
@@ -376,6 +420,8 @@ class DriversCache {
             ImportedFunctions: normalizeStringArray(driver.ImportedFunctions),
           }];
         }) as ProcessedDriver[];
+
+      this.drivers = [...MANUAL_DRIVERS, ...jsonDrivers];
 
       this.buildSearchIndex();
 
@@ -551,7 +597,11 @@ class DriversCache {
       driver.Company, driver.Description,
       driver.MD5, driver.SHA1, driver.SHA256,
       driver.FileVersion, driver.Copyright,
-      driver.Category, driver.Author, driver.MitreID
+      driver.Category, driver.Author, driver.MitreID,
+      driver.DownloadUrl,
+      driver.Signer, driver.DeviceObject, driver.Ioctl,
+      driver.VTDetections, driver.ReleaseTag, driver.ReleaseName,
+      driver.ReleaseAssetName, driver.ReleaseAssetSha256
     ].filter(Boolean);
 
     if (driver.Authentihash) {
@@ -559,6 +609,7 @@ class DriversCache {
     }
     if (driver.Tags?.length) searchFields.push(...driver.Tags);
     if (driver.CVE?.length) searchFields.push(...driver.CVE);
+    if (driver.Resources?.length) searchFields.push(...driver.Resources);
 
     if (searchFields.some(field => field && normalizeString(field.toString()).includes(searchTerm))) return true;
 

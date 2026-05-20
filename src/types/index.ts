@@ -4,6 +4,8 @@ export interface Driver {
   Company?: string;
   Description?: string;
   ImportedFunctions?: string[];
+  DownloadUrl?: string;
+  FeaturedKiller?: boolean;
   LoadsDespiteHVCI?: string;
   MD5?: string;
   SHA1?: string;
