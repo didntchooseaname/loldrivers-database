@@ -94,21 +94,30 @@ jobs:
             Write-Host "Fallback extraction successful"
           }
 
-          # Find SiPolicy_Enforced.xml
-          $xmlPath = Join-Path $extractPath "VulnerableDriverBlockList\SiPolicy_Enforced.xml"
-          if (-not (Test-Path $xmlPath)) {
-            $xmlFiles = Get-ChildItem -Path $extractPath -Recurse -Name "SiPolicy_Enforced.xml"
-            if ($xmlFiles.Count -gt 0) {
-              $xmlPath = Join-Path $extractPath $xmlFiles[0]
-              Write-Host "Found SiPolicy_Enforced.xml at: $xmlPath"
-            } else {
-              Write-Host "Available files:"
-              Get-ChildItem -Path $extractPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
-              Write-Error "SiPolicy_Enforced.xml not found"
-              exit 1
+          # Find the XML policy. Microsoft has shipped this package with different
+          # XML names over time, so prefer the modern policy and fall back to legacy.
+          $candidateNames = @(
+            "SiPolicy_Enforced.xml",
+            "DriverPolicy_Enforced.xml",
+            "SiPolicy_Enforced_LegacyFormat.xml",
+            "DriverPolicy_Enforced_LegacyFormat.xml"
+          )
+
+          $xmlPath = $null
+          foreach ($candidateName in $candidateNames) {
+            $xmlFile = Get-ChildItem -Path $extractPath -Recurse -File -Filter $candidateName | Select-Object -First 1
+            if ($xmlFile) {
+              $xmlPath = $xmlFile.FullName
+              Write-Host "Found blocklist XML policy '$candidateName' at: $xmlPath"
+              break
             }
-          } else {
-            Write-Host "Found SiPolicy_Enforced.xml at: $xmlPath"
+          }
+
+          if (-not $xmlPath) {
+            Write-Host "Available files:"
+            Get-ChildItem -Path $extractPath -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+            Write-Error "No supported blocklist XML policy found. Expected one of: $($candidateNames -join ', ')"
+            exit 1
           }
 
           "xml_path=$xmlPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
