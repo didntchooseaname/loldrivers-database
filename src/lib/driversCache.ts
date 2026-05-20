@@ -108,6 +108,13 @@ const createSearchKey = (query: string, filters: Record<string, unknown>, page: 
 
 const normalizeString = (str: string): string => str.toLowerCase().trim();
 
+const normalizeStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+
+  const normalized = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  return normalized.length > 0 ? normalized : undefined;
+};
+
 const readFileWithEncodingDetection = (filePath: string): string => {
   const buffer = fs.readFileSync(filePath);
   if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
@@ -344,22 +351,30 @@ class DriversCache {
 
       this.drivers = rawData
         .filter(item => item && typeof item === 'object')
-        .flatMap(driver => {
+        .flatMap((driver): ProcessedDriver[] => {
           if (driver.KnownVulnerableSamples && Array.isArray(driver.KnownVulnerableSamples)) {
-            return driver.KnownVulnerableSamples.map(sample => ({
-              ...sample,
-              DriverId: driver.Id,
-              Tags: driver.Tags,
-              Author: driver.Author,
-              Created: driver.Created,
-              MitreID: driver.MitreID,
-              CVE: driver.CVE,
-              Category: driver.Category,
-              Commands: driver.Commands,
-              Resources: driver.Resources
-            }));
+            return driver.KnownVulnerableSamples.map(sample => {
+              const sampleRecord = sample as Record<string, unknown>;
+
+              return {
+                ...sample,
+                DriverId: driver.Id,
+                Tags: driver.Tags,
+                Author: driver.Author,
+                Created: driver.Created,
+                MitreID: driver.MitreID,
+                CVE: driver.CVE,
+                Category: driver.Category,
+                Commands: driver.Commands,
+                Resources: driver.Resources,
+                ImportedFunctions: normalizeStringArray(sampleRecord.ImportedFunctions),
+              };
+            });
           }
-          return [driver];
+          return [{
+            ...driver,
+            ImportedFunctions: normalizeStringArray(driver.ImportedFunctions),
+          }];
         }) as ProcessedDriver[];
 
       this.buildSearchIndex();
@@ -547,7 +562,7 @@ class DriversCache {
 
     if (searchFields.some(field => field && normalizeString(field.toString()).includes(searchTerm))) return true;
 
-    if (driver.ImportedFunctions?.length) {
+    if (Array.isArray(driver.ImportedFunctions) && driver.ImportedFunctions.length > 0) {
       if (driver.ImportedFunctions.some(func => normalizeString(func).includes(searchTerm))) return true;
     }
 
