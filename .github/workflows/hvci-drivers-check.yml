@@ -145,7 +145,11 @@ jobs:
           $driversData = $jsonContent | ConvertFrom-Json
         } catch {
           Write-Host "JSON conversion failed, attempting to fix duplicate keys..."
-          $jsonContent = $jsonContent -replace '"init":', '"init_lowercase":'
+          # Windows PowerShell 5.1 ConvertFrom-Json treats object keys as
+          # case-insensitive, while drv.json can contain PE section names that
+          # differ only by case (for example INIT/init and PAGE/page).
+          $jsonContent = $jsonContent -creplace '"init"\s*:', '"init_lowercase":'
+          $jsonContent = $jsonContent -creplace '"page"\s*:', '"page_lowercase":'
           $driversData = $jsonContent | ConvertFrom-Json
         }
 
