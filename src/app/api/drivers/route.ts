@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     // Clear cache if requested
     if (searchParams.get('clearCache') === 'true') {
       apiCache.clear();
+      DriversCache.getInstance().clearCache();
       return NextResponse.json({ success: true, message: 'Cache cleared' });
     }
 

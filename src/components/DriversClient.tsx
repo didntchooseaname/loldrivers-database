@@ -875,6 +875,7 @@ export default function DriversClient({
   };
 
   const getDriverName = (driver: Driver): string => {
+    if (driver.DisplayName && driver.DisplayName.toLowerCase() !== 'unknown') return driver.DisplayName;
     if (driver.OriginalFilename && driver.OriginalFilename.toLowerCase() !== 'unknown') return driver.OriginalFilename;
     if (driver.Filename && driver.Filename.toLowerCase() !== 'unknown') return driver.Filename;
     if (driver.Tags && Array.isArray(driver.Tags) && driver.Tags.length > 0 && driver.Tags[0]?.trim()) return driver.Tags[0];

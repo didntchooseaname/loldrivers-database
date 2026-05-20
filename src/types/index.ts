@@ -1,11 +1,13 @@
 export interface Driver {
   OriginalFilename?: string;
   Filename?: string;
+  DisplayName?: string;
   Company?: string;
   Description?: string;
   ImportedFunctions?: string[];
   DownloadUrl?: string;
   FeaturedKiller?: boolean;
+  MvdbStatusOverride?: 'passed' | 'blocked' | null;
   LoadsDespiteHVCI?: string;
   MD5?: string;
   SHA1?: string;

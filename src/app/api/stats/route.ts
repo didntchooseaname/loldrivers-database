@@ -1,12 +1,20 @@
-﻿import { NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import DriversCache from '../../../lib/driversCache';
 
 // Specific cache for statistics
 let statsCache: { data: unknown; timestamp: number } | null = null;
 const STATS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+
+    if (searchParams.get('clearCache') === 'true') {
+      statsCache = null;
+      DriversCache.getInstance().clearCache();
+      return NextResponse.json({ success: true, message: 'Stats cache cleared' });
+    }
+
     // Check in-memory cache
     if (statsCache && Date.now() - statsCache.timestamp < STATS_CACHE_DURATION) {
       return NextResponse.json(statsCache.data, {

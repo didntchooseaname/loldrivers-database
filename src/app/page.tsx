@@ -1,6 +1,8 @@
 import DriversClient from '@/components/DriversClient';
 import DriversCache from '@/lib/driversCache';
 
+export const dynamic = 'force-dynamic';
+
 // Only load the first page of drivers for SSR (20 items instead of all ~2000+)
 const SSR_PAGE_SIZE = 20;
 

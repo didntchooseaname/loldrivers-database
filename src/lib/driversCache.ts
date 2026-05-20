@@ -37,11 +37,13 @@ interface SignatureEntry {
 interface ProcessedDriver extends Driver {
   OriginalFilename?: string;
   Filename?: string;
+  DisplayName?: string;
   Company?: string;
   Description?: string;
   ImportedFunctions?: string[];
   DownloadUrl?: string;
   FeaturedKiller?: boolean;
+  MvdbStatusOverride?: 'passed' | 'blocked' | null;
   LoadsDespiteHVCI?: string;
   MD5?: string;
   SHA1?: string;
@@ -158,19 +160,20 @@ const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
 const MANUAL_DRIVERS: ProcessedDriver[] = [
   {
     Id: 'manual-redteamfortress-phantomkiller-bootrepair',
+    DisplayName: 'PhantomKiller',
     OriginalFilename: 'BootRepair.sys',
-    Filename: 'BootRepair.sys',
+    Filename: 'PhantomKiller.sys',
     Company: 'LENOVO',
-    Description: 'PhantomKiller weaponizes the signed Lenovo BootRepair.sys driver shipped with Lenovo PC Manager. The driver exposes \\\\.\\BootRepair without secure DACL restrictions and accepts IOCTL 0x222014 with a 4-byte PID, then calls PsLookupProcessByProcessId, ObOpenObjectByPointer, and ZwTerminateProcess to terminate protected EDR/AV processes.',
+    Description: 'PhantomKiller is the newly released, featured process-killer variant based on Lenovo BootRepair.sys. It is tracked separately from the base BootRepair entry: the project ships it as PhantomKiller.sys, while the underlying vulnerable driver lineage is BootRepair.sys from Lenovo PC Manager. The driver exposes \\\\.\\BootRepair without secure DACL restrictions and accepts IOCTL 0x222014 with a 4-byte PID, then calls PsLookupProcessByProcessId, ObOpenObjectByPointer, and ZwTerminateProcess to terminate protected EDR/AV processes.',
     SHA256: '5ab36c116767eaae53a466fbc2dae7cfd608ed77721f65e83312037fbd57c946',
     MachineType: 'AMD64',
     Created: '2018-01-03',
     Author: 'redteamfortress / j3h4ck',
     Category: 'BYOVD Process Killer',
-    Tags: ['PhantomKiller', 'BootRepair.sys', 'Lenovo', 'BYOVD', 'EDR bypass', 'process killer'],
+    Tags: ['PhantomKiller', 'PhantomKiller.sys', 'BootRepair.sys', 'Lenovo', 'BYOVD', 'EDR bypass', 'process killer', 'featured killer'],
     ImportedFunctions: ['PsLookupProcessByProcessId', 'ObOpenObjectByPointer', 'ZwTerminateProcess'],
     Commands: {
-      Command: 'sc.exe create PhantomKiller binPath="C:\\Path\\to\\BootRepair.sys" type=kernel\nsc.exe start PhantomKiller\nPhantomKiller.exe <pid>',
+      Command: 'sc.exe create PhantomKiller binPath="C:\\Path\\to\\PhantomKiller.sys" type=kernel\nsc.exe start PhantomKiller\nPhantomKiller.exe <pid>',
       Description: 'Loads the signed Lenovo driver and uses the PhantomKiller POC to terminate a target process by PID through IOCTL 0x222014.',
       OperatingSystem: 'Windows x64',
       Privileges: 'Driver load requires administrative privileges; an already loaded driver can be abused by a low-privileged user according to the project README.',
@@ -183,9 +186,12 @@ const MANUAL_DRIVERS: ProcessedDriver[] = [
       'https://github.com/redteamfortress/PhantomKiller/raw/refs/heads/main/PhantomKiller.sys',
       'https://medium.com/@jehadbudagga/phantom-killer-reverse-engineering-and-weaponizing-a-lenovo-driver-to-terminate-edr-processes-9191cd06374f',
     ],
-    DownloadUrl: 'https://github.com/redteamfortress/PhantomKiller/releases/download/v1.0.0/PhantomKiller.zip',
+    DownloadUrl: 'https://raw.githubusercontent.com/redteamfortress/PhantomKiller/refs/heads/main/PhantomKiller.sys',
     FeaturedKiller: true,
+    MvdbStatusOverride: 'passed',
     Signer: 'LENOVO (Symantec Class 3 SHA256 Code Signing CA)',
+    BaseDriverName: 'BootRepair.sys',
+    SourceDriverName: 'PhantomKiller.sys',
     DeviceObject: '\\\\.\\BootRepair',
     Ioctl: '0x222014',
     VTDetections: '0/71 at time of discovery',
@@ -194,8 +200,13 @@ const MANUAL_DRIVERS: ProcessedDriver[] = [
     ReleasePublishedAt: '2026-05-19T07:04:09Z',
     ReleaseAssetName: 'PhantomKiller.zip',
     ReleaseAssetSha256: 'd05dd3a7b92170b201f314ba27aefa8bda3ca47f33c652b2b4f44545c58205b8',
+    DirectDriverDownloadUrl: 'https://raw.githubusercontent.com/redteamfortress/PhantomKiller/refs/heads/main/PhantomKiller.sys',
   },
 ];
+
+const MANUAL_DRIVERS_CACHE_KEY = MANUAL_DRIVERS
+  .map(driver => `${driver.Id || driver.SHA256 || driver.Filename}:${driver.FeaturedKiller ? 'featured' : 'standard'}`)
+  .join('|');
 
 /**
  * Derive certificate status from the Signatures[].Certificates[].ValidTo dates.
@@ -259,6 +270,11 @@ class DriversCache {
     // Compute cert status and MVDB status for every driver once
     for (const driver of this.drivers) {
       driver._certStatus = deriveCertStatus(driver);
+
+      if (driver.MvdbStatusOverride !== undefined) {
+        driver._mvdbStatus = driver.MvdbStatusOverride;
+        continue;
+      }
 
       // MVDB status: check if driver hash is in the HVCI allowed CSV
       const hashInCsv = (driver.MD5 && this.hvciAllowedHashes.has(driver.MD5.toLowerCase())) ||
@@ -380,7 +396,7 @@ class DriversCache {
 
   async loadDrivers(): Promise<ProcessedDriver[]> {
     const dataPath = path.join(process.cwd(), 'data', 'drv.json');
-    const currentFileHash = this.getFileHash(dataPath);
+    const currentFileHash = `${this.getFileHash(dataPath)}_${MANUAL_DRIVERS_CACHE_KEY}`;
     const cachedHash = cache.get(CACHE_KEYS.FILE_HASH);
     const cached = cache.get(CACHE_KEYS.ALL_DRIVERS);
 
@@ -527,23 +543,7 @@ class DriversCache {
       console.warn('Could not read HVCI blocklist metadata:', error);
     }
 
-    let hvciCompatibleCount = 0;
-    try {
-      const csvPath = path.join(process.cwd(), 'data', 'hvci_drivers.csv');
-      const csvContent = readFileWithEncodingDetection(csvPath);
-      const lines = csvContent.split('\n');
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-        if (columns.length >= 4 && columns[3] === 'Allowed') {
-          hvciCompatibleCount++;
-        }
-      }
-    } catch (error) {
-      console.warn('Could not read HVCI CSV for stats:', error);
-      hvciCompatibleCount = this.indexedData.get('hvci')?.length || 0;
-    }
+    const hvciCompatibleCount = this.indexedData.get('hvci')?.length || 0;
 
     const stats = {
       total: drivers.length,
@@ -593,8 +593,11 @@ class DriversCache {
 
   private searchInDriverOptimized(driver: ProcessedDriver, searchTerm: string): boolean {
     const searchFields = [
-      driver.OriginalFilename || driver.Filename,
+      driver.DisplayName,
+      driver.OriginalFilename,
+      driver.Filename,
       driver.Company, driver.Description,
+      driver.DisplayName,
       driver.MD5, driver.SHA1, driver.SHA256,
       driver.FileVersion, driver.Copyright,
       driver.Category, driver.Author, driver.MitreID,
