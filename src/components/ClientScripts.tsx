@@ -114,11 +114,26 @@ export default function ClientScripts() {
   }, [isHydrated]);
 
   useEffect(() => {
-    // Register service worker
-    if ('serviceWorker' in navigator && isHydrated) {
+    if (!isHydrated || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    if (process.env.NODE_ENV === 'production') {
+      // Production chunks are content-hashed (immutable), so the cache-first SW is safe.
       navigator.serviceWorker.register('/sw.js').catch(() => {
         // Ignore SW registration errors
       });
+    } else {
+      // Development: a cache-first SW serves stale, non-hashed Turbopack chunks and breaks
+      // HMR (e.g. "module factory is not available"). Tear down any SW + caches so dev stays clean.
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => registrations.forEach((reg) => reg.unregister()))
+        .catch(() => {});
+      if (typeof caches !== 'undefined') {
+        caches
+          .keys()
+          .then((keys) => keys.forEach((key) => caches.delete(key)))
+          .catch(() => {});
+      }
     }
   }, [isHydrated]);
 

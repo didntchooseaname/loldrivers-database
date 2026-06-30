@@ -8,11 +8,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AnimatedList } from '@/components/magicui/animated-list';
 import { History, ExternalLink, Loader2, AlertTriangle, RotateCw, Github } from 'lucide-react';
 
 interface ProcessedCommit {
@@ -102,11 +104,16 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
   return (
     <Dialog open={isVisible} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="modal-panel max-w-2xl max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden sm:rounded-xl">
-        <DialogHeader className="shrink-0 px-6 py-5 bg-muted/30">
-          <DialogTitle className="flex items-center gap-3 text-xl font-semibold tracking-tight">
-            <History className="h-5 w-5 text-muted-foreground" />
+        <DialogHeader className="shrink-0 border-b border-border bg-gradient-to-b from-muted/45 to-transparent px-6 pt-5 pb-4 pr-12 text-left">
+          <DialogTitle className="flex items-center gap-2.5 text-base font-semibold tracking-tight">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground/80 shrink-0">
+              <History className="h-4 w-4" />
+            </span>
             Changelog
           </DialogTitle>
+          <DialogDescription className="mt-1 pl-[2.625rem] text-xs text-muted-foreground">
+            Recent updates to the database, pulled live from GitHub.
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1 min-h-0">
@@ -134,13 +141,13 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
                 </AlertAction>
               </Alert>
             ) : (
-              <div className="space-y-3">
+              <AnimatedList className="gap-3" delay={70}>
                 {commits.map((commit) => (
                   <div
                     key={commit.sha}
                     className="commit-card flex gap-4 rounded-xl border border-border bg-card p-4 text-card-foreground transition-colors duration-smooth ease-apple hover:bg-muted/30"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-medium text-sm">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-foreground font-semibold text-sm">
                       {commit.title.slice(0, 1).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1 space-y-1.5">
@@ -177,7 +184,7 @@ export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClo
                     </div>
                   </div>
                 ))}
-              </div>
+              </AnimatedList>
             )}
 
             <div className="mt-6 pt-4">

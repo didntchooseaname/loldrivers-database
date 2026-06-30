@@ -10,6 +10,15 @@ interface HVCIBlocklistInfoProps {
   stats?: Stats;
 }
 
+function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border bg-background/40 px-3 py-2">
+      <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium text-foreground tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 export default function HVCIBlocklistInfo({ stats }: HVCIBlocklistInfoProps) {
   const hvciCheck = stats?.hvciBlocklistCheck;
 
@@ -18,39 +27,33 @@ export default function HVCIBlocklistInfo({ stats }: HVCIBlocklistInfoProps) {
   }
 
   return (
-    <Card className="bg-card text-card-foreground border-border">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2 text-base font-medium">
-          <Shield className="h-4 w-4 text-muted-foreground" />
-          <span>Microsoft Vulnerable Drivers Blocklist Check</span>
+    <Card size="sm" className="border-border bg-card/60">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Shield className="h-4 w-4" />
+            </span>
+            Microsoft Vulnerable Driver Blocklist
+          </div>
+          <a
+            href={hvciCheck.source}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground underline decoration-foreground/30 underline-offset-4 transition-colors hover:decoration-foreground"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Official source
+          </a>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground">Last Check:</span>
-          <SafeDate date={hvciCheck.lastCheck} />
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <Metric label="Last check" value={<SafeDate date={hvciCheck.lastCheck} />} />
+          <Metric label="MS last update" value={<SafeDate date={hvciCheck.microsoftLastModified} />} />
+          <Metric label="Blocked hashes" value={hvciCheck.totalBlockedHashes.toLocaleString()} />
+          <Metric label="Matched drivers" value={hvciCheck.matchedDrivers.toLocaleString()} />
         </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground">Microsoft Last Update:</span>
-          <SafeDate date={hvciCheck.microsoftLastModified} />
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground">Blocked Hashes:</span>
-          <span>{hvciCheck.totalBlockedHashes.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground">Matched Drivers:</span>
-          <span className="font-medium">{hvciCheck.matchedDrivers}</span>
-        </div>
-        <a
-          href={hvciCheck.source}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-primary hover:underline mt-2"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          Microsoft Official Block List
-        </a>
       </CardContent>
     </Card>
   );

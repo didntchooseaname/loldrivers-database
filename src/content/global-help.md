@@ -1,51 +1,38 @@
-# About LOLDrivers Database
+# About this database
 
-A driver security research platform that goes beyond cataloging: advanced filtering, behavioral analysis, and Microsoft Vulnerable Drivers Blocklist compatibility verification for Windows drivers used in real-world attacks.
+A research-focused interface for the LOLDrivers dataset. It goes beyond a plain catalogue: behavioral analysis, advanced filtering, and live verification against Microsoft's Vulnerable Driver Blocklist for the Windows drivers abused in real-world attacks.
 
-**Audience:** Security researchers, threat hunters, malware analysts, and system administrators.
+**Built for:** security researchers, threat hunters, malware analysts, and system administrators.
 
 ---
 
-## Project Vision
+## What it does
 
-- Address gaps in existing driver analysis tools with a comprehensive, research-focused platform.
-- Enable efficient identification, analysis, and defense against driver-based attacks through search and filtering that existing solutions do not offer.
+- **Behavioral analysis** - Each driver's imported functions are inspected to surface capabilities: process killing, memory manipulation, debug bypass, registry access, and file-system access.
+- **Blocklist verification** - Compatibility is checked daily against Microsoft's live Vulnerable Driver Blocklist (MVDB), rather than a static bundled list.
+- **Search & filtering** - Find drivers by name, hash, company, description, blocklist status, architecture, or behavior - and combine those filters freely.
+- **Certificate insight** - Code-signing certificate status is surfaced on each card to help judge legitimacy.
+- **Architecture awareness** - Filter and identify drivers by x64, x32, or arm64.
 
-## Features
+## How it works
 
-- **Behavioral analysis** — Imported functions are analyzed to detect capabilities such as memory manipulation, process killing, debug bypass, registry manipulation, and file system access.
-- **Microsoft Vulnerable Drivers Blocklist verification** — Compatibility is checked against Microsoft’s Vulnerable Driver Blocklist (MVDB) for more accurate results than static lists.
-- **Search and filtering** — Find drivers by hashes, company, description, Microsoft Vulnerable Drivers Blocklist status, architecture, and behavioral patterns.
-- **Certificate information** — Certificate validation and status are shown in driver details for security assessment.
-- **Architecture-aware filtering** — Filter by x64, x32, or arm64 with clear labels on each driver card.
+- **Live data pipeline** - Continuously synced with the upstream LOLDrivers project for current threat intelligence.
+- **Server-side search** - Filtering and search run on the server, so large queries stay fast.
+- **Shareable state** - Your search and filters live in the URL; copy the link to share or bookmark an exact view.
+- **Responsive** - Works on desktop and smaller screens alike.
 
-## Technical Implementation
+## Key terms
 
-- **Data pipeline** — Continuous integration with the LOLDrivers project for up-to-date threat intelligence.
-- **Server-side processing** — Filtering and search run on the server for good performance on large datasets.
-- **Microsoft Vulnerable Drivers Blocklist data** — Automated workflows fetch and parse Microsoft’s Vulnerable Driver Blocklist (MVDB) so blocklist compatibility data stays current.
-- **URL state** — Filter and search state live in the URL for sharing and bookmarking.
-- **Responsive layout** — Usable on desktop and smaller screens.
+- **MVDB** - Microsoft's Vulnerable Driver Blocklist: the driver hashes Windows blocks when Hypervisor-protected Code Integrity (HVCI) is enabled. "MVDB passed" means a driver is *not* on that list.
+- **BYOVD** - "Bring Your Own Vulnerable Driver": loading a legitimately signed but vulnerable driver to gain kernel access and disable defenses.
+- **Process killer** - A driver that can be abused to terminate protected processes, often security software.
+- **Authentihash** - A code-level hash that ignores the signature, so it stays stable when a file is re-signed. See the dedicated help from any hash row.
+- **Behavioral capabilities** - The tags on each card, derived from the kernel functions a driver imports.
 
-## Research Use
+## Legal & ethical notice
 
-- Support for cybersecurity research, threat intelligence, and academic work on driver-based attack vectors.
-- Open-source and community-oriented to encourage contributions and collaborative research.
-
-## Quick Reference — Key Terms
-
-- **Microsoft Vulnerable Drivers Blocklist (MVDB)** — The official list of driver hashes that Windows blocks when Hypervisor-protected Code Integrity is enabled; our checks compare against this list.
-- **Process killer drivers** — Legitimate drivers with vulnerabilities that can be abused to terminate processes with elevated privileges.
-- **Behavioral analysis** — Automated detection of driver capabilities from imported function analysis.
-- **Architecture display** — x64, x32, or arm64 shown next to driver names for quick identification.
-- **Capacities section** — Part of each driver card that lists behavioral capabilities from function analysis.
-
-## Legal & Ethical Notice
-
-This database is for legitimate security research and defensive use only. Use must comply with applicable laws, organizational policies, and ethical standards. Misuse for malicious purposes is prohibited.
-
-**Community:** Improve driver security through responsible disclosure and collaborative offensive and defensive research.
+This database exists for legitimate security research and defensive work only. Your use must comply with applicable laws, organizational policy, and ethical standards. Misuse for malicious purposes is prohibited.
 
 ## Disclaimer
 
-This project is provided “as is” without warranty or guarantee. Maintainers are not responsible for the accuracy, completeness, or fitness of the data or platform. Users assume all risk when using the database and its information.
+Provided "as is", without warranty. Maintainers are not responsible for the accuracy, completeness, or fitness of the data. You assume all risk when using this database and the information it contains.

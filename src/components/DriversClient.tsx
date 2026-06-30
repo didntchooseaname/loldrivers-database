@@ -15,6 +15,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { BlurFade } from '@/components/magicui/blur-fade';
+import { NumberTicker } from '@/components/magicui/number-ticker';
+import { BorderBeam } from '@/components/magicui/border-beam';
+import { useSpotlight } from '@/components/magicui/use-spotlight';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Collapsible,
   CollapsibleContent,
@@ -53,22 +64,50 @@ const fetcher = async (url: string) => {
   }
 };
 
-// Parse URL params (only on client)
-const getInitialUrlParams = () => {
-  if (typeof window === 'undefined') {
-    return { searchQuery: '', activeFilters: new Set<string>(), currentPage: 1 };
-  }
-  return parseFiltersFromURL(new URL(window.location.href).searchParams);
-};
+// Loading placeholder shaped like a driver card
+function DriverCardSkeleton() {
+  return (
+    <Card className="driver-card flex h-full flex-col overflow-hidden">
+      <CardHeader className="shrink-0 px-3 pt-3 pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-2.5 w-2/5" />
+          </div>
+          <Skeleton className="h-7 w-7 rounded-md shrink-0" />
+        </div>
+        <div className="flex gap-1.5 mt-2">
+          <Skeleton className="h-5 w-20 rounded-full" />
+          <Skeleton className="h-5 w-24 rounded-full" />
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col px-3 pt-0 pb-3 gap-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-11/12" />
+        <Skeleton className="h-8 w-full rounded-md mt-1" />
+        <Skeleton className="h-8 w-full rounded-md" />
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function DriversClient({
   initialDrivers,
-  initialStats
+  initialStats,
+  initialUiParams,
 }: {
   initialDrivers: DriversResponse;
   initialStats: { success: boolean; stats: Stats };
+  initialUiParams?: { searchQuery: string; activeFilters: string[]; currentPage: number };
 }) {
-  const initialParams = getInitialUrlParams();
+  // Derived on the server from the request URL, so SSR and the first client render
+  // are identical (no hydration mismatch on URL-driven filter/search state).
+  const initialParams = {
+    searchQuery: initialUiParams?.searchQuery ?? '',
+    activeFilters: new Set(initialUiParams?.activeFilters ?? []),
+    currentPage: initialUiParams?.currentPage ?? 1,
+  };
+  const spotlight = useSpotlight<HTMLDivElement>();
 
   const [searchQuery, setSearchQuery] = useState(initialParams.searchQuery);
   const [inputValue, setInputValue] = useState(initialParams.searchQuery);
@@ -898,8 +937,10 @@ export default function DriversClient({
     return (
       <Card
         key={`driver-${index}-${driver.MD5 || driver.SHA256}`}
-        className={`driver-card flex h-full flex-col overflow-hidden ${danger ? 'driver-card--danger border-l-[3px] border-l-destructive' : ''}`}
+        {...spotlight}
+        className={`driver-card magic-card flex h-full flex-col overflow-hidden ${danger ? 'driver-card--danger' : ''}`}
       >
+        {danger && <BorderBeam color="var(--destructive)" duration={7} width={1.5} />}
         <CardHeader className="shrink-0 px-3 pt-3 pb-2">
           {/* Top row: name + arch + download */}
           <div className="flex items-start justify-between gap-2">
@@ -939,78 +980,111 @@ export default function DriversClient({
   return (
     <div className="container">
       <header className="header">
+        <div className="header__dots dot-pattern" aria-hidden />
         <div className="header-top flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="header-content">
-            <h1 className="text-xl sm:text-2xl font-bold">LOLDrivers Database</h1>
-            <p className="header-subtitle">Vulnerable and malicious Windows drivers database</p>
+            <p className="header-eyebrow"><span className="header-eyebrow__dot" aria-hidden /> Live threat intelligence</p>
+            <h1><span className="text-sheen">LOLDrivers Database</span></h1>
+            <p className="header-subtitle">Search, analyze, and hunt vulnerable and malicious Windows drivers used in real-world attacks.</p>
             <p className="last-updated">
-              <SafeDate date={statsData?.stats?.lastUpdated || null} prefix="Last updated: " fallback="Loading..." />
+              <Clock className="h-3.5 w-3.5 opacity-70" aria-hidden />
+              <SafeDate date={statsData?.stats?.lastUpdated || null} prefix="Updated " fallback="Loading…" />
             </p>
           </div>
-          <div className="header-controls flex shrink-0 gap-1">
-            <Button variant="ghost" size="icon" onClick={() => setShowChangelogPopup(true)} title="View changelog" aria-label="View changelog">
-              <History className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={shareCurrentSearch} title="Share current search" aria-label="Share current search">
-              <Share2 className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => setShowHelpPopup(true)} aria-label="Help" title="Help">
-              <HelpCircle className="h-4 w-4" />
-            </Button>
-            <ThemeSwitcher />
-          </div>
+          <TooltipProvider delayDuration={250}>
+            <div className="header-controls flex shrink-0 gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setShowChangelogPopup(true)} aria-label="View changelog">
+                    <History className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Changelog</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={shareCurrentSearch} aria-label="Share current search">
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Share this view</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setShowHelpPopup(true)} aria-label="Help and definitions">
+                    <HelpCircle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Help &amp; definitions</TooltipContent>
+              </Tooltip>
+              <ThemeSwitcher />
+            </div>
+          </TooltipProvider>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stats-section">
-          <div className="stat-item flex flex-col gap-0.5">
-            <span className="stat-label flex items-center gap-1.5"><Database className="h-3.5 w-3.5 opacity-70" /> Total Drivers</span>
-            <span className="stat-value">{statsData?.stats?.total || 0}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 stats-section">
+          <div className="stat-item flex flex-col gap-1">
+            <span className="stat-label flex items-center gap-1.5"><Database className="h-3.5 w-3.5 opacity-70" /> Total drivers</span>
+            <NumberTicker value={statsData?.stats?.total || 0} className="stat-value" />
+            <span className="text-[0.625rem] text-muted-foreground/80">Catalogued samples</span>
           </div>
           <div role="button" tabIndex={0}
-            className={`stat-item clickable flex flex-col gap-0.5 ${activeFilters.has('hvci') ? 'active' : ''}`}
+            className={`stat-item clickable flex flex-col gap-1 ${activeFilters.has('hvci') ? 'active' : ''}`}
             onClick={() => applyDirectFilter('hvci')}
+            aria-pressed={activeFilters.has('hvci')}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), applyDirectFilter('hvci'))}>
-            <span className="stat-label flex items-center gap-1.5"><Check className="h-3.5 w-3.5 opacity-70" /> MVDB Passed</span>
-            <span className="stat-value">{statsData?.stats?.hvciCompatible || 0}</span>
+            <span className="stat-label flex items-center gap-1.5"><Check className="h-3.5 w-3.5 opacity-70" /> MVDB passed</span>
+            <NumberTicker value={statsData?.stats?.hvciCompatible || 0} className="stat-value" />
+            <span className="text-[0.625rem] inline-flex items-center gap-1 text-muted-foreground/80">
+              <Filter className="h-2.5 w-2.5" />{activeFilters.has('hvci') ? 'Filtering · click to clear' : 'Click to filter'}
+            </span>
           </div>
           <div role="button" tabIndex={0}
-            className={`stat-item clickable process-killer-item flex flex-col gap-0.5 ${activeFilters.has('process-killer') ? 'active' : ''}`}
+            className={`stat-item clickable process-killer-item flex flex-col gap-1 ${activeFilters.has('process-killer') ? 'active' : ''}`}
             onClick={() => applyDirectFilter('process-killer')}
+            aria-pressed={activeFilters.has('process-killer')}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), applyDirectFilter('process-killer'))}>
-            <span className="stat-label flex items-center gap-1.5"><Skull className="h-3.5 w-3.5 opacity-70" /> Process Killer Drivers</span>
-            <span className="stat-value">{statsData?.stats?.processKillerDrivers || 0}</span>
+            <span className="stat-label flex items-center gap-1.5"><Skull className="h-3.5 w-3.5 opacity-70" /> Process killers</span>
+            <NumberTicker value={statsData?.stats?.processKillerDrivers || 0} className="stat-value" />
+            <span className="text-[0.625rem] inline-flex items-center gap-1 text-muted-foreground/80">
+              <Filter className="h-2.5 w-2.5" />{activeFilters.has('process-killer') ? 'Filtering · click to clear' : 'Click to filter'}
+            </span>
           </div>
         </div>
 
-        <HVCIBlocklistInfo stats={statsData?.stats} />
+        <div className="mt-3">
+          <HVCIBlocklistInfo stats={statsData?.stats} />
+        </div>
       </header>
 
       <div className="search-section">
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
             <Input
               id="driver-search" name="search" type="text"
-              placeholder="Search drivers by name, hash, company, description..."
+              placeholder="Search by name, hash, company, description…"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && performSearch()}
               disabled={isLoading}
-              className="h-10"
+              className="h-11 pl-10 bg-card"
               aria-label="Search drivers by name, hash, company, or description"
             />
           </div>
-          <Button onClick={performSearch} disabled={isLoading}>
+          <Button onClick={performSearch} disabled={isLoading} className="h-11 px-5 shimmer-cta">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {isLoading ? 'Searching...' : 'Search'}
+            {isLoading ? 'Searching…' : 'Search'}
           </Button>
-          <Button variant="outline" onClick={clearAllFilters} disabled={!searchQuery.trim() && activeFilters.size === 0}>
+          <Button variant="outline" onClick={clearAllFilters} disabled={!searchQuery.trim() && activeFilters.size === 0} className="h-11">
             <Eraser className="h-4 w-4" /> Clear
           </Button>
         </div>
 
-        <div className="filter-options">
+        <div className="filter-panel">
+          <div className="filter-options">
           <div className="filter-group">
-            <span className="filter-label">Quick Filters:</span>
+            <span className="filter-label">Quick</span>
             <Button variant={pendingFilters.has('hvci') ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFilter('hvci')}>
               <Check className="h-3.5 w-3.5" /> MVDB Passed
             </Button>
@@ -1030,8 +1104,9 @@ export default function DriversClient({
               <ArrowUp className="h-3.5 w-3.5" /> Oldest First
             </Button>
           </div>
+          <div className="filter-divider" />
           <div className="filter-group advanced-filters">
-            <span className="filter-label">Behaviors:</span>
+            <span className="filter-label">Behaviors</span>
             <Button variant={pendingFilters.has('process-killer') ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFilter('process-killer')}>
               <Skull className="h-3.5 w-3.5" /> Process Killer
             </Button>
@@ -1049,8 +1124,9 @@ export default function DriversClient({
             </Button>
           </div>
 
+          <div className="filter-divider" />
           <div className="filter-group certificate-filters">
-            <span className="filter-label">Certificates:</span>
+            <span className="filter-label">Certificates</span>
             <Button variant={pendingFilters.has('cert-expired') ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFilter('cert-expired')} disabled={pendingFilters.has('cert-missing')}>
               <Clock className="h-3.5 w-3.5" /> Expired
             </Button>
@@ -1062,8 +1138,9 @@ export default function DriversClient({
             </Button>
           </div>
 
+          <div className="filter-divider" />
           <div className="filter-group meta-filters">
-            <span className="filter-label">Architecture:</span>
+            <span className="filter-label">Architecture</span>
             <Button variant={pendingFilters.has('architecture-AMD64') ? 'secondary' : 'outline'} size="sm" onClick={() => toggleFilter('architecture-AMD64')}>
               <Cpu className="h-3.5 w-3.5" /> x64
             </Button>
@@ -1074,20 +1151,26 @@ export default function DriversClient({
               <Cpu className="h-3.5 w-3.5" /> arm64
             </Button>
           </div>
+          <div className="filter-divider" />
           <div className="filter-group control-filters">
             <Button onClick={applyFilters} disabled={pendingFilters.size === 0 && searchQuery.trim() === ''} size="sm">
-              <Check className="h-3.5 w-3.5" /> Apply Filters
+              <Check className="h-3.5 w-3.5" /> Apply filters
+              {pendingFilters.size > 0 && (
+                <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-foreground/20 px-1 text-[0.625rem] font-semibold tabular-nums">{pendingFilters.size}</span>
+              )}
             </Button>
-            <Button variant="destructive" size="sm" onClick={clearAllFilters} disabled={!searchQuery.trim() && activeFilters.size === 0}>
-              <Eraser className="h-3.5 w-3.5" /> Clear Filters
+            <Button variant="outline" size="sm" onClick={clearAllFilters} disabled={!searchQuery.trim() && activeFilters.size === 0}>
+              <Eraser className="h-3.5 w-3.5" /> Clear filters
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowFilterHelpPopup(true)} title="How filters work">
-              <HelpCircle className="h-3.5 w-3.5" /> Filter Help
+            <Button variant="ghost" size="sm" onClick={() => setShowFilterHelpPopup(true)} className="ml-auto">
+              <HelpCircle className="h-3.5 w-3.5" /> How filters work
             </Button>
           </div>
+          </div>
         </div>
-        <p className="filter-apply-hint text-xs text-muted-foreground mt-1.5">
-          Changes apply when you click Apply Filters. Live search activates as you type.
+        <p className="filter-apply-hint text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+          <Filter className="h-3 w-3 opacity-70 shrink-0" aria-hidden />
+          Toggle filters, then <strong className="font-medium text-foreground">Apply</strong>. Search runs live as you type.
         </p>
         <div aria-live="polite" aria-atomic="true" className="sr-only">{filterAnnouncement}</div>
 
@@ -1110,36 +1193,53 @@ export default function DriversClient({
           </div>
         )}
 
-        <div className="search-stats mb-4">
-          <span>
-            {isLoading
-              ? 'Searching...'
-              : `Showing ${Math.min(ITEMS_PER_PAGE, drivers.length)} of ${totalItems} drivers (Page ${currentPage} of ${totalPages})`
-            }
-          </span>
-          {(searchQuery || activeFilters.size > 0) && <span className="server-search-indicator"> (Server-side search)</span>}
-          {error && <span className="error-indicator"> (Error occurred)</span>}
+        <div className="search-stats mb-4 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {isLoading ? (
+            <span>Searching…</span>
+          ) : (
+            <span>
+              Showing <strong className="font-semibold text-foreground tabular-nums">{Math.min(ITEMS_PER_PAGE, drivers.length)}</strong> of{' '}
+              <strong className="font-semibold text-foreground tabular-nums">{totalItems.toLocaleString()}</strong> drivers
+              <span className="text-muted-foreground/70"> · page {currentPage} of {totalPages}</span>
+            </span>
+          )}
+          {(searchQuery || activeFilters.size > 0) && !isLoading && (
+            <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[0.625rem] font-medium">
+              <Filter className="h-2.5 w-2.5" /> Filtered
+            </Badge>
+          )}
+          {error && <span className="text-destructive">· error occurred</span>}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 drivers-grid items-stretch">
-        {!isLoading && drivers.length > 0 ? (
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, i) => <DriverCardSkeleton key={`sk-${i}`} />)
+        ) : drivers.length > 0 ? (
           drivers.map((driver, index) => {
             const globalIndex = (currentPage - 1) * ITEMS_PER_PAGE + index;
-            return createDriverCard(driver, globalIndex);
+            return (
+              <BlurFade
+                key={`card-${currentPage}-${globalIndex}-${driver.MD5 || driver.SHA256}`}
+                delay={Math.min(index * 40, 320)}
+                className="h-full"
+              >
+                {createDriverCard(driver, globalIndex)}
+              </BlurFade>
+            );
           })
-        ) : !isLoading ? (
+        ) : (
           <div className="empty-state col-span-full">
             <SearchX className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
             <h3>No drivers found</h3>
-            <p className="mt-1">Try adjusting your search term or clearing some filters.</p>
+            <p className="mt-1">Try a different search term, or clear some filters to widen the results.</p>
             {(searchQuery || activeFilters.size > 0) && (
               <Button variant="outline" size="sm" className="mt-3" onClick={clearAllFilters}>
                 <Eraser className="h-3.5 w-3.5" /> Clear all filters
               </Button>
             )}
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Pagination */}
@@ -1221,7 +1321,7 @@ export default function DriversClient({
             <p className="footer__disclaimer">Independent interface for educational and research purposes.</p>
             <div className="footer__actions">
               <button type="button" onClick={() => setShowTermsPopup(true)} className="footer__legal">
-                <Scale className="footer__icon-inline" aria-hidden /> Terms of Service
+                <Scale className="footer__icon-inline" aria-hidden /> Terms &amp; License
               </button>
             </div>
           </div>
@@ -1230,21 +1330,21 @@ export default function DriversClient({
 
       {/* Help Dialog */}
       <HelpDialog open={showHelpPopup} onOpenChange={setShowHelpPopup}
-        title="About LOLDrivers Database" description="Technical definitions, project vision, and key terms."
+        title="About this database" description="What this project is, what it does, and the key terms."
         icon={<BookOpen className="h-5 w-5 text-muted-foreground" />}>
         {helpContent ? <MarkdownRenderer content={helpContent.globalHelp} /> : <p className="text-muted-foreground">Loading help content...</p>}
       </HelpDialog>
 
       {/* Filter Help Dialog */}
       <HelpDialog open={showFilterHelpPopup} onOpenChange={setShowFilterHelpPopup}
-        title="Filter Help – How Each Filter Works" description="Explanation of each filter option."
+        title="How filters work" description="What each filter does, and how to combine them."
         icon={<Filter className="h-5 w-5 text-muted-foreground" />}>
         {helpContent ? <MarkdownRenderer content={helpContent.filterHelp} /> : <p className="text-muted-foreground">Loading filter help...</p>}
       </HelpDialog>
 
       {/* Authentihash Help Dialog */}
       <HelpDialog open={showAuthentihashHelpPopup} onOpenChange={setShowAuthentihashHelpPopup}
-        title="Authentihash Information" description="What authentihashes are and how they are used."
+        title="Authentihashes explained" description="Code-level hashes that stay stable across re-signing."
         icon={<Shield className="h-5 w-5 text-muted-foreground" />} showScrollIndicator={false}>
         {helpContent ? <MarkdownRenderer content={helpContent.authentihashHelp} /> : <p className="text-muted-foreground">Loading...</p>}
       </HelpDialog>

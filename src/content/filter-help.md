@@ -1,107 +1,57 @@
 # How Filters Work
 
-This guide explains each filter and how to combine them for precise queries.
+Filters narrow the catalogue to exactly the drivers you care about. Toggle any combination, then click **Apply filters** - the search box runs live as you type, so you can refine both at once.
 
 ---
 
-## Information Notice
+## Quick filters
 
-This implementation was inspired by loldrivers.com’s Microsoft Vulnerable Drivers Blocklist check; their implementation was not accurate. Unlike the Trail of Bits script (which uses a local blocklist), we query **Microsoft’s direct vulnerable driver blocklist** for comparison.
+- **MVDB Passed** - Drivers that are *not* on Microsoft's Vulnerable Driver Blocklist, so they can still load where the blocklist is enforced (Windows 11, most enterprise builds).
+- **Trusted Certificate** - Drivers whose signing certificate is still within its validity period.
+- **Unknown Certificate** - Drivers whose certificate is expired or otherwise untrusted. Mutually exclusive with *Trusted Certificate*.
+- **Recent Drivers** - Entries added to the database in the last 6 months.
+- **Newest First / Oldest First** - Sort by the date the entry was added. Only one direction can be active; sorting is applied after filtering.
 
-- **Trail of Bits script:** https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1  
-- **Microsoft blocklist:** https://aka.ms/VulnerableDriverBlockList
+## Behavior filters
 
-## MVDB Passed Filter
+These infer what a driver can *do* from the Windows kernel functions it imports. Many legitimate drivers import the same APIs, so treat a match as a lead for investigation, not a verdict.
 
-- **What it does:** Shows only drivers that passed the Microsoft Vulnerable Driver Blocklist (MVDB) automated daily check.
-- **How it works:** A GitHub Action fetches the blocklist from https://aka.ms/VulnerableDriverBlockList and cross-references it with this database.
-- **Use case:** Find drivers that can run on systems with Microsoft Vulnerable Drivers Blocklist in effect (important for Windows 11 and enterprise security).
+- **Process Killer** - Can terminate processes (e.g. `ZwTerminateProcess`). A classic BYOVD primitive for disabling security tooling.
+- **Memory Manipulator** - Can allocate, map, or change the protection of memory (`ZwMapViewOfSection`, `ZwAllocateVirtualMemory`, `ZwProtectVirtualMemory`). Useful for code injection or bypassing memory protections.
+- **Debug Bypass** - Can read or alter debug-related system state (`ZwSetInformationProcess`, `ZwQuerySystemInformation`). Often used to hide from debuggers or evade analysis.
+- **Registry Manipulator** - Can create, modify, or delete registry keys and values (`ZwCreateKey`, `ZwSetValueKey`, `ZwDeleteKey`). Common for persistence and configuration tampering.
+- **File Manipulator** - Can create, read, write, or delete files (`ZwCreateFile`, `ZwReadFile`, `ZwWriteFile`, `ZwDeleteFile`). Relevant to data theft, log tampering, and payload staging.
 
-## Process Killer Filter
+## Certificate filters
 
-- **What it does:** Shows drivers that are known to be exploitable and have been used in real attacks, with the ability to terminate processes.
-- **Technical:** Legitimate drivers with security flaws that attackers use for privilege escalation or other malicious actions.
-- **Attack vector:** Often used in BYOVD (Bring Your Own Vulnerable Driver) attacks to load a vulnerable driver and bypass security.
-- **Use case:** Identify potentially dangerous drivers in your environment for blocking or monitoring.
+Refine by the state of a driver's code-signing certificate. Only one can be active at a time.
 
-## Memory Manipulator Filter
+- **Valid** - A certificate that is present and currently within its validity period.
+- **Expired** - A certificate that exists but has passed its expiry date.
+- **No Cert** - No certificate information is available for the entry.
 
-- **What it does:** Finds drivers that can manipulate memory, allocate virtual memory, or map memory sections.
-- **Detection:** Looks for functions such as `ZwProtectVirtualMemory`, `ZwAllocateVirtualMemory`, `ZwMapViewOfSection`, and related kernel APIs.
-- **Security impact:** Can support code injection, privilege escalation, or bypass of memory protections.
-- **Note:** Many legitimate drivers also use memory APIs; context and further analysis are important.
+## Architecture filters
 
-## Debug Bypass Filter
+Filter by target processor architecture. Only one can be active at a time, and the architecture is also shown on each driver card.
 
-- **What it does:** Finds drivers that can bypass debugging protections or manipulate debug-related system information.
-- **Detection:** Looks for functions such as `ZwSetInformationProcess`, `ZwQuerySystemInformation`, and debug-related kernel APIs.
-- **Use:** Can hide processes from debuggers, disable debugging, or manipulate debug ports; often used by malware to evade analysis.
+- **x64** - 64-bit x86 (AMD64); the default on modern Windows.
+- **x32** - 32-bit x86 (I386); legacy and compatibility scenarios.
+- **arm64** - 64-bit ARM (ARM64); Windows on ARM devices.
 
-## Registry Manipulator Filter
+## Combining filters effectively
 
-- **What it does:** Finds drivers that can create, modify, or delete Windows registry keys and values.
-- **Detection:** Registry-related functions such as `ZwCreateKey`, `ZwSetValueKey`, `ZwDeleteKey`, and similar APIs.
-- **Use:** Often used for persistence, changing system configuration, or hiding malicious activity.
+All non-exclusive filters stack, so you can build precise queries:
 
-## File Manipulator Filter
+- **MVDB Passed + Process Killer** - Drivers that can still load *and* can kill processes - a high-value target list for BYOVD defense.
+- **MVDB Passed + Recent** - New additions that aren't blocked yet.
+- **Memory Manipulator + Process Killer** - Drivers with several abusable primitives at once.
+- **Registry Manipulator + File Manipulator** - Broad system-tampering capability.
 
-- **What it does:** Finds drivers with file system capabilities: create, read, write, or delete files.
-- **Detection:** File-related functions such as `ZwCreateFile`, `ZwReadFile`, `ZwWriteFile`, `ZwDeleteFile`, and I/O operations.
-- **Security impact:** Can be used for data theft, log tampering, or deploying more malware.
+**Apply vs. Clear** - Changes take effect only when you press **Apply filters**; the badge on that button shows how many filters are staged. Use **Clear filters** to reset both the search box and every active filter.
 
-## Certificate Manipulator Filter
+## A note on the MVDB check
 
-- **What it does:** Finds drivers that can manipulate digital certificates and certificate stores.
-- **Detection:** Certificate-related functions and validation APIs.
-- **Security impact:** Can bypass code-signing checks, install malicious certificates, or undermine PKI.
+This implementation was inspired by an earlier blocklist check on loldrivers.com that was not fully accurate. Rather than relying on a bundled local list (as the Trail of Bits script does), a daily GitHub Action queries **Microsoft's live Vulnerable Driver Blocklist** and cross-references it with this database.
 
-## IoControlCode Filter
-
-- **What it does:** Filters by `IoControlCode` (IOCTL) usage patterns.
-- **Context:** IOCTL codes define how user-mode applications talk to kernel drivers via `DeviceIoControl`.
-- **Use case:** Malicious drivers often implement custom IOCTL handlers; poorly validated handlers are a common privilege-escalation vector.
-
-## Architecture Filters
-
-Filter by target processor architecture. Only one can be active at a time.
-
-- **x64 (AMD64)** — 64-bit x86; most common on modern Windows.
-- **x32 (I386)** — 32-bit x86; legacy and compatibility.
-- **arm64 (ARM64)** — ARM 64-bit; Windows on ARM devices.
-
-Architecture is also shown on each driver card next to the name.
-
-## Certificate Validation Filters
-
-*Certificate-based filtering is currently disabled in the UI while the validation system is updated. Certificate status is still shown in driver details.*
-
-- **Display:** Driver cards show certificate status (expired, valid, missing, revoked, suspicious) for assessment.
-- **Risk:** Certificate data helps assess legitimacy; expired or suspicious certs can indicate outdated or risky signing.
-
-## Recent Drivers Filter
-
-- **What it does:** Shows drivers added to the database in the last 6 months.
-- **Use:** Spot newly discovered malicious drivers or recently reported threats.
-- **Logic:** Based on the “Created” date of the driver entry.
-
-## Newest First / Oldest First
-
-- **What it does:** Sorts all results by the date the driver was added to the database.
-- **Newest first** — Recent discoveries at the top; good for emerging threats.
-- **Oldest first** — Long-known drivers first; good for historical patterns.
-- Only one sort direction can be active. Sorting applies after filtering.
-
-## Using Filters Effectively
-
-**Combining filters (except mutually exclusive ones) gives precise queries. Examples:**
-
-- MVDB Passed + Process Killer — Microsoft Vulnerable Drivers Blocklist–compatible drivers with process-termination capability.
-- MVDB Passed + Recent — Newly added drivers that are Microsoft Vulnerable Drivers Blocklist–compatible.
-- Memory Manipulator + Process Killer — High-risk drivers with multiple capabilities.
-- Registry + File Manipulator — Drivers with broad system manipulation.
-
-**Apply vs Clear:** Changes are applied only when you click **Apply Filters**. Use **Clear Filters** to reset search and all filters.
-
-**Behavioral filters** — Use capability filters (Memory, Debug Bypass, Registry, File, Process Killer) to understand what a driver can do and how it might be abused.
-
-**Architecture** — Filter by architecture when you care about a specific platform (e.g. x64 for most current systems, ARM64 for Windows on ARM).
+- Microsoft blocklist: https://aka.ms/VulnerableDriverBlockList
+- Trail of Bits script: https://raw.githubusercontent.com/trailofbits/HVCI-loldrivers-check/refs/heads/main/check_allowed_drivers.ps1

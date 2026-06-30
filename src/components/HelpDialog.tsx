@@ -34,7 +34,6 @@ export function HelpDialog({
 
   useEffect(() => {
     if (!open) return;
-    // Check if content is scrollable after render
     const el = scrollRef.current;
     if (el) {
       const check = () => setCanScroll(el.scrollHeight > el.clientHeight + 10);
@@ -52,17 +51,19 @@ export function HelpDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[36rem] max-h-[82vh] flex flex-col gap-0 p-0 overflow-hidden border-border/60 rounded-lg">
-        {/* Clean minimal header */}
-        <DialogHeader className="shrink-0 px-5 pt-4 pb-3 border-b border-border/40">
-          <DialogTitle className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <span className="flex items-center justify-center h-6 w-6 rounded bg-muted text-muted-foreground shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="shrink-0 border-b border-border bg-gradient-to-b from-muted/45 to-transparent px-6 pt-5 pb-4 pr-12 text-left">
+          <DialogTitle className="flex items-center gap-2.5 text-base font-semibold tracking-tight">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground/80 shrink-0 [&>svg]:h-4 [&>svg]:w-4">
               {icon}
             </span>
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription className="text-[0.6875rem] text-muted-foreground mt-0.5 pl-8">{description}</DialogDescription>
+            <DialogDescription className="mt-1 pl-[2.625rem] text-xs text-muted-foreground">
+              {description}
+            </DialogDescription>
           )}
         </DialogHeader>
 
@@ -72,15 +73,13 @@ export function HelpDialog({
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth help-dialog-content"
           onScroll={handleScroll}
         >
-          <div className="px-5 py-4">
-            {children}
-          </div>
+          <div className="px-6 py-5">{children}</div>
         </div>
 
-        {/* Scroll fade hint */}
+        {/* Scroll hint */}
         {showScrollIndicator && canScroll && (
-          <div className="shrink-0 flex justify-center py-1.5 border-t border-border/30 bg-gradient-to-t from-card to-transparent">
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/60 animate-bounce" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-10 items-end justify-center bg-gradient-to-t from-popover via-popover/80 to-transparent pb-1.5">
+            <ChevronDown className="h-4 w-4 animate-bounce text-muted-foreground/70" />
           </div>
         )}
       </DialogContent>

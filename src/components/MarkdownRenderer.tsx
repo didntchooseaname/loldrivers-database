@@ -41,36 +41,30 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // Sections with ## or ### become clean section blocks
+    // Headings: # -> h2 (page title), ## -> h3 (section), ### -> h4 (subsection).
+    // Plain typographic hierarchy — no boxes, no separators.
     out = out
-      .replace(/^###\s+(.*$)/gm, (_m, title) =>
-        `</div><div class="help-section"><h4>${title}</h4>`)
-      .replace(/^##\s+(.*$)/gm, (_m, title) =>
-        `</div><div class="help-section"><h4>${title}</h4>`)
+      .replace(/^###\s+(.*$)/gm, '<h4>$1</h4>')
+      .replace(/^##\s+(.*$)/gm, '<h3>$1</h3>')
       .replace(/^#\s+(.*$)/gm, '<h2>$1</h2>');
 
     out = convertListBlocks(out);
 
     out = out
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*\n]+)\*/g, '<em>$1</em>')
       .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="/content/assets/$2" alt="$1" class="help-image" loading="lazy" />')
       .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/---/g, '')
-      // Legal/disclaimer blocks
-      .replace(/(\*\*Legal & Ethical Notice:\*\*.*?)(\*\*Community:\*\*.*?)(\*\*Disclaimer:\*\*.*?)(?=\n\n|\n$|$)/gs,
-        '<div class="help-note">$1</div><div class="help-note">$2</div><div class="help-note">$3</div>')
       .replace(/&apos;/g, "'")
       .replace(/&quot;/g, '"')
       // Paragraphs (skip lines starting with HTML tags)
       .replace(/^(?!<)(.+)$/gm, '<p>$1</p>')
       .replace(/<p><\/p>/g, '')
-      .replace(/<p>(<h[234].*?<\/h[234]>)<\/p>/g, '$1')
-      .replace(/<p>(<\/div>.*?<div.*?>)<\/p>/g, '$1')
-      .replace(/<p>(<div.*?>)<\/p>/g, '$1')
-      .replace(/<p>(<ul>.*?<\/ul>)<\/p>/gs, '$1')
-      .replace(/<p>(<ol>.*?<\/ol>)<\/p>/gs, '$1')
-      + '</div>';
+      .replace(/<p>(<h[234][\s\S]*?<\/h[234]>)<\/p>/g, '$1')
+      .replace(/<p>(<ul>[\s\S]*?<\/ul>)<\/p>/g, '$1')
+      .replace(/<p>(<ol>[\s\S]*?<\/ol>)<\/p>/g, '$1');
 
     return out;
   };
