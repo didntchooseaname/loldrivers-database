@@ -9,13 +9,17 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: data-pipeline
+  cancel-in-progress: false
+
 jobs:
   check-hvci-drivers:
     runs-on: windows-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -66,10 +70,16 @@ jobs:
           $downloadHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash
           Write-Host "Downloaded ZIP hash: $downloadHash"
 
+          # Re-run when either the Microsoft blocklist or the driver catalog changed.
+          $catalogHash = (Get-FileHash -Path "data/drv.json" -Algorithm SHA256).Hash
+          $stateKey = "$downloadHash|$catalogHash"
+          "blocklist_hash=$downloadHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "catalog_hash=$catalogHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
           if (Test-Path "data/blocklist-hash.txt") {
             $storedHash = (Get-Content "data/blocklist-hash.txt" -Raw).Trim()
-            if ($downloadHash -eq $storedHash) {
-              Write-Host "Hash matches stored hash. Skipping processing."
+            if ($stateKey -eq $storedHash) {
+              Write-Host "Blocklist and catalog unchanged. Skipping processing."
               "skip_processing=true" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
               exit 0
             } else {
@@ -123,7 +133,7 @@ jobs:
           "xml_path=$xmlPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
           # Store new hash
-          $downloadHash | Out-File -FilePath "data/blocklist-hash.txt" -Encoding utf8 -NoNewline
+          $stateKey | Out-File -FilePath "data/blocklist-hash.txt" -Encoding utf8 -NoNewline
 
         } catch {
           Write-Error "Failed to download or process blocklist: $_"
@@ -223,6 +233,8 @@ jobs:
           if ($driver.KnownVulnerableSamples -and $driver.KnownVulnerableSamples.Count -gt 0) {
             foreach ($sample in $driver.KnownVulnerableSamples) {
               $isBlocked = $false
+              # Since Nov 2026 upstream nests PE metadata under ResearchEvidence
+              $meta = if ($sample.ResearchEvidence) { $sample.ResearchEvidence } else { $sample }
 
               if (Test-BlockedHash $sample) {
                 $isBlocked = $true
@@ -230,22 +242,22 @@ jobs:
 
               # Check file version rules
               if (-not $isBlocked) {
-                $fileMaxVersion = ($fileRules.Deny | Where-Object { $_.FileName -eq $sample.OriginalFilename }).MaximumFileVersion
-                if ($fileMaxVersion -and $sample.FileVersion) {
+                $fileMaxVersion = ($fileRules.Deny | Where-Object { $_.FileName -eq $meta.OriginalFilename }).MaximumFileVersion
+                if ($fileMaxVersion -and $meta.FileVersion) {
                   try {
-                    $version = ($sample.FileVersion -replace ',\s*', '.').Split()[0]
+                    $version = ($meta.FileVersion -replace ',\s*', '.').Split()[0]
                     if ($version -and [version]$version -le [version]$fileMaxVersion) {
                       $isBlocked = $true
                     }
                   } catch {
-                    Write-Host "Warning: Could not parse version '$($sample.FileVersion)' for $($sample.OriginalFilename)"
+                    Write-Host "Warning: Could not parse version '$($meta.FileVersion)' for $($meta.OriginalFilename)"
                   }
                 }
               }
 
               # Check signer rules
               if (-not $isBlocked) {
-                if (Test-BlockedSigner $sample) {
+                if (Test-BlockedSigner $meta) {
                   $isBlocked = $true
                 }
               }
@@ -255,6 +267,7 @@ jobs:
                 SHA1 = $sample.SHA1
                 SHA256 = $sample.SHA256
                 Status = if ($isBlocked) { "Blocked" } else { "Allowed" }
+                AuthentihashSHA256 = $sample.Authentihash.SHA256
               }
 
               if ($isBlocked) {
@@ -304,6 +317,16 @@ jobs:
           color = if ([int]$env:allowed_drivers -gt [int]$env:blocked_drivers) { "orange" } else { "green" }
         } | ConvertTo-Json | Out-File -FilePath ".github/hvci-stats.json" -Encoding utf8
 
+        # Machine-readable record of this check, read by the app
+        $mvdbSync = [ordered]@{
+          checked_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          blocklist_sha256 = $env:blocklist_hash
+          catalog_sha256 = $env:catalog_hash
+          allowed = [int]$env:allowed_drivers
+          blocked = [int]$env:blocked_drivers
+        } | ConvertTo-Json
+        [System.IO.File]::WriteAllText("data/mvdb-sync.json", $mvdbSync + "`n", (New-Object System.Text.UTF8Encoding $false))
+
     - name: Commit and push changes
       if: env.skip_processing == 'false'
       shell: powershell
@@ -311,11 +334,12 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
 
-        git add data/hvci_drivers.csv data/blocklist-hash.txt .github/hvci-stats.json
+        git add data/hvci_drivers.csv data/blocklist-hash.txt data/mvdb-sync.json .github/hvci-stats.json
 
         $status = git status --porcelain
         if ($status) {
           git commit -m "Update HVCI driver check results - $env:allowed_drivers allowed, $env:blocked_drivers blocked"
+          git pull --rebase
           git push
           Write-Host "Changes committed and pushed"
         } else {

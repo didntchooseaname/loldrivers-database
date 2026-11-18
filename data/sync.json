@@ -1,0 +1,10 @@
+{
+  "upstream": {
+    "repository": "magicsword-io/LOLDrivers",
+    "commit": "ef19d4c10047af428a18ef65407f0eef9a80875a",
+    "committed_at": "2026-10-27T00:41:28Z",
+    "message": "Validate catalog indicators and generated detection policies"
+  },
+  "synced_at": "2026-11-02T07:30:42Z",
+  "samples": 2430
+}

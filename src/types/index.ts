@@ -86,7 +86,17 @@ export interface Stats {
   amd64Drivers: number;
   i386Drivers: number;
   arm64Drivers: number;
-  lastUpdated: string;
+  mvdbBlockedDrivers?: number;
+  certValidDrivers?: number;
+  certExpiredDrivers?: number;
+  certMissingDrivers?: number;
+  mvdbUncheckedDrivers?: number;
+  catalogSync?: {
+    upstream: { repository: string; commit: string; committed_at: string; message: string };
+    synced_at: string;
+    samples: number;
+  } | null;
+  mvdbSync?: { checked_at: string; allowed: number; blocked: number } | null;
   hvciBlocklistCheck?: {
     lastCheck: string;
     microsoftLastModified: string;
