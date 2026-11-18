@@ -7,8 +7,8 @@
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield&issueType=license)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database.svg?type=shield&issueType=security)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdidntchooseaname%2Floldrivers-database?ref=badge_shield&issueType=security)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-didntchooseaname%2Floldrivers--database-blue.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAyCAYAAAAnWDnqAAAAAXNSR0IArs4c6QAAA05JREFUaEPtmUtyEzEQhtWTQyQLHNak2AB7ZnyXZMEjXMGeK/AIi+QuHrMnbChYY7MIh8g01fJoopFb0uhhEqqcbWTp06/uv1saEDv4O3n3dV60RfP947Mm9/SQc0ICFQgzfc4CYZoTPAswgSJCCUJUnAAoRHOAUOcATwbmVLWdGoH//PB8mnKqScAhsD0kYP3j/Yt5LPQe2KvcXmGvRHcDnpxfL2zOYJ1mFwrryWTz0advv1Ut4CJgf5uhDuDj5eUcAUoahrdY/56ebRWeraTjMt/00Sh3UDtjgHtQNHwcRGOC98BJEAEymycmYcWwOprTgcB6VZ5JK5TAJ+fXGLBm3FDAmn6oPPjR4rKCAoJCal2eAiQp2x0vxTPB3ALO2CRkwmDy5WohzBDwSEFKRwPbknEggCPB/imwrycgxX2NzoMCHhPkDwqYMr9tRcP5qNrMZHkVnOjRMWwLCcr8ohBVb1OMjxLwGCvjTikrsBOiA6fNyCrm8V1rP93iVPpwaE+gO0SsWmPiXB+jikdf6SizrT5qKasx5j8ABbHpFTx+vFXp9EnYQmLx02h1QTTrl6eDqxLnGjporxl3NL3agEvXdT0WmEost648sQOYAeJS9Q7bfUVoMGnjo4AZdUMQku50McDcMWcBPvr0SzbTAFDfvJqwLzgxwATnCgnp4wDl6Aa+Ax283gghmj+vj7feE2KBBRMW3FzOpLOADl0Isb5587h/U4gGvkt5v60Z1VLG8BhYjbzRwyQZemwAd6cCR5/XFWLYZRIMpX39AR0tjaGGiGzLVyhse5C9RKC6ai42ppWPKiBagOvaYk8lO7DajerabOZP46Lby5wKjw1HCRx7p9sVMOWGzb/vA1hwiWc6jm3MvQDTogQkiqIhJV0nBQBTU+3okKCFDy9WwferkHjtxib7t3xIUQtHxnIwtx4mpg26/HfwVNVDb4oI9RHmx5WGelRVlrtiw43zboCLaxv46AZeB3IlTkwouebTr1y2NjSpHz68WNFjHvupy3q8TFn3Hos2IAk4Ju5dCo8B3wP7VPr/FGaKiG+T+v+TQqIrOqMTL1VdWV1DdmcbO8KXBz6esmYWYKPwDL5b5FA1a0hwapHiom0r/cKaoqr+27/XcrS5UwSMbQAAAABJRU5ErkJggg==)](https://deepwiki.com/didntchooseaname/loldrivers-database)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://typescriptlang.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7-blue?style=flat-square&logo=typescript)](https://typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 [🚀 Live Demo](https://loldb.xsec.fr) | [📚 Documentation](https://deepwiki.com/didntchooseaname/loldrivers-database) | [🤝 Contributing](#contributing)
@@ -55,7 +55,7 @@ Unlike static driver lists, this platform analyzes imported functions to automat
 - **Multi-attribute search** - Hashes, company names, descriptions
 - **Behavioral filters** - Search by detected capabilities
 - **Microsoft vulnerable drivers blocklist compatibility** - Filter by HVCI-compatible (drivers that passed the Microsoft vulnerable drivers blocklist check)
-- **Architecture-aware** - Filter by x64, x32, ARM64 with visual indicators
+- **Architecture-aware** - Filter by x64, x86, ARM64 with visual indicators
 - **URL state management** - Bookmark and share search queries
 
 ### 📊 Certificate Analysis System
@@ -67,8 +67,9 @@ Unlike static driver lists, this platform analyzes imported functions to automat
 ## 🏗️ Technical Implementation
 
 ### Modern Architecture
-- **Next.js 15** with App Router and React 18
-- **TypeScript** for type safety and better development experience
+- **Next.js 16** with App Router and React 19
+- **Tailwind CSS 4** with a token-based light and dark theme
+- **TypeScript 7** (native compiler) for type safety
 - **Server-side processing** for optimal performance with large datasets
 - **SWR caching** for intelligent data fetching and synchronization
 
@@ -101,8 +102,8 @@ Unlike static driver lists, this platform analyzes imported functions to automat
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- pnpm 9+
+- Node.js 20.9+ (24 LTS recommended)
+- Bun 1.3+
 
 ### Installation
 ```bash
@@ -111,10 +112,10 @@ git clone https://github.com/didntchooseaname/loldrivers-database.git
 cd loldrivers-database
 
 # Install dependencies
-pnpm install
+bun install
 
 # Start development server
-pnpm dev
+bun run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000) to see the application.
@@ -122,10 +123,10 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 ### Production Deployment
 ```bash
 # Build for production
-pnpm build
+bun run build
 
 # Start production server
-pnpm start
+bun run start
 ```
 
 ## 📖 Key Terms & Concepts
@@ -136,14 +137,15 @@ pnpm start
 - **BYOVD** - Bring Your Own Vulnerable Driver attacks using legitimate-but-vulnerable drivers
 - **Certificate Trust** - Validation of driver signing authorities and certificate chains
 
-## �️ Available Scripts
+## 🛠️ Available Scripts
 
 ```bash
-pnpm dev          # Development server
-pnpm build        # Production build
-pnpm start        # Production server
-pnpm lint         # ESLint checking
-pnpm type-check   # TypeScript validation
+bun run dev          # Development server
+bun run build        # Production build
+bun run start        # Production server
+bun run lint         # ESLint checking
+bun run type-check   # TypeScript validation
+bun run test         # Playwright end-to-end tests
 ```
 
 ## 🤝 Contributing
