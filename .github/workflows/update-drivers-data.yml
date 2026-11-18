@@ -186,12 +186,14 @@ jobs:
         git push origin "$BRANCH"
         echo "Changes pushed successfully"
 
-    - name: Re-check new samples against the Microsoft blocklist
+    - name: Re-check new samples (Microsoft blocklist, VirusTotal)
       if: steps.check_commits.outputs.has_new_commit == 'true'
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BRANCH: ${{ github.ref_name }}
-      run: gh workflow run hvci-drivers-check.yml --ref "$BRANCH"
+      run: |
+        gh workflow run hvci-drivers-check.yml --ref "$BRANCH"
+        gh workflow run virustotal-enrich.yml --ref "$BRANCH"
 
     - name: Cleanup
       if: always()

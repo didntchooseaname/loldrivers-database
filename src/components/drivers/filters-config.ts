@@ -1,4 +1,5 @@
 import {
+  Radar,
   ArrowDownWideNarrow, Bug, CalendarClock, Cpu, Database, FileCode2,
   MemoryStick, ShieldCheck, ShieldOff, ShieldX, Skull, type LucideIcon,
 } from 'lucide-react';
@@ -49,6 +50,18 @@ export const FILTER_GROUPS: FilterGroup[] = [
       { key: 'cert-valid', label: 'Valid', icon: ShieldCheck, count: (s) => s?.certValidDrivers, tone: 'positive', glossary: 'cert-valid' },
       { key: 'cert-expired', label: 'Expired', icon: ShieldX, count: (s) => s?.certExpiredDrivers, tone: 'caution', glossary: 'cert-expired' },
       { key: 'cert-missing', label: 'No signature data', icon: ShieldOff, count: (s) => s?.certMissingDrivers, glossary: 'cert-missing' },
+    ],
+  },
+  {
+    id: 'virustotal',
+    label: 'VirusTotal',
+    exclusive: true,
+    options: [
+      { key: 'vt-high', label: 'More than 20 detections', icon: Radar, count: (s) => s?.vtBuckets?.high, tone: 'danger', glossary: 'vt-high' },
+      { key: 'vt-medium', label: '6 to 20 detections', icon: Radar, count: (s) => s?.vtBuckets?.medium, tone: 'caution', glossary: 'vt-medium' },
+      { key: 'vt-low', label: '1 to 5 detections', icon: Radar, count: (s) => s?.vtBuckets?.low, glossary: 'vt-low' },
+      { key: 'vt-none', label: 'No detections', icon: Radar, count: (s) => s?.vtBuckets?.none, glossary: 'vt-none' },
+      { key: 'vt-unscanned', label: 'Not scanned yet', icon: Radar, count: (s) => s?.vtBuckets?.unscanned, glossary: 'vt-unscanned' },
     ],
   },
   {

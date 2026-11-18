@@ -57,6 +57,7 @@ interface ProcessedDriver extends Driver {
   Signatures?: SignatureEntry[];
   // Computed at index time
   _certStatus?: 'valid' | 'expired' | 'none';
+  _vt?: { m: number; s: number; t: number; d: string | null } | null;
   _mvdbStatus?: 'passed' | 'blocked' | null;
 }
 
@@ -171,6 +172,20 @@ export interface MvdbSync {
   checked_at: string;
   allowed: number;
   blocked: number;
+}
+
+export type VtBucket = 'none' | 'low' | 'medium' | 'high' | 'unscanned';
+export const VT_BUCKETS: VtBucket[] = ['none', 'low', 'medium', 'high', 'unscanned'];
+
+interface VtEntry { m?: number; s?: number; t?: number; d?: string | null; f: string; nf?: boolean }
+
+export function vtBucket(vt: { m: number; s: number } | null | undefined): VtBucket {
+  if (!vt) return 'unscanned';
+  const detections = vt.m + vt.s;
+  if (detections === 0) return 'none';
+  if (detections <= 5) return 'low';
+  if (detections <= 20) return 'medium';
+  return 'high';
 }
 
 function readJsonFile<T>(file: string): T | null {
@@ -313,10 +328,14 @@ class DriversCache {
 
   private buildSearchIndex(): void {
     this.mvdbVerdicts = loadMvdbVerdicts();
+    const vtEntries = readJsonFile<{ entries: Record<string, VtEntry> }>('virustotal.json')?.entries ?? {};
 
     // Compute cert status and MVDB status for every driver once
     for (const driver of this.drivers) {
       driver._certStatus = deriveCertStatus(driver);
+
+      const vt = typeof driver.SHA256 === 'string' ? vtEntries[driver.SHA256.toLowerCase()] : undefined;
+      driver._vt = vt && !vt.nf ? { m: vt.m ?? 0, s: vt.s ?? 0, t: vt.t ?? 0, d: vt.d ?? null } : null;
 
       if (driver.MvdbStatusOverride !== undefined) {
         driver._mvdbStatus = driver.MvdbStatusOverride;
@@ -430,6 +449,9 @@ class DriversCache {
     this.indexedData.set('amd64', amd64Drivers);
     this.indexedData.set('i386', i386Drivers);
     this.indexedData.set('arm64', arm64Drivers);
+    for (const bucket of VT_BUCKETS) {
+      this.indexedData.set(`vt-${bucket}`, this.drivers.filter((d) => vtBucket(d._vt as { m: number; s: number } | null) === bucket));
+    }
 
     console.log(`Index: ${trustedCertDrivers.length} valid certs, ${untrustedCertDrivers.length} expired, ${certMissingDrivers.length} no cert, ${recentDrivers.length} recent (12mo)`);
   }
@@ -600,6 +622,7 @@ class DriversCache {
       arm64Drivers: this.indexedData.get('arm64')?.length || 0,
       mvdbBlockedDrivers: drivers.filter(d => d._mvdbStatus === 'blocked').length,
       mvdbUncheckedDrivers: drivers.filter(d => !d._mvdbStatus).length,
+      vtBuckets: Object.fromEntries(VT_BUCKETS.map((bucket) => [bucket, this.indexedData.get(`vt-${bucket}`)?.length || 0])),
       certValidDrivers: this.indexedData.get('trustedCert')?.length || 0,
       certExpiredDrivers: this.indexedData.get('untrustedCert')?.length || 0,
       certMissingDrivers: this.indexedData.get('certMissing')?.length || 0,
@@ -618,18 +641,13 @@ class DriversCache {
       if (!value) continue;
       if (filterType === 'newestFirst' || filterType === 'oldestFirst') continue;
 
-      if (filterType === 'architecture') {
-        const indexKey = (value as string).toLowerCase();
-        const indexedResult = this.indexedData.get(indexKey);
-        if (indexedResult) {
-          result = result.filter(d => indexedResult.includes(d));
-        }
-        continue;
-      }
-
-      const indexedResult = this.indexedData.get(filterType);
+      const indexKey = filterType === 'architecture'
+        ? (value as string).toLowerCase()
+        : filterType === 'vt' ? `vt-${value}` : filterType;
+      const indexedResult = this.indexedData.get(indexKey);
       if (indexedResult) {
-        result = result.filter(d => indexedResult.includes(d));
+        const members = new Set(indexedResult);
+        result = result.filter(d => members.has(d));
       }
     }
 

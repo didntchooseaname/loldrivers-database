@@ -77,6 +77,15 @@ export const GLOSSARY = {
   x64: { term: 'x64', definition: 'Built for 64-bit Intel and AMD processors (AMD64).' },
   x86: { term: 'x86', definition: 'Built for 32-bit Intel processors (I386). Cannot load on 64-bit Windows.' },
   arm64: { term: 'ARM64', definition: 'Built for 64-bit ARM processors, such as Windows on Snapdragon devices.' },
+  virustotal: {
+    term: 'VirusTotal score',
+    definition: 'Engines that flag this exact file as malicious or suspicious, out of those that analysed it. Refreshed daily within the API quota.',
+  },
+  'vt-none': { term: 'No detections', definition: 'No antivirus engine flags this file. Common for signed vulnerable drivers, which is what makes them useful to attackers.' },
+  'vt-low': { term: '1 to 5 detections', definition: 'A handful of engines flag the file, often by generic or heuristic signatures.' },
+  'vt-medium': { term: '6 to 20 detections', definition: 'A clear minority of engines flag the file as malicious or suspicious.' },
+  'vt-high': { term: 'More than 20 detections', definition: 'Widely flagged by antivirus engines. Typical of malicious drivers and well-known BYOVD tools.' },
+  'vt-unscanned': { term: 'Not scanned yet', definition: 'No VirusTotal result yet. The daily job scans new samples first, within the free API quota.' },
   mitre: {
     term: 'MITRE ATT&CK',
     definition: 'The ATT&CK technique this abuse maps to, for example T1068 Exploitation for Privilege Escalation.',

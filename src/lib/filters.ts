@@ -31,6 +31,7 @@ export const BOOLEAN_FILTERS: FilterDef[] = [
 ];
 
 export const ARCHITECTURE_VALUES = ['AMD64', 'I386', 'ARM64'] as const;
+export const VT_VALUES = ['none', 'low', 'medium', 'high', 'unscanned'] as const;
 
 /** Parse URL search params into filter state */
 export function parseFiltersFromURL(params: URLSearchParams): {
@@ -48,6 +49,11 @@ export function parseFiltersFromURL(params: URLSearchParams): {
   const arch = params.get('architecture');
   if (arch && (ARCHITECTURE_VALUES as readonly string[]).includes(arch)) {
     activeFilters.add(`architecture-${arch}`);
+  }
+
+  const vt = params.get('vt');
+  if (vt && (VT_VALUES as readonly string[]).includes(vt)) {
+    activeFilters.add(`vt-${vt}`);
   }
 
   const pageParam = params.get('page');
@@ -76,6 +82,10 @@ export function serializeFiltersToParams(
     }
   }
 
+  for (const bucket of VT_VALUES) {
+    if (activeFilters.has(`vt-${bucket}`)) params.set('vt', bucket);
+  }
+
   if (currentPage > 1) params.set('page', currentPage.toString());
 
   return params;
@@ -102,6 +112,10 @@ export function buildApiUrl(
     if (activeFilters.has(`architecture-${arch}`)) {
       params.set('architecture', arch);
     }
+  }
+
+  for (const bucket of VT_VALUES) {
+    if (activeFilters.has(`vt-${bucket}`)) params.set('vt', bucket);
   }
 
   return `/api/drivers?${params.toString()}`;
@@ -138,5 +152,7 @@ export function serverFiltersFromParams(params: URLSearchParams): Record<string,
   if (architecture && (ARCHITECTURE_VALUES as readonly string[]).includes(architecture)) {
     filters.architecture = architecture;
   }
+  const vt = params.get('vt');
+  if (vt && (VT_VALUES as readonly string[]).includes(vt)) filters.vt = vt;
   return filters;
 }

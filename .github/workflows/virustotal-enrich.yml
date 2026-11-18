@@ -1,0 +1,73 @@
+name: VirusTotal Enrichment
+
+on:
+  schedule:
+    # Daily quota resets at 00:00 UTC
+    - cron: '20 0 * * *'
+  workflow_dispatch:
+    inputs:
+      max_lookups:
+        description: 'Upper bound on lookups for this run'
+        required: false
+        default: '490'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: virustotal
+  cancel-in-progress: false
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    - name: Query VirusTotal within the remaining quota
+      id: enrich
+      env:
+        VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        VT_MAX_LOOKUPS: ${{ inputs.max_lookups || '490' }}
+      run: node .github/scripts/virustotal-enrich.mjs
+
+    - name: Commit results
+      if: always()
+      env:
+        LOOKUPS: ${{ steps.enrich.outputs.lookups }}
+        SCANNED: ${{ steps.enrich.outputs.scanned }}
+        TOTAL: ${{ steps.enrich.outputs.total }}
+        BRANCH: ${{ github.ref_name }}
+      run: |
+        [ -f data/virustotal.json ] || exit 0
+        git add data/virustotal.json
+        if git diff --cached --quiet; then
+          echo "No VirusTotal changes to commit"
+          exit 0
+        fi
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action - VirusTotal"
+        git commit -m "chore(data): refresh VirusTotal results (${LOOKUPS:-0} lookups, ${SCANNED:-?}/${TOTAL:-?} scanned)"
+        git pull --rebase origin "$BRANCH"
+        git push origin "$BRANCH"
+
+    - name: Job summary
+      if: always()
+      env:
+        LOOKUPS: ${{ steps.enrich.outputs.lookups }}
+        SCANNED: ${{ steps.enrich.outputs.scanned }}
+        TOTAL: ${{ steps.enrich.outputs.total }}
+      run: |
+        {
+          echo "## VirusTotal Enrichment"
+          echo "- Lookups this run: ${LOOKUPS:-0}"
+          echo "- Samples with results: ${SCANNED:-?} / ${TOTAL:-?}"
+        } >> "$GITHUB_STEP_SUMMARY"

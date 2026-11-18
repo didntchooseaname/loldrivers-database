@@ -224,7 +224,7 @@ export function truncateMiddle(value: string, head = 10, tail = 8): string {
 
 const SUMMARY_FIELDS = [
   'Id', 'DisplayName', 'OriginalFilename', 'Filename', 'Company', 'Created', 'MachineType',
-  'FeaturedKiller', 'DownloadUrl', 'MD5', 'SHA1', 'SHA256', '_mvdbStatus',
+  'FeaturedKiller', 'DownloadUrl', 'MD5', 'SHA1', 'SHA256', '_mvdbStatus', '_vt',
 ] as const;
 
 /** Card-sized projection of a driver. The detail view fetches the full record. */
@@ -255,4 +255,21 @@ export function getImportCount(driver: Driver): number {
 
 export function getResourceCount(driver: Driver): number {
   return typeof driver._resourceCount === 'number' ? driver._resourceCount : getResources(driver).length;
+}
+
+export interface VtResult { m: number; s: number; t: number; d: string | null }
+export type VtBucket = 'none' | 'low' | 'medium' | 'high' | 'unscanned';
+
+export function getVt(driver: Driver): VtResult | null {
+  const vt = driver._vt as VtResult | null | undefined;
+  return vt && typeof vt.m === 'number' ? vt : null;
+}
+
+export function getVtBucket(vt: VtResult | null): VtBucket {
+  if (!vt) return 'unscanned';
+  const detections = vt.m + vt.s;
+  if (detections === 0) return 'none';
+  if (detections <= 5) return 'low';
+  if (detections <= 20) return 'medium';
+  return 'high';
 }

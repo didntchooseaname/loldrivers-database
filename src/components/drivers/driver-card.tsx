@@ -8,7 +8,7 @@ import type { Driver } from '@/types';
 import {
   CAPABILITY_LABELS, formatArchitecture, getCapabilities, getCertStatus, getCompany,
   getDescription, getDownloadUrl, getDriverName, getMvdbStatus, getPrimaryHash,
-  getImportCount, getResourceCount, truncateMiddle,
+  getImportCount, getResourceCount, getVt, getVtBucket, truncateMiddle,
 } from '@/lib/driver-model';
 import { CopyButton } from './copy-button';
 import { Term } from '@/components/term';
@@ -40,6 +40,7 @@ export const DriverCard = memo(function DriverCard({ driver, onOpen, onDownload 
   const imports = getImportCount(driver);
   const resources = getResourceCount(driver);
   const hasDownload = getDownloadUrl(driver) !== null;
+  const vt = getVt(driver);
 
   return (
     <article
@@ -90,6 +91,13 @@ export const DriverCard = memo(function DriverCard({ driver, onOpen, onDownload 
         )}
         {cert === 'valid' && <Term id="cert-valid" asChild><Badge variant="neutral" className="status-badge">Valid cert</Badge></Term>}
         {cert === 'expired' && <Term id="cert-expired" asChild><Badge variant="caution" className="status-badge">Expired cert</Badge></Term>}
+        {vt && (
+          <Term id="virustotal" asChild>
+            <Badge variant={VT_VARIANT[getVtBucket(vt)]} className="status-badge font-mono tabular-nums">
+              VT {vt.m + vt.s}/{vt.t}
+            </Badge>
+          </Term>
+        )}
       </div>
 
       {description && (
@@ -134,6 +142,8 @@ export const DriverCard = memo(function DriverCard({ driver, onOpen, onDownload 
     </article>
   );
 });
+
+const VT_VARIANT = { none: 'neutral', low: 'neutral', medium: 'caution', high: 'danger', unscanned: 'neutral' } as const;
 
 function ArchChip({ label }: { label: string }) {
   const chip = <span className="relative z-10 shrink-0 cursor-help rounded border px-1 py-px font-mono text-[0.625rem] font-medium text-muted-foreground">{label}</span>;

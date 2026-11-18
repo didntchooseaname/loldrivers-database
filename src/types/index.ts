@@ -91,6 +91,7 @@ export interface Stats {
   certExpiredDrivers?: number;
   certMissingDrivers?: number;
   mvdbUncheckedDrivers?: number;
+  vtBuckets?: Record<'none' | 'low' | 'medium' | 'high' | 'unscanned', number>;
   catalogSync?: {
     upstream: { repository: string; commit: string; committed_at: string; message: string };
     synced_at: string;

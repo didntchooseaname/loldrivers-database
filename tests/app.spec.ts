@@ -149,6 +149,17 @@ test.describe('filters', () => {
     await expect(page.locator('.active-filters')).toHaveCount(0);
   });
 
+  test('VirusTotal bands filter results and stay exclusive', async ({ page }) => {
+    await open(page);
+    const none = filters(page).getByRole('radio', { name: /^No detections/ });
+    const unscanned = filters(page).getByRole('radio', { name: /^Not scanned yet/ });
+    await unscanned.click();
+    await expect(page).toHaveURL(/vt=unscanned/);
+    await none.click();
+    await expect(unscanned).toHaveAttribute('aria-checked', 'false');
+    await expect(page).toHaveURL(/vt=none/);
+  });
+
   test('sort menu orders results', async ({ page }) => {
     await open(page);
     await page.getByLabel('Sort results').selectOption('newest-first');
@@ -246,6 +257,14 @@ test.describe('api', () => {
     expect(Array.isArray(detail.driver.ImportedFunctions)).toBe(true);
     expect((await request.get('/api/drivers/not-a-real-key')).status()).toBe(404);
     expect((await request.get('/api/drivers/%3Cscript%3E')).status()).toBe(400);
+  });
+
+  test('VirusTotal buckets partition the catalog', async ({ request }) => {
+    const { stats } = await (await request.get('/api/stats')).json();
+    const sum = Object.values(stats.vtBuckets as Record<string, number>).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(stats.total);
+    const scanned = await (await request.get('/api/drivers?vt=none&limit=1')).json();
+    if (scanned.total > 0) expect(scanned.drivers[0]._vt.m + scanned.drivers[0]._vt.s).toBe(0);
   });
 
   test('cache clearing is no longer exposed', async ({ request }) => {

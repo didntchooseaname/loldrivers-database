@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
+  Radar,
   AlertTriangle, Download, ExternalLink, FileSignature, Fingerprint, Search,
   Skull, Terminal, Waypoints,
 } from 'lucide-react';
@@ -14,7 +15,7 @@ import type { Driver } from '@/types';
 import {
   CAPABILITY_LABELS, FUNCTION_GROUP_LABELS, formatArchitecture, getCapabilities,
   getCertStatus, getCompany, getDescription, getDownloadUrl, getDriverName, getHashes,
-  getMvdbStatus, getResources, getSigners, groupImportedFunctions,
+  getMvdbStatus, getResources, getSigners, getVt, getVtBucket, groupImportedFunctions,
 } from '@/lib/driver-model';
 import { CopyButton } from './copy-button';
 import { Term } from '@/components/term';
@@ -41,7 +42,11 @@ export default function DriverDetailSheet({ driver, loading, onOpenChange, onDow
     <Sheet open={driver !== null} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="driver-sheet flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[40rem]"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
+        }}
+        className="driver-sheet outline-none flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[40rem]"
       >
         {driver && (
           <DriverDetail
@@ -67,6 +72,7 @@ function DriverDetail({ driver, loading, onDownload, onAuthentihashHelp }: Omit<
   const description = getDescription(driver);
   const hashes = getHashes(driver);
   const signers = getSigners(driver);
+  const vt = getVt(driver);
   const resources = getResources(driver);
   const commands = driver.Commands;
   const hasDownload = getDownloadUrl(driver) !== null;
@@ -107,13 +113,6 @@ function DriverDetail({ driver, loading, onDownload, onAuthentihashHelp }: Omit<
               <Download aria-hidden /> Download sample
             </Button>
           )}
-          {driver.SHA256 && (
-            <Button size="sm" variant="outline" asChild>
-              <a href={`https://www.virustotal.com/gui/file/${driver.SHA256}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink aria-hidden /> VirusTotal
-              </a>
-            </Button>
-          )}
         </div>
       </div>
 
@@ -133,6 +132,12 @@ function DriverDetail({ driver, loading, onDownload, onAuthentihashHelp }: Omit<
                   ))}
                 </div>
               )}
+            </Section>
+          )}
+
+          {driver.SHA256 && (
+            <Section title={<Term id="virustotal" />} icon={Radar}>
+              <VirusTotalPanel vt={vt} sha256={String(driver.SHA256)} />
             </Section>
           )}
 
@@ -360,6 +365,47 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+const VT_BAR: Record<string, string> = {
+  none: 'bg-muted-foreground/40',
+  low: 'bg-muted-foreground/70',
+  medium: 'bg-warning',
+  high: 'bg-destructive',
+};
+
+function VirusTotalPanel({ vt, sha256 }: { vt: ReturnType<typeof getVt>; sha256: string }) {
+  const link = `https://www.virustotal.com/gui/file/${sha256}`;
+  if (!vt) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Not scanned yet. New samples are queued first by the daily enrichment job.{' '}
+        <a href={link} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-4">Open on VirusTotal</a>
+      </p>
+    );
+  }
+  const detections = vt.m + vt.s;
+  const bucket = getVtBucket(vt);
+  const ratio = vt.t > 0 ? Math.min(100, (detections / vt.t) * 100) : 0;
+  const analysed = vt.d ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(vt.d)) : null;
+  return (
+    <div className="rounded-lg border bg-card p-3.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="font-mono text-2xl font-medium tabular-nums">
+          {detections}<span className="text-base text-muted-foreground">/{vt.t}</span>
+        </p>
+        <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          Full report <ExternalLink className="size-3.5" aria-hidden />
+        </a>
+      </div>
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${detections} of ${vt.t} engines flag this file`}>
+        <div className={cn('h-full rounded-full', VT_BAR[bucket])} style={{ width: `${Math.max(ratio, detections > 0 ? 2 : 0)}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {vt.m} malicious, {vt.s} suspicious{analysed && ` · last analysed ${analysed}`}
+      </p>
+    </div>
   );
 }
 

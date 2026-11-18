@@ -29,6 +29,16 @@ Refine by the state of a driver's code-signing certificate. Only one can be acti
 - **Expired** - A certificate that exists but has passed its expiry date.
 - **No signature data** - The catalog has no certificate details for this sample. It does not necessarily mean the file is unsigned.
 
+## VirusTotal filters
+
+Each sample's SHA256 is looked up on VirusTotal by a daily job that spends the free API quota on new samples first, then refreshes results older than 30 days. Only one band can be active at a time.
+
+- **More than 20 detections** - Widely flagged; typical of malicious drivers and well-known BYOVD tools.
+- **6 to 20 detections** - A clear minority of engines flag the file.
+- **1 to 5 detections** - A few engines flag it, often through generic signatures.
+- **No detections** - No engine flags it. Common for signed vulnerable drivers, which is exactly why attackers like them.
+- **Not scanned yet** - Waiting in the enrichment queue.
+
 ## Architecture filters
 
 Filter by target processor architecture. Only one can be active at a time, and the architecture is also shown on each driver card.
