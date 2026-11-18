@@ -4,7 +4,7 @@ import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { useTheme } from 'next-themes';
 import { Sun, Moon } from 'lucide-react';
-import { useIsHydrated } from '@/hooks/useHydration';
+import { useMounted } from '@/hooks/use-mounted';
 import { Button } from '@/components/ui/button';
 
 type DocWithVT = Document & {
@@ -23,7 +23,7 @@ const prefersReducedMotion = () =>
  * with next-themes for persistence.
  */
 export function AnimatedThemeToggler({ className }: { className?: string }) {
-  const isHydrated = useIsHydrated();
+  const isHydrated = useMounted();
   const { resolvedTheme, setTheme } = useTheme();
   const ref = React.useRef<HTMLButtonElement>(null);
 

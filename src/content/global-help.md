@@ -12,7 +12,7 @@ A research-focused interface for the LOLDrivers dataset. It goes beyond a plain 
 - **Blocklist verification** - Compatibility is checked daily against Microsoft's live Vulnerable Driver Blocklist (MVDB), rather than a static bundled list.
 - **Search & filtering** - Find drivers by name, hash, company, description, blocklist status, architecture, or behavior - and combine those filters freely.
 - **Certificate insight** - Code-signing certificate status is surfaced on each card to help judge legitimacy.
-- **Architecture awareness** - Filter and identify drivers by x64, x32, or arm64.
+- **Architecture awareness** - Filter and identify drivers by x64, x86 or ARM64.
 
 ## How it works
 

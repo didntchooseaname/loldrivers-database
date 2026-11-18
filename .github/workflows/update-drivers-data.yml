@@ -3,13 +3,16 @@ name: Update LOLDrivers Data
 # Trigger on new commits to the LOLDrivers JSON file
 on:
   schedule:
-    - cron: '0 1 * * 1'  # Check weekly on Mondays at 01:00 UTC
+    - cron: '17 */6 * * *'  # Check upstream every 6 hours
   workflow_dispatch:  # Allows manual execution
 
 permissions:
   contents: write
-  actions: read
-  pull-requests: write
+  actions: write
+
+concurrency:
+  group: data-pipeline
+  cancel-in-progress: false
 
 env:
   REMOTE_URL: https://raw.githubusercontent.com/magicsword-io/LOLDrivers/refs/heads/main/loldrivers.io/content/api/drivers.json
@@ -17,6 +20,7 @@ env:
   LOCAL_FILE: data/drv.json
   BACKUP_FILE: data/drv.bak
   COMMIT_HASH_FILE: data/.last_commit_hash
+  SYNC_FILE: data/sync.json
 
 jobs:
   update-drivers-data:
@@ -24,7 +28,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
@@ -101,6 +105,10 @@ jobs:
     - name: Download and backup files
       if: steps.check_commits.outputs.has_new_commit == 'true'
       id: download
+      env:
+        LATEST_COMMIT: ${{ steps.check_commits.outputs.latest_commit }}
+        UPSTREAM_DATE: ${{ steps.check_commits.outputs.commit_date }}
+        UPSTREAM_MESSAGE: ${{ steps.check_commits.outputs.commit_message }}
       run: |
         echo "Downloading remote drivers.json..."
         curl -s -L "$REMOTE_URL" -o temp_drivers.json
@@ -123,25 +131,41 @@ jobs:
           echo "backup_created=false" >> $GITHUB_OUTPUT
         fi
 
+        if ! jq -e 'type == "array" and length > 0' temp_drivers.json > /dev/null; then
+          echo "Downloaded file is not a non-empty JSON array"
+          exit 1
+        fi
+
         mv temp_drivers.json "$LOCAL_FILE"
-        echo "${{ steps.check_commits.outputs.latest_commit }}" > "$COMMIT_HASH_FILE"
+        echo "$LATEST_COMMIT" > "$COMMIT_HASH_FILE"
+
+        jq -n \
+          --arg commit "$LATEST_COMMIT" \
+          --arg committed_at "$UPSTREAM_DATE" \
+          --arg message "$UPSTREAM_MESSAGE" \
+          --arg synced_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+          --argjson samples "$(jq '[.[].KnownVulnerableSamples // [] | length] | add' "$LOCAL_FILE")" \
+          '{upstream: {repository: "magicsword-io/LOLDrivers", commit: $commit, committed_at: $committed_at, message: $message}, synced_at: $synced_at, samples: $samples}' \
+          > "$SYNC_FILE"
         echo "Files updated successfully"
 
     - name: Commit and push changes
       if: steps.check_commits.outputs.has_new_commit == 'true'
+      env:
+        COMMIT_MSG: ${{ steps.check_commits.outputs.commit_message }}
+        LATEST: ${{ steps.check_commits.outputs.latest_commit }}
+        STORED: ${{ steps.check_commits.outputs.stored_commit }}
+        BACKUP_CREATED: ${{ steps.download.outputs.backup_created }}
+        BRANCH: ${{ github.ref_name }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action - LOLDrivers Updater"
 
-        git add "$LOCAL_FILE" "$COMMIT_HASH_FILE"
-        if [ "${{ steps.download.outputs.backup_created }}" = "true" ]; then
+        git add "$LOCAL_FILE" "$COMMIT_HASH_FILE" "$SYNC_FILE"
+        if [ "$BACKUP_CREATED" = "true" ]; then
           git add "$BACKUP_FILE"
         fi
 
-        # Reuse commit info from step 1 (no redundant API call)
-        COMMIT_MSG="${{ steps.check_commits.outputs.commit_message }}"
-        LATEST="${{ steps.check_commits.outputs.latest_commit }}"
-        STORED="${{ steps.check_commits.outputs.stored_commit }}"
         TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
         # Build multi-line commit message via temp file
@@ -158,8 +182,18 @@ jobs:
         git commit -F /tmp/commit_msg.txt
         rm -f /tmp/commit_msg.txt
 
-        git push origin ${{ github.ref_name }}
+        git pull --rebase origin "$BRANCH"
+        git push origin "$BRANCH"
         echo "Changes pushed successfully"
+
+    - name: Re-check new samples (Microsoft blocklist, VirusTotal)
+      if: steps.check_commits.outputs.has_new_commit == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BRANCH: ${{ github.ref_name }}
+      run: |
+        gh workflow run hvci-drivers-check.yml --ref "$BRANCH"
+        gh workflow run virustotal-enrich.yml --ref "$BRANCH"
 
     - name: Cleanup
       if: always()
@@ -167,6 +201,12 @@ jobs:
 
     - name: Job Summary
       if: always()
+      env:
+        HAS_NEW: ${{ steps.check_commits.outputs.has_new_commit }}
+        LATEST: ${{ steps.check_commits.outputs.latest_commit }}
+        STORED: ${{ steps.check_commits.outputs.stored_commit }}
+        AUTHOR: ${{ steps.check_commits.outputs.commit_author }}
+        MESSAGE: ${{ steps.check_commits.outputs.commit_message }}
       run: |
         {
           echo "## Update LOLDrivers Data"
@@ -175,12 +215,12 @@ jobs:
           echo "- **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo ""
 
-          if [ "${{ steps.check_commits.outputs.has_new_commit }}" = "true" ]; then
+          if [ "$HAS_NEW" = "true" ]; then
             echo "### Update Applied"
-            echo "- **Commit:** \`${{ steps.check_commits.outputs.latest_commit }}\`"
-            echo "- **Previous:** \`${{ steps.check_commits.outputs.stored_commit }}\`"
-            echo "- **Author:** ${{ steps.check_commits.outputs.commit_author }}"
-            echo "- **Message:** ${{ steps.check_commits.outputs.commit_message }}"
+            echo "- **Commit:** \`$LATEST\`"
+            echo "- **Previous:** \`$STORED\`"
+            echo "- **Author:** $AUTHOR"
+            echo "- **Message:** $MESSAGE"
           else
             echo "### No Update Needed"
             echo "No new commits detected in the upstream LOLDrivers repository."

@@ -57,6 +57,7 @@ interface ProcessedDriver extends Driver {
   Signatures?: SignatureEntry[];
   // Computed at index time
   _certStatus?: 'valid' | 'expired' | 'none';
+  _vt?: { m: number; s: number; t: number; d: string | null } | null;
   _mvdbStatus?: 'passed' | 'blocked' | null;
 }
 
@@ -131,29 +132,69 @@ const readFileWithEncodingDetection = (filePath: string): string => {
   return buffer.toString('utf8');
 };
 
-const loadHVCIAllowedHashes = (): Set<string> => {
+type MvdbVerdict = 'passed' | 'blocked';
+
+// data/hvci_drivers.csv is produced by the HVCI Drivers Check workflow.
+// Hashes missing from it have not been checked yet and must not be reported as blocked.
+const loadMvdbVerdicts = (): Map<string, MvdbVerdict> => {
+  const verdicts = new Map<string, MvdbVerdict>();
   try {
     const csvPath = path.join(process.cwd(), 'data', 'hvci_drivers.csv');
-    const csvContent = readFileWithEncodingDetection(csvPath);
-    const lines = csvContent.split('\n');
-    const allowedHashes = new Set<string>();
+    const lines = readFileWithEncodingDetection(csvPath).split('\n');
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
       const columns = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-      if (columns.length >= 4 && columns[3] === 'Allowed') {
-        if (columns[0]) allowedHashes.add(columns[0].toLowerCase());
-        if (columns[1]) allowedHashes.add(columns[1].toLowerCase());
-        if (columns[2]) allowedHashes.add(columns[2].toLowerCase());
+      if (columns.length < 4) continue;
+      const verdict: MvdbVerdict | null = columns[3] === 'Allowed' ? 'passed' : columns[3] === 'Blocked' ? 'blocked' : null;
+      if (!verdict) continue;
+      // MD5, SHA1, SHA256, Status, AuthentihashSHA256 (the last column was added Nov 2026)
+      for (const hash of [...columns.slice(0, 3), columns[4]]) {
+        if (!hash) continue;
+        const key = hash.toLowerCase();
+        if (verdicts.get(key) !== 'passed') verdicts.set(key, verdict);
       }
     }
-    console.log(`Loaded ${allowedHashes.size} HVCI allowed hashes from CSV`);
-    return allowedHashes;
+    console.log(`Loaded ${verdicts.size} MVDB verdicts from CSV`);
   } catch (error) {
     console.warn('Could not load HVCI CSV file:', error);
-    return new Set();
   }
+  return verdicts;
 };
+
+export interface CatalogSync {
+  upstream: { repository: string; commit: string; committed_at: string; message: string };
+  synced_at: string;
+  samples: number;
+}
+
+export interface MvdbSync {
+  checked_at: string;
+  allowed: number;
+  blocked: number;
+}
+
+export type VtBucket = 'none' | 'low' | 'medium' | 'high' | 'unscanned';
+export const VT_BUCKETS: VtBucket[] = ['none', 'low', 'medium', 'high', 'unscanned'];
+
+interface VtEntry { m?: number; s?: number; t?: number; d?: string | null; f: string; nf?: boolean }
+
+export function vtBucket(vt: { m: number; s: number } | null | undefined): VtBucket {
+  if (!vt) return 'unscanned';
+  const detections = vt.m + vt.s;
+  if (detections === 0) return 'none';
+  if (detections <= 5) return 'low';
+  if (detections <= 20) return 'medium';
+  return 'high';
+}
+
+function readJsonFile<T>(file: string): T | null {
+  try {
+    return JSON.parse(readFileWithEncodingDetection(path.join(process.cwd(), 'data', file))) as T;
+  } catch {
+    return null;
+  }
+}
 
 const KILLER_FUNCTIONS_REGEX = /zwterminateprocess/i;
 
@@ -240,13 +281,34 @@ function deriveCertStatus(driver: ProcessedDriver): 'valid' | 'expired' | 'none'
   return hasValidCert ? 'valid' : 'expired';
 }
 
+// Upstream moved PE metadata under KnownVulnerableSamples[].ResearchEvidence (Nov 2026).
+const EVIDENCE_FIELDS = [
+  'MachineType', 'ImportedFunctions', 'Signatures', 'Company', 'Description', 'Product',
+  'ProductVersion', 'FileVersion', 'OriginalFilename', 'Filename', 'InternalName', 'Copyright',
+  'Imphash', 'LoadsDespiteHVCI', 'CreationTimestamp', 'Publisher', 'PDBPath',
+] as const;
+
+function evidenceFields(evidence: unknown): Record<string, unknown> {
+  if (!evidence || typeof evidence !== 'object') return {};
+  const source = evidence as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of EVIDENCE_FIELDS) {
+    const value = source[key];
+    if (value === undefined || value === null || value === '') continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+
 class DriversCache {
   private static instance: DriversCache;
   private drivers: ProcessedDriver[] = [];
   private isLoaded = false;
   private fileHash: string = '';
   private indexedData: Map<string, ProcessedDriver[]> = new Map();
-  private hvciAllowedHashes: Set<string> = new Set();
+  private mvdbVerdicts: Map<string, MvdbVerdict> = new Map();
 
   static getInstance(): DriversCache {
     if (!DriversCache.instance) {
@@ -265,28 +327,25 @@ class DriversCache {
   }
 
   private buildSearchIndex(): void {
-    this.hvciAllowedHashes = loadHVCIAllowedHashes();
+    this.mvdbVerdicts = loadMvdbVerdicts();
+    const vtEntries = readJsonFile<{ entries: Record<string, VtEntry> }>('virustotal.json')?.entries ?? {};
 
     // Compute cert status and MVDB status for every driver once
     for (const driver of this.drivers) {
       driver._certStatus = deriveCertStatus(driver);
+
+      const vt = typeof driver.SHA256 === 'string' ? vtEntries[driver.SHA256.toLowerCase()] : undefined;
+      driver._vt = vt && !vt.nf ? { m: vt.m ?? 0, s: vt.s ?? 0, t: vt.t ?? 0, d: vt.d ?? null } : null;
 
       if (driver.MvdbStatusOverride !== undefined) {
         driver._mvdbStatus = driver.MvdbStatusOverride;
         continue;
       }
 
-      // MVDB status: check if driver hash is in the HVCI allowed CSV
-      const hashInCsv = (driver.MD5 && this.hvciAllowedHashes.has(driver.MD5.toLowerCase())) ||
-                         (driver.SHA1 && this.hvciAllowedHashes.has(driver.SHA1.toLowerCase())) ||
-                         (driver.SHA256 && this.hvciAllowedHashes.has(driver.SHA256.toLowerCase()));
-      if (hashInCsv) {
-        driver._mvdbStatus = 'passed';
-      } else if (driver.MD5 || driver.SHA1 || driver.SHA256) {
-        driver._mvdbStatus = 'blocked';
-      } else {
-        driver._mvdbStatus = null;
-      }
+      const verdicts = [driver.MD5, driver.SHA1, driver.SHA256, driver.Authentihash?.SHA256]
+        .filter((hash): hash is string => typeof hash === 'string' && hash.length > 0)
+        .map((hash) => this.mvdbVerdicts.get(hash.toLowerCase()));
+      driver._mvdbStatus = verdicts.includes('passed') ? 'passed' : verdicts.includes('blocked') ? 'blocked' : null;
     }
 
     // HVCI/MVDB: use the precomputed status
@@ -390,6 +449,9 @@ class DriversCache {
     this.indexedData.set('amd64', amd64Drivers);
     this.indexedData.set('i386', i386Drivers);
     this.indexedData.set('arm64', arm64Drivers);
+    for (const bucket of VT_BUCKETS) {
+      this.indexedData.set(`vt-${bucket}`, this.drivers.filter((d) => vtBucket(d._vt as { m: number; s: number } | null) === bucket));
+    }
 
     console.log(`Index: ${trustedCertDrivers.length} valid certs, ${untrustedCertDrivers.length} expired, ${certMissingDrivers.length} no cert, ${recentDrivers.length} recent (12mo)`);
   }
@@ -414,10 +476,11 @@ class DriversCache {
         .flatMap((driver): ProcessedDriver[] => {
           if (driver.KnownVulnerableSamples && Array.isArray(driver.KnownVulnerableSamples)) {
             return driver.KnownVulnerableSamples.map(sample => {
-              const sampleRecord = sample as Record<string, unknown>;
+              const sampleRecord = { ...evidenceFields(sample.ResearchEvidence), ...sample } as Record<string, unknown>;
+              delete sampleRecord.ResearchEvidence;
 
               return {
-                ...sample,
+                ...sampleRecord,
                 DriverId: driver.Id,
                 Tags: driver.Tags,
                 Author: driver.Author,
@@ -527,21 +590,20 @@ class DriversCache {
     return result;
   }
 
+  async getDriverByKey(key: string): Promise<ProcessedDriver | null> {
+    const needle = key.trim().toLowerCase();
+    if (!needle) return null;
+    const drivers = await this.loadDrivers();
+    return drivers.find((d) =>
+      [d.SHA256, d.SHA1, d.MD5, d.Id].some((v) => typeof v === 'string' && v.toLowerCase() === needle),
+    ) ?? null;
+  }
+
   async getStatistics() {
     const cached = cache.get(CACHE_KEYS.STATS);
     if (cached) return cached;
 
     const drivers = await this.loadDrivers();
-
-    let hvciBlocklistCheck;
-    try {
-      const dataPath = path.join(process.cwd(), 'data', 'drv.json');
-      const fileContent = readFileWithEncodingDetection(dataPath);
-      const jsonData = JSON.parse(fileContent);
-      hvciBlocklistCheck = jsonData._metadata?.hvciBlocklistCheck;
-    } catch (error) {
-      console.warn('Could not read HVCI blocklist metadata:', error);
-    }
 
     const hvciCompatibleCount = this.indexedData.get('hvci')?.length || 0;
 
@@ -558,8 +620,14 @@ class DriversCache {
       amd64Drivers: this.indexedData.get('amd64')?.length || 0,
       i386Drivers: this.indexedData.get('i386')?.length || 0,
       arm64Drivers: this.indexedData.get('arm64')?.length || 0,
-      lastUpdated: new Date().toISOString(),
-      ...(hvciBlocklistCheck && { hvciBlocklistCheck })
+      mvdbBlockedDrivers: drivers.filter(d => d._mvdbStatus === 'blocked').length,
+      mvdbUncheckedDrivers: drivers.filter(d => !d._mvdbStatus).length,
+      vtBuckets: Object.fromEntries(VT_BUCKETS.map((bucket) => [bucket, this.indexedData.get(`vt-${bucket}`)?.length || 0])),
+      certValidDrivers: this.indexedData.get('trustedCert')?.length || 0,
+      certExpiredDrivers: this.indexedData.get('untrustedCert')?.length || 0,
+      certMissingDrivers: this.indexedData.get('certMissing')?.length || 0,
+      catalogSync: readJsonFile<CatalogSync>('sync.json'),
+      mvdbSync: readJsonFile<MvdbSync>('mvdb-sync.json'),
     };
 
     cache.put(CACHE_KEYS.STATS, stats, STATS_CACHE_TTL);
@@ -573,18 +641,13 @@ class DriversCache {
       if (!value) continue;
       if (filterType === 'newestFirst' || filterType === 'oldestFirst') continue;
 
-      if (filterType === 'architecture') {
-        const indexKey = (value as string).toLowerCase();
-        const indexedResult = this.indexedData.get(indexKey);
-        if (indexedResult) {
-          result = result.filter(d => indexedResult.includes(d));
-        }
-        continue;
-      }
-
-      const indexedResult = this.indexedData.get(filterType);
+      const indexKey = filterType === 'architecture'
+        ? (value as string).toLowerCase()
+        : filterType === 'vt' ? `vt-${value}` : filterType;
+      const indexedResult = this.indexedData.get(indexKey);
       if (indexedResult) {
-        result = result.filter(d => indexedResult.includes(d));
+        const members = new Set(indexedResult);
+        result = result.filter(d => members.has(d));
       }
     }
 

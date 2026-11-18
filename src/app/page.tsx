@@ -1,11 +1,12 @@
 import DriversClient from '@/components/DriversClient';
 import DriversCache from '@/lib/driversCache';
-import { parseFiltersFromURL } from '@/lib/filters';
+import { parseFiltersFromURL, serverFiltersFromParams } from '@/lib/filters';
+import { toSummary } from '@/lib/driver-model';
+import type { Driver, Stats } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-// Only load the first page of drivers for SSR (20 items instead of all ~2000+)
-const SSR_PAGE_SIZE = 20;
+const SSR_PAGE_SIZE = 24;
 
 export default async function HomePage({
   searchParams,
@@ -29,38 +30,32 @@ export default async function HomePage({
     currentPage: parsed.currentPage,
   };
 
-  try {
-    const [initialDrivers, initialStats] = await Promise.all([
-      cache.getDrivers(1, SSR_PAGE_SIZE),
-      cache.getStatistics()
-    ]);
+  const filters = serverFiltersFromParams(usp);
+  const driversPromise = parsed.searchQuery || Object.keys(filters).length > 0
+    ? cache.searchDrivers(parsed.searchQuery, filters, parsed.currentPage, SSR_PAGE_SIZE) as Promise<{ drivers: Driver[]; total: number; hasMore: boolean }>
+    : cache.getDrivers(parsed.currentPage, SSR_PAGE_SIZE);
+  const data = await Promise.all([driversPromise, cache.getStatistics()]).catch((error) => {
+    console.error('SSR error:', error);
+    return null;
+  });
 
+  if (!data) {
     return (
-      <DriversClient
-        initialDrivers={{
-          success: true,
-          ...initialDrivers
-        }}
-        initialStats={{
-          success: true,
-          stats: initialStats
-        }}
-        initialUiParams={initialUiParams}
-      />
-    );
-  } catch (error) {
-    console.error('SSR Error:', error);
-
-    return (
-      <div className="container">
-        <div className="error-message">
-          <h1>Error Loading Drivers Database</h1>
-          <p>We&apos;re experiencing technical difficulties. Please try again later.</p>
-          <p className="error-details">{error instanceof Error ? error.message : 'Unknown error'}</p>
-        </div>
-      </div>
+      <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+        <h1 className="text-xl font-semibold tracking-tight">The driver catalog is unavailable</h1>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          The data source could not be loaded. Please retry in a moment.
+        </p>
+      </main>
     );
   }
-}
 
-// SEO metadata inherited from layout.tsx (title template, OG, JSON-LD, etc.)
+  const [initialDrivers, initialStats] = data;
+  return (
+    <DriversClient
+      initialDrivers={{ success: true, ...initialDrivers, drivers: initialDrivers.drivers.map(toSummary) }}
+      initialStats={{ success: true, stats: initialStats as Stats }}
+      initialUiParams={initialUiParams}
+    />
+  );
+}

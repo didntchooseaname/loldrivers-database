@@ -31,6 +31,7 @@ export const BOOLEAN_FILTERS: FilterDef[] = [
 ];
 
 export const ARCHITECTURE_VALUES = ['AMD64', 'I386', 'ARM64'] as const;
+export const VT_VALUES = ['none', 'low', 'medium', 'high', 'unscanned'] as const;
 
 /** Parse URL search params into filter state */
 export function parseFiltersFromURL(params: URLSearchParams): {
@@ -48,6 +49,11 @@ export function parseFiltersFromURL(params: URLSearchParams): {
   const arch = params.get('architecture');
   if (arch && (ARCHITECTURE_VALUES as readonly string[]).includes(arch)) {
     activeFilters.add(`architecture-${arch}`);
+  }
+
+  const vt = params.get('vt');
+  if (vt && (VT_VALUES as readonly string[]).includes(vt)) {
+    activeFilters.add(`vt-${vt}`);
   }
 
   const pageParam = params.get('page');
@@ -74,6 +80,10 @@ export function serializeFiltersToParams(
     if (activeFilters.has(`architecture-${arch}`)) {
       params.set('architecture', arch);
     }
+  }
+
+  for (const bucket of VT_VALUES) {
+    if (activeFilters.has(`vt-${bucket}`)) params.set('vt', bucket);
   }
 
   if (currentPage > 1) params.set('page', currentPage.toString());
@@ -104,5 +114,45 @@ export function buildApiUrl(
     }
   }
 
+  for (const bucket of VT_VALUES) {
+    if (activeFilters.has(`vt-${bucket}`)) params.set('vt', bucket);
+  }
+
   return `/api/drivers?${params.toString()}`;
+}
+
+const SERVER_FILTER_KEYS: Record<string, string> = {
+  hvci: 'hvci',
+  killer: 'killer',
+  recent: 'recent',
+  'newest-first': 'newestFirst',
+  'oldest-first': 'oldestFirst',
+  'memory-manipulator': 'memoryManipulator',
+  'process-killer': 'processKiller',
+  'debug-bypass': 'debugBypass',
+  'registry-manipulator': 'registryManipulator',
+  'file-manipulator': 'fileManipulator',
+  'cert-revoked': 'certRevoked',
+  'cert-expired': 'certExpired',
+  'cert-suspicious': 'certSuspicious',
+  'cert-valid': 'certValid',
+  'cert-missing': 'certMissing',
+  'trusted-cert': 'trustedCert',
+  'untrusted-cert': 'untrustedCert',
+};
+
+/** Translate URL search params into the filter object understood by DriversCache. */
+export function serverFiltersFromParams(params: URLSearchParams): Record<string, boolean | string> {
+  const filters: Record<string, boolean | string> = {};
+  for (const [param, key] of Object.entries(SERVER_FILTER_KEYS)) {
+    if (params.get(param) === 'true') filters[key] = true;
+  }
+  if (filters.trustedCert) delete filters.untrustedCert;
+  const architecture = params.get('architecture');
+  if (architecture && (ARCHITECTURE_VALUES as readonly string[]).includes(architecture)) {
+    filters.architecture = architecture;
+  }
+  const vt = params.get('vt');
+  if (vt && (VT_VALUES as readonly string[]).includes(vt)) filters.vt = vt;
+  return filters;
 }
