@@ -1,22 +1,22 @@
 version: 2
 updates:
-  - package-ecosystem: "pnpm"
+  - package-ecosystem: "bun"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     groups:
-      patch-updates:
-        patterns:
-          - "*"
-        update-types:
-          - "patch"
-      minor-updates:
-        patterns:
-          - "*"
+      minor-and-patch:
         update-types:
           - "minor"
+          - "patch"
+    commit-message:
+      prefix: "build(deps)"
     pull-request-branch-name:
       separator: "-"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci(actions)"
