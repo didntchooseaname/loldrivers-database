@@ -57,3 +57,10 @@ coverage/
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .cursor/rules/snyk_rules.mdc
+
+# Local agent and test artefacts
+AGENTS.md
+CLAUDE.md
+.claude/
+test-results/
+playwright-report/
