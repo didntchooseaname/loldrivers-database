@@ -106,3 +106,37 @@ export function buildApiUrl(
 
   return `/api/drivers?${params.toString()}`;
 }
+
+const SERVER_FILTER_KEYS: Record<string, string> = {
+  hvci: 'hvci',
+  killer: 'killer',
+  recent: 'recent',
+  'newest-first': 'newestFirst',
+  'oldest-first': 'oldestFirst',
+  'memory-manipulator': 'memoryManipulator',
+  'process-killer': 'processKiller',
+  'debug-bypass': 'debugBypass',
+  'registry-manipulator': 'registryManipulator',
+  'file-manipulator': 'fileManipulator',
+  'cert-revoked': 'certRevoked',
+  'cert-expired': 'certExpired',
+  'cert-suspicious': 'certSuspicious',
+  'cert-valid': 'certValid',
+  'cert-missing': 'certMissing',
+  'trusted-cert': 'trustedCert',
+  'untrusted-cert': 'untrustedCert',
+};
+
+/** Translate URL search params into the filter object understood by DriversCache. */
+export function serverFiltersFromParams(params: URLSearchParams): Record<string, boolean | string> {
+  const filters: Record<string, boolean | string> = {};
+  for (const [param, key] of Object.entries(SERVER_FILTER_KEYS)) {
+    if (params.get(param) === 'true') filters[key] = true;
+  }
+  if (filters.trustedCert) delete filters.untrustedCert;
+  const architecture = params.get('architecture');
+  if (architecture && (ARCHITECTURE_VALUES as readonly string[]).includes(architecture)) {
+    filters.architecture = architecture;
+  }
+  return filters;
+}
