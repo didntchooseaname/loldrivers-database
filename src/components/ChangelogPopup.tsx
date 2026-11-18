@@ -1,50 +1,25 @@
 'use client';
 
-import React from 'react';
-import Image from 'next/image';
 import useSWR from 'swr';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
+import { AlertTriangle, ArrowUpRight, History, RotateCw } from 'lucide-react';
+import { AppDialog } from '@/components/app-dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AnimatedList } from '@/components/magicui/animated-list';
-import { History, ExternalLink, Loader2, AlertTriangle, RotateCw, Github } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/github';
+import { cn } from '@/lib/utils';
+import type { Stats } from '@/types';
 
 interface ProcessedCommit {
   sha: string;
   shortSha: string;
   title: string;
   description: string;
-  author: {
-    name: string;
-    email: string;
-    date: string;
-    github?: {
-      login: string;
-      avatar_url: string;
-      html_url: string;
-    } | null;
-  };
+  author: { name: string; date: string; github?: { login: string } | null };
   html_url: string;
-  timestamp: number;
 }
 
 interface CommitsResponse {
   success: boolean;
   data: ProcessedCommit[];
-  meta: {
-    total: number;
-    page: number;
-    per_page: number;
-    last_updated: string;
-  };
 }
 
 interface ChangelogPopupProps {
@@ -52,205 +27,178 @@ interface ChangelogPopupProps {
   onClose: () => void;
 }
 
-type BadgeVariant = 'default' | 'secondary' | 'outline' | 'destructive';
-
-const commitsFetcher = (url: string) => fetch(url).then(r => r.json());
-
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffTime = Math.abs(now.getTime() - date.getTime());
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-  }).format(date);
+const TAGS: Record<string, { label: string; tone: string }> = {
+  feat: { label: 'New', tone: 'border-signal/40 text-signal' },
+  fix: { label: 'Fix', tone: 'border-warning/40 text-warning' },
+  perf: { label: 'Perf', tone: 'border-border text-foreground/80' },
+  refactor: { label: 'Refactor', tone: 'border-border text-muted-foreground' },
+  revert: { label: 'Revert', tone: 'border-destructive/40 text-destructive' },
+  docs: { label: 'Docs', tone: 'border-border text-muted-foreground' },
+  chore: { label: 'Chore', tone: 'border-border text-muted-foreground' },
+  style: { label: 'Style', tone: 'border-border text-muted-foreground' },
+  test: { label: 'Test', tone: 'border-border text-muted-foreground' },
+  build: { label: 'Build', tone: 'border-border text-muted-foreground' },
+  ci: { label: 'CI', tone: 'border-border text-muted-foreground' },
 };
 
-// Conventional-commit prefixes → human label + badge tone, mirroring the
-// "Feature / Bug Fix" tags of the Magic UI changelog template.
-const COMMIT_TAGS: Record<string, { label: string; variant: BadgeVariant }> = {
-  feat: { label: 'Feature', variant: 'default' },
-  fix: { label: 'Bug Fix', variant: 'secondary' },
-  perf: { label: 'Performance', variant: 'secondary' },
-  refactor: { label: 'Refactor', variant: 'secondary' },
-  revert: { label: 'Revert', variant: 'destructive' },
-  docs: { label: 'Docs', variant: 'outline' },
-  chore: { label: 'Chore', variant: 'outline' },
-  style: { label: 'Style', variant: 'outline' },
-  test: { label: 'Test', variant: 'outline' },
-  build: { label: 'Build', variant: 'outline' },
-  ci: { label: 'CI', variant: 'outline' },
-};
+const MAX_ENTRIES = 5;
 
-const parseCommit = (title: string): { tag: { label: string; variant: BadgeVariant } | null; subject: string } => {
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+const fetcher = (url: string) => fetch(url).then((r) => {
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+});
+
+function parse(title: string) {
   const match = title.match(/^(\w+)(?:\([^)]*\))?!?:\s*(.+)$/);
-  if (match) {
-    const tag = COMMIT_TAGS[match[1].toLowerCase()] ?? null;
-    if (tag) {
-      const subject = match[2];
-      return { tag, subject: subject.charAt(0).toUpperCase() + subject.slice(1) };
-    }
-  }
-  return { tag: null, subject: title };
-};
+  const tag = match ? TAGS[match[1].toLowerCase()] : undefined;
+  const subject = tag && match ? match[2] : title;
+  return { tag, subject: subject.charAt(0).toUpperCase() + subject.slice(1) };
+}
 
-const sanitizeGitHubUrl = (url: string): string => {
+const isDataSync = (title: string) => /^Update LOLDrivers data/i.test(title);
+
+function safeCommitUrl(url: string): string {
   try {
-    const urlObj = new URL(url);
-    if (urlObj.hostname === 'github.com' && urlObj.protocol === 'https:') {
-      const pathPattern = /^\/[^/]+\/[^/]+\/commit\/[a-f0-9]+$/;
-      if (pathPattern.test(urlObj.pathname)) {
-        return `https://github.com${urlObj.pathname}`;
-      }
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' && parsed.hostname === 'github.com' && /^\/[^/]+\/[^/]+\/commit\/[a-f0-9]+$/.test(parsed.pathname)) {
+      return `https://github.com${parsed.pathname}`;
     }
   } catch {
-    // Invalid URL
+    // ignore malformed URL
   }
-  return '#';
-};
+  return 'https://github.com/didntchooseaname/loldrivers-database/commits/main';
+}
 
-export const ChangelogPopup: React.FC<ChangelogPopupProps> = ({ isVisible, onClose }) => {
-  // SWR: auto-fetches when visible, refreshes every 5 minutes, cached across open/close
+function groupByDay(commits: ProcessedCommit[]) {
+  const groups: Array<{ day: string; commits: ProcessedCommit[] }> = [];
+  for (const commit of commits) {
+    const day = DAY.format(new Date(commit.author.date));
+    const last = groups.at(-1);
+    if (last?.day === day) last.commits.push(commit);
+    else groups.push({ day, commits: [commit] });
+  }
+  return groups;
+}
+
+export default function ChangelogPopup({ isVisible, onClose }: ChangelogPopupProps) {
   const { data, error, isLoading, mutate } = useSWR<CommitsResponse>(
-    isVisible ? '/api/commits?per_page=20' : null,
-    commitsFetcher,
-    {
-      revalidateOnFocus: false,
-      refreshInterval: 300000, // Auto-refresh every 5 minutes while open
-      dedupingInterval: 60000, // Don't re-fetch within 1 minute
-      errorRetryCount: 2,
-    }
+    isVisible ? '/api/commits?per_page=60' : null,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 300_000, errorRetryCount: 1 },
   );
 
-  const commits = data?.data || [];
+  const commits = data?.data ?? [];
+  const groups = groupByDay(commits.filter((c) => !isDataSync(c.title)).slice(0, MAX_ENTRIES));
+  const { data: statsData } = useSWR<{ stats: Stats }>(isVisible ? '/api/stats' : null, fetcher, { revalidateOnFocus: false });
+  const sync = statsData?.stats.catalogSync;
 
   return (
-    <Dialog open={isVisible} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="modal-panel max-w-2xl max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden sm:rounded-xl">
-        <DialogHeader className="shrink-0 border-b border-border bg-gradient-to-b from-muted/45 to-transparent px-6 pt-5 pb-4 pr-12 text-left">
-          <DialogTitle className="flex items-center gap-2.5 text-base font-semibold tracking-tight">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground/80 shrink-0">
-              <History className="h-4 w-4" />
-            </span>
-            Changelog
-          </DialogTitle>
-          <DialogDescription className="mt-1 pl-[2.625rem] text-xs text-muted-foreground">
-            Recent updates to the database, pulled live from GitHub.
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Native scroll container — reliable inside a flex dialog, and lets the
-            sticky date column anchor to it. */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-          <div className="px-6 py-6">
-            {isLoading && !data ? (
-              <div className="flex flex-col gap-4 py-2">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading changelog...
-                </div>
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <Skeleton className="h-16 w-full rounded-lg" />
-              </div>
-            ) : error ? (
-              <Alert variant="destructive" className="rounded-lg">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>Failed to load changelog. Please try again later.</AlertDescription>
-                <AlertAction>
-                  <Button variant="outline" size="sm" onClick={() => mutate()}>
-                    <RotateCw className="h-3 w-3 mr-2" />
-                    Retry
-                  </Button>
-                </AlertAction>
-              </Alert>
-            ) : (
-              <AnimatedList delay={70}>
-                {commits.map((commit) => {
-                  const { tag, subject } = parseCommit(commit.title);
-                  return (
-                    <div key={commit.sha} className="flex flex-col gap-y-1 md:flex-row">
-                      {/* Date column — sticky on desktop, mirrors the Magic UI timeline */}
-                      <div className="shrink-0 self-start pb-2 md:w-28 md:pb-8 md:pt-px md:sticky md:top-4">
-                        <time className="text-xs font-medium text-muted-foreground" dateTime={commit.author.date}>
-                          {formatDate(commit.author.date)}
-                        </time>
-                      </div>
-
-                      {/* Content column — timeline line + dot, then commit details */}
-                      <div className="relative flex-1 pb-8 md:pl-7">
-                        <div className="hidden md:block absolute left-0 top-0 h-full w-px bg-border" aria-hidden />
-                        <div className="hidden md:block absolute left-0 top-[5px] size-2.5 -translate-x-1/2 rounded-full bg-primary ring-4 ring-background z-10" aria-hidden />
-
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {tag && (
-                              <Badge variant={tag.variant} className="px-2 py-0 text-[0.65rem] uppercase tracking-wide">
-                                {tag.label}
-                              </Badge>
-                            )}
-                            <h4 className="font-medium leading-snug text-sm text-foreground">{subject}</h4>
-                          </div>
-
-                          {commit.description && (
-                            <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                              {commit.description}
-                            </p>
-                          )}
-
-                          <div className="flex flex-wrap items-center gap-3 pt-0.5 text-xs">
-                            {commit.author.github && (
-                              <div className="flex items-center gap-1.5">
-                                <Image
-                                  src={commit.author.github.avatar_url}
-                                  alt=""
-                                  width={16}
-                                  height={16}
-                                  className="rounded-full"
-                                />
-                                <span className="text-muted-foreground">{commit.author.github.login}</span>
-                              </div>
-                            )}
-                            <a
-                              href={sanitizeGitHubUrl(commit.html_url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 font-mono text-muted-foreground transition-colors hover:text-primary"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              {commit.shortSha}
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </AnimatedList>
-            )}
-
-            <div className="mt-2 border-t border-border pt-5">
+    <AppDialog
+      open={isVisible}
+      onOpenChange={(open) => !open && onClose()}
+      icon={<History />}
+      title="Changelog"
+      description="Product updates and catalog syncs, straight from the repository."
+      footer={
+        <>
+          <span className="text-xs text-muted-foreground">{MAX_ENTRIES} latest updates</span>
+          <a
+            href="https://github.com/didntchooseaname/loldrivers-database/commits/main"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/85 hover:text-foreground"
+          >
+            <GithubIcon className="size-3.5" /> Full history <ArrowUpRight className="size-3.5" aria-hidden />
+          </a>
+        </>
+      }
+    >
+      {isLoading && !data ? (
+        <div className="flex flex-col gap-5" aria-label="Loading changelog">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col gap-2">
+              <div className="skeleton h-3 w-24 rounded" />
+              <div className="skeleton h-4 w-3/4 rounded" />
+              <div className="skeleton h-3 w-1/2 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+          <p className="flex items-center gap-2 font-medium"><AlertTriangle className="size-4 text-destructive" aria-hidden /> Could not reach GitHub</p>
+          <p className="text-muted-foreground">The changelog is fetched live and may be rate limited. Try again in a minute.</p>
+          <Button variant="outline" size="sm" onClick={() => mutate()}><RotateCw aria-hidden /> Retry</Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-7">
+          {sync && (
+            <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3.5 py-2.5 text-[0.8125rem]">
+              <span className="live-dot shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1">
+                Catalog pulled from LOLDrivers on <span className="font-medium">{DAY.format(new Date(sync.synced_at))}</span>
+                <span className="text-muted-foreground"> · upstream version of {DAY.format(new Date(sync.upstream.committed_at))}</span>
+              </span>
               <a
-                href="https://github.com/didntchooseaname/loldrivers-database/commits/main"
+                href={`https://github.com/${sync.upstream.repository}/commit/${sync.upstream.commit}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                className="shrink-0 font-mono text-[0.6875rem] text-muted-foreground transition-colors hover:text-foreground"
+                aria-label={`Upstream commit ${sync.upstream.commit.slice(0, 7)}`}
               >
-                <Github className="h-4 w-4" />
-                View all commits on GitHub
+                {sync.upstream.commit.slice(0, 7)}
               </a>
             </div>
-          </div>
+          )}
+          <ol className="changelog flex flex-col gap-7">
+            {groups.map((group) => (
+              <li key={group.day} className="grid gap-3 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:gap-5">
+                <h3 className="font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted-foreground sm:pt-1">
+                  {group.day}
+                </h3>
+                <ul className="flex flex-col gap-3 border-l pl-4">
+                  {group.commits.map((commit) => {
+                    const { tag, subject } = parse(commit.title);
+                    return (
+                      <li key={commit.sha} className="flex flex-col gap-1">
+                        <div className="flex items-start gap-2">
+                          {tag && (
+                            <span className={cn('mt-px shrink-0 rounded border px-1.5 font-mono text-[0.625rem] uppercase leading-5 tracking-wide', tag.tone)}>
+                              {tag.label}
+                            </span>
+                          )}
+                          <p className="min-w-0 flex-1 text-sm font-medium leading-6">{subject}</p>
+                          <CommitLink commit={commit} />
+                        </div>
+                        {commit.description && (
+                          <p className="line-clamp-3 whitespace-pre-line text-[0.8125rem] leading-relaxed text-muted-foreground">
+                            {commit.description}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </ol>
         </div>
-      </DialogContent>
-    </Dialog>
+      )}
+    </AppDialog>
   );
-};
+}
+
+function CommitLink({ commit }: { commit: ProcessedCommit }) {
+  return (
+    <a
+      href={safeCommitUrl(commit.html_url)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="shrink-0 rounded font-mono text-[0.6875rem] leading-6 text-muted-foreground transition-colors hover:text-foreground"
+      aria-label={`Commit ${commit.shortSha} on GitHub`}
+    >
+      {commit.shortSha}
+    </a>
+  );
+}

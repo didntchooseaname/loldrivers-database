@@ -6,9 +6,9 @@
 // So on localhost this worker wipes its caches, unregisters itself, and
 // reloads open tabs into a clean, SW-free state.
 
-const CACHE_NAME = 'loldrivers-v3';
-const STATIC_CACHE = 'static-v3';
-const API_CACHE = 'api-v3';
+const CACHE_NAME = 'loldrivers-v4';
+const STATIC_CACHE = 'static-v4';
+const API_CACHE = 'api-v4';
 
 const DEV_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
 const IS_DEV = DEV_HOSTS.includes(self.location.hostname);

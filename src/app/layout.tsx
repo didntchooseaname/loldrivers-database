@@ -1,24 +1,24 @@
 import type { Metadata, Viewport } from 'next';
-import { Suspense } from 'react';
-import { Montserrat, Fira_Code } from 'next/font/google';
+import { IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from 'next-themes';
-import ClientScripts from '@/components/ClientScripts';
-import { AppWrapper } from '@/components/AppWrapper';
+import { ServiceWorker } from '@/components/ServiceWorker';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const SITE_URL = 'https://loldb.xsec.fr';
 
-const fontSans = Montserrat({
+const fontSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  variable: '--font-sans',
+  weight: ['400', '500', '600'],
+  variable: '--font-plex',
   display: 'swap',
 });
 
-const fontMono = Fira_Code({
+const fontMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-mono',
+  variable: '--font-jetbrains',
   display: 'swap',
 });
 
@@ -75,8 +75,8 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#e8e8e8' },
-    { media: '(prefers-color-scheme: dark)', color: '#2b2b2b' },
+    { media: '(prefers-color-scheme: light)', color: '#fbfbfc' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f1114' },
   ],
 };
 
@@ -97,14 +97,6 @@ const jsonLd = {
   },
 };
 
-function LoadingFallback() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" aria-hidden />
-    </div>
-  );
-}
-
 export default function RootLayout({
   children,
 }: {
@@ -118,40 +110,24 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        {/* Theme flash prevention */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('theme');var t=s==='light'||s==='dark'||s==='system'?s:'dark';var r=t==='system'?window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light':t;document.documentElement.setAttribute('data-color-scheme',r);if(r==='dark')document.documentElement.classList.add('dark');else document.documentElement.classList.remove('dark')}catch(e){document.documentElement.setAttribute('data-color-scheme','dark');document.documentElement.classList.add('dark')}})();`,
-          }}
-        />
-        {/* Font Awesome async (help dialogs only) */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var l=document.createElement('link');l.rel='stylesheet';l.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';l.integrity='sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==';l.crossOrigin='anonymous';l.referrerPolicy='no-referrer';document.head.appendChild(l)})();`,
-          }}
-        />
         <meta name="color-scheme" content="light dark" />
         <meta name="format-detection" content="telephone=no" />
-        <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
-        <meta httpEquiv="X-XSS-Protection" content="1; mode=block" />
         <meta name="referrer" content="strict-origin-when-cross-origin" />
       </head>
       <body className="font-sans antialiased">
-        <ThemeProvider attribute="class" storageKey="theme" defaultTheme="dark" enableSystem>
+        <ThemeProvider attribute="class" storageKey="theme" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <ErrorBoundary>
-            <Suspense fallback={<LoadingFallback />}>
-              <a
-                href="#main-content"
-                className="skip-link fixed left-0 top-0 z-[100] -translate-y-full bg-primary px-4 py-2 text-primary-foreground transition-transform focus-visible:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                Skip to main content
-              </a>
-              <AppWrapper>
-                <div className="app-entry">{children}</div>
-              </AppWrapper>
-              <ClientScripts />
-              <Toaster position="bottom-right" richColors closeButton />
-            </Suspense>
+            <a
+              href="#results"
+              className="fixed left-3 top-3 z-[100] -translate-y-[150%] rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground transition-transform focus-visible:translate-y-0"
+            >
+              Skip to results
+            </a>
+            <TooltipProvider delayDuration={350} skipDelayDuration={150}>
+              {children}
+            </TooltipProvider>
+            <ServiceWorker />
+            <Toaster position="bottom-right" closeButton />
           </ErrorBoundary>
         </ThemeProvider>
       </body>

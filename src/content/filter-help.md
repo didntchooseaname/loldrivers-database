@@ -1,26 +1,25 @@
 # How Filters Work
 
-Filters narrow the catalogue to exactly the drivers you care about. Toggle any combination, then click **Apply filters** - the search box runs live as you type, so you can refine both at once.
+Filters narrow the catalogue to exactly the drivers you care about. Every change applies instantly, and the search box runs live as you type, so you can refine both at once. Hover any filter to see what it means.
 
 ---
 
-## Quick filters
+## Status
 
-- **MVDB Passed** - Drivers that are *not* on Microsoft's Vulnerable Driver Blocklist, so they can still load where the blocklist is enforced (Windows 11, most enterprise builds).
-- **Trusted Certificate** - Drivers whose signing certificate is still within its validity period.
-- **Unknown Certificate** - Drivers whose certificate is expired or otherwise untrusted. Mutually exclusive with *Trusted Certificate*.
-- **Recent Drivers** - Entries added to the database in the last 6 months.
-- **Newest First / Oldest First** - Sort by the date the entry was added. Only one direction can be active; sorting is applied after filtering.
+- **MVDB passed** - Drivers that are *not* on Microsoft's Vulnerable Driver Blocklist, so they can still load where the blocklist is enforced (Windows 11, most enterprise builds).
+- **Added in last 12 months** - Entries added to the database in the last year.
+
+**Sort** - The sort menu above the results orders them by the date the entry was added, newest or oldest first. Sorting is applied after filtering.
 
 ## Behavior filters
 
 These infer what a driver can *do* from the Windows kernel functions it imports. Many legitimate drivers import the same APIs, so treat a match as a lead for investigation, not a verdict.
 
-- **Process Killer** - Can terminate processes (e.g. `ZwTerminateProcess`). A classic BYOVD primitive for disabling security tooling.
-- **Memory Manipulator** - Can allocate, map, or change the protection of memory (`ZwMapViewOfSection`, `ZwAllocateVirtualMemory`, `ZwProtectVirtualMemory`). Useful for code injection or bypassing memory protections.
-- **Debug Bypass** - Can read or alter debug-related system state (`ZwSetInformationProcess`, `ZwQuerySystemInformation`). Often used to hide from debuggers or evade analysis.
-- **Registry Manipulator** - Can create, modify, or delete registry keys and values (`ZwCreateKey`, `ZwSetValueKey`, `ZwDeleteKey`). Common for persistence and configuration tampering.
-- **File Manipulator** - Can create, read, write, or delete files (`ZwCreateFile`, `ZwReadFile`, `ZwWriteFile`, `ZwDeleteFile`). Relevant to data theft, log tampering, and payload staging.
+- **Process killer** - Can terminate processes (e.g. `ZwTerminateProcess`). A classic BYOVD primitive for disabling security tooling.
+- **Memory manipulation** - Can allocate, map, or change the protection of memory (`ZwMapViewOfSection`, `ZwAllocateVirtualMemory`, `ZwProtectVirtualMemory`). Useful for code injection or bypassing memory protections.
+- **Debug bypass** - Can read or alter debug-related system state (`ZwSetInformationProcess`, `ZwQuerySystemInformation`). Often used to hide from debuggers or evade analysis.
+- **Registry access** - Can create, modify, or delete registry keys and values (`ZwCreateKey`, `ZwSetValueKey`, `ZwDeleteKey`). Common for persistence and configuration tampering.
+- **File system access** - Can create, read, write, or delete files (`ZwCreateFile`, `ZwReadFile`, `ZwWriteFile`, `ZwDeleteFile`). Relevant to data theft, log tampering, and payload staging.
 
 ## Certificate filters
 
@@ -28,26 +27,26 @@ Refine by the state of a driver's code-signing certificate. Only one can be acti
 
 - **Valid** - A certificate that is present and currently within its validity period.
 - **Expired** - A certificate that exists but has passed its expiry date.
-- **No Cert** - No certificate information is available for the entry.
+- **No signature data** - The catalog has no certificate details for this sample. It does not necessarily mean the file is unsigned.
 
 ## Architecture filters
 
 Filter by target processor architecture. Only one can be active at a time, and the architecture is also shown on each driver card.
 
 - **x64** - 64-bit x86 (AMD64); the default on modern Windows.
-- **x32** - 32-bit x86 (I386); legacy and compatibility scenarios.
-- **arm64** - 64-bit ARM (ARM64); Windows on ARM devices.
+- **x86** - 32-bit x86 (I386); legacy and compatibility scenarios.
+- **ARM64** - 64-bit ARM (ARM64); Windows on ARM devices.
 
 ## Combining filters effectively
 
 All non-exclusive filters stack, so you can build precise queries:
 
-- **MVDB Passed + Process Killer** - Drivers that can still load *and* can kill processes - a high-value target list for BYOVD defense.
-- **MVDB Passed + Recent** - New additions that aren't blocked yet.
-- **Memory Manipulator + Process Killer** - Drivers with several abusable primitives at once.
-- **Registry Manipulator + File Manipulator** - Broad system-tampering capability.
+- **MVDB passed + Process killer** - Drivers that can still load *and* can kill processes - a high-value target list for BYOVD defense.
+- **MVDB passed + Added in last 12 months** - New additions that aren't blocked yet.
+- **Memory manipulation + Process killer** - Drivers with several abusable primitives at once.
+- **Registry access + File system access** - Broad system-tampering capability.
 
-**Apply vs. Clear** - Changes take effect only when you press **Apply filters**; the badge on that button shows how many filters are staged. Use **Clear filters** to reset both the search box and every active filter.
+**Removing filters** - Active filters appear as chips above the results. Remove one with its cross, or use **Clear all** to reset the search box and every filter. The two counters in the header (MVDB passed, Process killers) also toggle their filter.
 
 ## A note on the MVDB check
 
